@@ -56,3 +56,5 @@ supabase_environments.md
 *.apk
 *.aab
 
+*.zip
+novaxpress_app_wasm_cpanel.zip

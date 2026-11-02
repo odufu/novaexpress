@@ -272,130 +272,260 @@ class _PangeaDateRangePickerModalState extends State<PangeaDateRangePickerModal>
         ? const Color(0xFF0369A1).withValues(alpha: 0.35)
         : const Color(0xFFBAE6FD).withValues(alpha: 0.7);
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 800;
+
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
         ),
       ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 16,
+        vertical: isMobile ? 16 : 24,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 780,
-          maxHeight: 560,
+        constraints: BoxConstraints(
+          maxWidth: isMobile ? 420 : 780,
+          maxHeight: isMobile ? MediaQuery.of(context).size.height * 0.90 : 560,
         ),
-        child: Column(
-          children: [
-            // Main Body: Left Sidebar + Right Calendars
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: isMobile
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Left Presets Sidebar
-                  _buildSidebar(isDark, primaryBlue),
+                  // Mobile Header with Title and Presets
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Filter by Date Range',
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              splashRadius: 16,
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        // Presets Horizontal Scroll
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              DateRangePreset.today,
+                              DateRangePreset.yesterday,
+                              DateRangePreset.thisMonth,
+                              DateRangePreset.last7Days,
+                              DateRangePreset.thisWeek,
+                              DateRangePreset.last30Days,
+                            ].map((p) {
+                              final isSelected = _selectedPreset == p;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: InkWell(
+                                  onTap: () => _applyPreset(p),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? primaryBlue
+                                          : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? primaryBlue
+                                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _getPresetLabel(p),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                  // Subtle vertical divider
-                  VerticalDivider(
-                    width: 1,
+                  Divider(
+                    height: 1,
                     thickness: 1,
                     color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                   ),
 
-                  // Right Dual Month Calendars & Range Inputs
+                  // Calendar View (Single month with prev/next navigation)
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Dual Calendar View Side-by-Side
                           Expanded(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Left Month Calendar
-                                Expanded(
-                                  child: _buildMonthCalendar(
-                                    monthDate: _leftMonth,
-                                    isLeft: true,
-                                    isDark: isDark,
-                                    primaryBlue: primaryBlue,
-                                    rangeHighlightColor: rangeHighlightColor,
-                                  ),
-                                ),
-                                const SizedBox(width: 24),
-                                // Right Month Calendar
-                                Expanded(
-                                  child: _buildMonthCalendar(
-                                    monthDate: _rightMonth,
-                                    isLeft: false,
-                                    isDark: isDark,
-                                    primaryBlue: primaryBlue,
-                                    rangeHighlightColor: rangeHighlightColor,
-                                  ),
-                                ),
-                              ],
+                            child: _buildMonthCalendar(
+                              monthDate: _leftMonth,
+                              isLeft: true,
+                              isRightNavigable: true,
+                              isDark: isDark,
+                              primaryBlue: primaryBlue,
+                              rangeHighlightColor: rangeHighlightColor,
                             ),
                           ),
-
-                          const SizedBox(height: 12),
-
-                          // Compare checkbox
-                          Row(
-                            children: [
-                              SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: Checkbox(
-                                  value: _compare,
-                                  activeColor: primaryBlue,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  side: BorderSide(
-                                    color: isDark ? const Color(0xFF64748B) : const Color(0xFFCBD5E1),
-                                    width: 1.5,
-                                  ),
-                                  onChanged: (val) => setState(() => _compare = val ?? false),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Compare',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          // Dropdown + Formatted Date Boxes Row
+                          const SizedBox(height: 8),
                           _buildRangeInputBar(isDark, primaryBlue),
                         ],
                       ),
                     ),
                   ),
+
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+
+                  // Modal Footer
+                  _buildFooter(isDark, primaryBlue),
+                ],
+              )
+            : Column(
+                children: [
+                  // Main Body: Left Sidebar + Right Calendars (Desktop Layout)
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left Presets Sidebar
+                        _buildSidebar(isDark, primaryBlue),
+
+                        // Subtle vertical divider
+                        VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
+
+                        // Right Dual Month Calendars & Range Inputs
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Dual Calendar View Side-by-Side
+                                Expanded(
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Left Month Calendar
+                                      Expanded(
+                                        child: _buildMonthCalendar(
+                                          monthDate: _leftMonth,
+                                          isLeft: true,
+                                          isDark: isDark,
+                                          primaryBlue: primaryBlue,
+                                          rangeHighlightColor: rangeHighlightColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 24),
+                                      // Right Month Calendar
+                                      Expanded(
+                                        child: _buildMonthCalendar(
+                                          monthDate: _rightMonth,
+                                          isLeft: false,
+                                          isDark: isDark,
+                                          primaryBlue: primaryBlue,
+                                          rangeHighlightColor: rangeHighlightColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                // Compare checkbox
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: Checkbox(
+                                        value: _compare,
+                                        activeColor: primaryBlue,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        side: BorderSide(
+                                          color: isDark ? const Color(0xFF64748B) : const Color(0xFFCBD5E1),
+                                          width: 1.5,
+                                        ),
+                                        onChanged: (val) => setState(() => _compare = val ?? false),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Compare',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 10),
+
+                                // Dropdown + Formatted Date Boxes Row
+                                _buildRangeInputBar(isDark, primaryBlue),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Bottom Footer Divider
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+
+                  // Modal Footer: Lagos Time + Cancel / Update Buttons
+                  _buildFooter(isDark, primaryBlue),
                 ],
               ),
-            ),
-
-            // Bottom Footer Divider
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-            ),
-
-            // Modal Footer: Lagos Time + Cancel / Update Buttons
-            _buildFooter(isDark, primaryBlue),
-          ],
-        ),
       ),
     );
   }
@@ -500,6 +630,7 @@ class _PangeaDateRangePickerModalState extends State<PangeaDateRangePickerModal>
   Widget _buildMonthCalendar({
     required DateTime monthDate,
     required bool isLeft,
+    bool isRightNavigable = false,
     required bool isDark,
     required Color primaryBlue,
     required Color rangeHighlightColor,
@@ -616,7 +747,7 @@ class _PangeaDateRangePickerModalState extends State<PangeaDateRangePickerModal>
               ),
             ),
             const Spacer(),
-            if (!isLeft)
+            if (!isLeft || isRightNavigable)
               IconButton(
                 onPressed: _nextMonth,
                 icon: const Icon(Icons.chevron_right_rounded, size: 20),
@@ -753,6 +884,72 @@ class _PangeaDateRangePickerModalState extends State<PangeaDateRangePickerModal>
   }
 
   Widget _buildRangeInputBar(bool isDark, Color primaryBlue) {
+    final startBox = Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+        ),
+      ),
+      alignment: Alignment.centerLeft,
+      child: Text(
+        _displayFormat.format(_startDate),
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: isDark ? Colors.white : const Color(0xFF0F172A),
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+
+    final endBox = Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+        ),
+      ),
+      alignment: Alignment.centerLeft,
+      child: Text(
+        _displayFormat.format(_endDate),
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: isDark ? Colors.white : const Color(0xFF0F172A),
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+
+    final isMobile = MediaQuery.of(context).size.width < 800;
+
+    if (isMobile) {
+      return Row(
+        children: [
+          Expanded(child: startBox),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              'to',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF94A3B8),
+              ),
+            ),
+          ),
+          Expanded(child: endBox),
+        ],
+      );
+    }
+
     return Row(
       children: [
         // Dropdown for Preset
@@ -792,29 +989,7 @@ class _PangeaDateRangePickerModalState extends State<PangeaDateRangePickerModal>
         const SizedBox(width: 10),
 
         // Start Date Input Display
-        Expanded(
-          child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
-              ),
-            ),
-            alignment: Alignment.centerLeft,
-            child: Text(
-              _displayFormat.format(_startDate),
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
+        Expanded(child: startBox),
 
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -829,68 +1004,49 @@ class _PangeaDateRangePickerModalState extends State<PangeaDateRangePickerModal>
         ),
 
         // End Date Input Display
-        Expanded(
-          child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
-              ),
-            ),
-            alignment: Alignment.centerLeft,
-            child: Text(
-              _displayFormat.format(_endDate),
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
+        Expanded(child: endBox),
       ],
     );
   }
 
   Widget _buildFooter(bool isDark, Color primaryBlue) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Text(
-            'Dates are shown in Lagos Time',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFF64748B),
+          Expanded(
+            child: Text(
+              'Lagos Time (WAT)',
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF64748B),
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           OutlinedButton(
             onPressed: () => Navigator.of(context).pop(),
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               side: BorderSide(
                 color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
             child: Text(
               'Cancel',
               style: GoogleFonts.inter(
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop(
@@ -905,16 +1061,16 @@ class _PangeaDateRangePickerModalState extends State<PangeaDateRangePickerModal>
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryBlue,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
             child: Text(
-              'Update',
+              'Apply',
               style: GoogleFonts.inter(
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),

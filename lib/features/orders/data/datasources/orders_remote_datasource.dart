@@ -430,7 +430,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           'client_id': (rawClientId != null && uuidRegex.hasMatch(rawClientId)) ? rawClientId : '11111111-1111-4111-8111-111111111111',
           'client_name': resolvedClientName.isNotEmpty ? resolvedClientName : 'Merchant',
           'distribution_center_id': dcId,
-          'distribution_center_name': insertPayload['distribution_center_name']?.toString() ?? 'Wuse Grand Central Distribution Center',
+          'distribution_center_name': insertPayload['distribution_center_name']?.toString() ?? 'Central Command Distribution Center',
           'delivery_agent_id': validRiderId,
           'delivery_agent_name': insertPayload['delivery_agent_name']?.toString(),
           'closer_id': (insertPayload['closer_id'] != null && uuidRegex.hasMatch(insertPayload['closer_id'].toString())) ? insertPayload['closer_id'].toString() : null,

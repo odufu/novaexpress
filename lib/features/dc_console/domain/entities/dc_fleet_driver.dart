@@ -42,20 +42,20 @@ class DCFleetDriver {
     required this.name,
     required this.phone,
     this.email = '',
-    required this.avatarUrl,
-    required this.vehicleModel,
-    required this.vehiclePlate,
-    required this.vehicleType,
-    required this.status,
+    this.avatarUrl = '',
+    this.vehicleModel = 'Bajaj Boxer BM150',
+    this.vehiclePlate = 'ABJ-123-XY',
+    this.vehicleType = 'Motorcycle',
+    this.status = 'active',
     required this.assignedZone,
     this.distributionCenterId,
     this.coveredLgas = const [],
-    required this.totalAssignedOrders,
-    required this.completedOrders,
-    required this.routeProgressPercent,
-    required this.efficiencyRating,
-    required this.cashInCustody,
-    required this.itemsInCustody,
+    this.totalAssignedOrders = 0,
+    this.completedOrders = 0,
+    this.routeProgressPercent = 0.0,
+    this.efficiencyRating = 100.0,
+    this.cashInCustody = 0.0,
+    this.itemsInCustody = 0,
     this.currentLatitude = 9.0765,
     this.currentLongitude = 7.3986,
     this.personnelType = 'pda',
@@ -75,6 +75,15 @@ class DCFleetDriver {
   bool get isActive => status.toLowerCase() == 'active';
   bool get isDelayed => status.toLowerCase() == 'delayed';
   bool get isAtRest => status.toLowerCase() == 'at_rest';
+  bool get isAvailable =>
+      (status.toLowerCase() == 'active' ||
+          status.toLowerCase() == 'available' ||
+          status.toLowerCase() == 'online') &&
+      status.toLowerCase() != 'offline' &&
+      status.toLowerCase() != 'inactive' &&
+      status.toLowerCase() != 'banned' &&
+      status.toLowerCase() != 'unavailable';
+  bool get isUnavailable => !isAvailable;
   bool get isPda => personnelType.toLowerCase() == 'pda';
   bool get isInHouseRider => personnelType.toLowerCase() == 'in_house_rider';
   double get totalPerDeliveryEntitlement => commissionRate + transportAllowance;

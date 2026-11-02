@@ -386,9 +386,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        'Shipment #${order.orderNumber}',
-                        style: GoogleFonts.jetBrainsMono(fontSize: 11.5, fontWeight: FontWeight.bold),
+                      Flexible(
+                        child: Text(
+                          'Shipment #${order.orderNumber}',
+                          style: GoogleFonts.jetBrainsMono(fontSize: 11.5, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ],
                   ),
@@ -664,7 +668,6 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'Shipment ID',
@@ -673,12 +676,18 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      Text(
-                        '#${order.orderNumber}',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '#${order.orderNumber}',
+                          textAlign: TextAlign.end,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ],
@@ -688,12 +697,16 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     children: [
                       Icon(Icons.inventory_2_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
                       const SizedBox(width: 6),
-                      Text(
-                        '${order.quantity}x Delivery Items',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
+                      Expanded(
+                        child: Text(
+                          '${order.quantity}x Delivery Items',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ],
@@ -730,12 +743,15 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        CurrencyFormatter.formatNaira(order.totalAmount),
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.orange,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          CurrencyFormatter.formatNaira(order.totalAmount),
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.orange,
+                          ),
                         ),
                       ),
                     ],

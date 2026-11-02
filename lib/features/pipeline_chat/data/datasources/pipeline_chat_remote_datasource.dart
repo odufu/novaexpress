@@ -104,17 +104,43 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
           : await db.from('orders').select().eq('order_number', cleanId).maybeSingle();
 
       if (orderRow != null) {
+        final dcId = orderRow['distribution_center_id']?.toString() ?? '22222222-2222-4222-8222-222222222222';
+        String? dcName = orderRow['distribution_center_name']?.toString();
+        if (dcName == null || dcName.isEmpty) {
+          try {
+            final dcRow = await db.from('distribution_centers').select('name').eq('id', dcId).maybeSingle();
+            if (dcRow != null) dcName = dcRow['name']?.toString();
+          } catch (_) {}
+          dcName ??= 'Central Command Distribution Center';
+        }
+
+        final riderId = orderRow['delivery_agent_id']?.toString();
+        String? riderName = orderRow['delivery_agent_name']?.toString();
+        if ((riderName == null || riderName.isEmpty) && riderId != null) {
+          try {
+            final aRow = await db.from('delivery_agents').select('agent_code, bank_account_name, users(first_name, last_name)').eq('id', riderId).maybeSingle();
+            if (aRow != null) {
+              final u = aRow['users'];
+              if (u is Map) {
+                final fn = '${u['first_name'] ?? ''} ${u['last_name'] ?? ''}'.trim();
+                if (fn.isNotEmpty) riderName = fn;
+              }
+              riderName ??= aRow['bank_account_name']?.toString() ?? aRow['agent_code']?.toString();
+            }
+          } catch (_) {}
+        }
+
         final newConv = await db.from('order_conversations').insert({
           'order_id': orderRow['id'],
           'order_number': orderRow['order_number'] ?? 'ORD-${orderRow['id'].toString().substring(0, 8)}',
           'customer_name': orderRow['customer_name'] ?? 'Customer',
           'customer_phone': orderRow['customer_phone'],
           'client_id': orderRow['client_id'] ?? '11111111-1111-4111-8111-111111111111',
-          'client_name': orderRow['client_name'] ?? 'Merchant',
-          'distribution_center_id': orderRow['distribution_center_id'],
-          'distribution_center_name': orderRow['distribution_center_name'],
-          'delivery_agent_id': orderRow['delivery_agent_id'],
-          'delivery_agent_name': orderRow['delivery_agent_name'],
+          'client_name': orderRow['client_name'] ?? 'NOVACARE LIMITED',
+          'distribution_center_id': dcId,
+          'distribution_center_name': dcName,
+          'delivery_agent_id': riderId,
+          'delivery_agent_name': riderName,
           'closer_id': orderRow['closer_id'],
           'closer_name': orderRow['closer_name'],
           'marketer_id': orderRow['marketer_id'],
@@ -123,7 +149,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
           'current_product_name': orderRow['product_name'],
           'current_package_name': orderRow['package_deal_name'],
           'current_total_amount': orderRow['total_amount'] ?? 0,
-          'last_message_text': 'Order chat pipeline initialized.',
+          'last_message_text': 'Order chat pipeline initialized. DC Ops, courier & merchant connected.',
           'last_message_sender_name': 'System',
           'last_message_at': DateTime.now().toIso8601String(),
         }).select('*,client_closers(avatar_url,full_name),client_marketers(avatar_url,full_name)').maybeSingle();
@@ -212,7 +238,16 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
       } else if (r.contains('client') || r.contains('merchant')) {
         final targetClientId = (clientId != null && clientId.isNotEmpty) ? clientId : userId;
         query = query.eq('client_id', targetClientId);
-      } else if (r.contains('dc') || r.contains('manager') || r.contains('operations') || r.contains('dispatcher')) {
+      } else if (r.contains('dc') ||
+          r.contains('manager') ||
+          r.contains('operations') ||
+          r.contains('dispatcher') ||
+          r.contains('stock') ||
+          r.contains('inventory') ||
+          r.contains('finance') ||
+          r.contains('remittance') ||
+          r.contains('accountant') ||
+          r.contains('ops')) {
         if (distributionCenterId != null && distributionCenterId.isNotEmpty) {
           if (distributionCenterId == '22222222-2222-4222-8222-222222222222') {
             query = query.or('distribution_center_id.eq.$distributionCenterId,distribution_center_id.is.null');
@@ -220,7 +255,8 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
             query = query.eq('distribution_center_id', distributionCenterId);
           }
         } else {
-          return [];
+          // If DC ID is not explicitly set, default to Central Command DC or any assigned DC conversation
+          query = query.or('distribution_center_id.eq.22222222-2222-4222-8222-222222222222,distribution_center_id.is.null');
         }
       } else if (r.contains('super_admin') || r.contains('admin')) {
         if (distributionCenterId != null && distributionCenterId.isNotEmpty) {

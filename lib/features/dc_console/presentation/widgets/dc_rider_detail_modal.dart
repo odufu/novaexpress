@@ -16,6 +16,7 @@ import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/dc_transaction_record.dart';
 import '../providers/dc_console_provider.dart';
 import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
+import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
 final riderOrdersSearchProvider = StateProvider.autoDispose<String>((ref) => '');
 final riderOrdersFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
@@ -826,6 +827,23 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                     );
                   },
                 ),
+                ExcelColumnDef<OrderEntity>(
+                  key: 'actions',
+                  label: 'CHAT',
+                  defaultWidth: 70,
+                  minWidth: 60,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Center(
+                      child: IconButton(
+                        icon: const Icon(Icons.forum_rounded, size: 18, color: Color(0xFF6366F1)),
+                        tooltip: 'Chat with Rider & Merchant',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           );
@@ -843,22 +861,56 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                order.orderNumber,
-                style: GoogleFonts.firaCode(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+              Expanded(
+                child: Text(
+                  order.orderNumber,
+                  style: GoogleFonts.firaCode(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
               ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.forum_rounded, size: 18, color: Color(0xFF6366F1)),
+                tooltip: 'Order Chat',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+              ),
+              const SizedBox(width: 8),
               _buildOrderStatusPill(order.status),
             ],
           ),
           const SizedBox(height: 4),
-          Text(order.customerName, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-          Text('${order.customerPhone} • ${order.deliveryAddress}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+          Text(
+            order.customerName,
+            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+          Text(
+            '${order.customerPhone} • ${order.deliveryAddress}',
+            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('${order.quantity}x ${order.productName}', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8))),
-              Text(CurrencyFormatter.formatNaira(order.totalAmount), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+              Expanded(
+                child: Text(
+                  '${order.quantity}x ${order.productName}',
+                  style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(CurrencyFormatter.formatNaira(order.totalAmount), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+              ),
             ],
           ),
         ],

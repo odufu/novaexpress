@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../orders/domain/services/order_routing_service.dart';
@@ -45,15 +47,35 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
     super.initState();
     _endDate = DateTime.now();
     _startDate = _endDate.subtract(const Duration(days: 30));
-    _selectedDcId = ref.read(dcConsoleProvider).selectedDcId;
+
+    final dcState = ref.read(dcConsoleProvider);
+    final authUser = ref.read(authProvider).user;
+    final isSuperAdmin = authUser != null && (authUser.isSuperAdmin == true || authUser.role == 'super_admin' || authUser.role == 'admin');
+    final isGrandDc = dcState.isCurrentHubGrandDc;
+
+    if (!isSuperAdmin && !isGrandDc) {
+      _selectedDcId = authUser?.distributionCenterId ?? dcState.activeHubId;
+    } else {
+      _selectedDcId = dcState.selectedDcId ?? (isGrandDc ? dcState.activeHubId : authUser?.distributionCenterId);
+    }
     _loadFinancialData();
   }
 
   Future<void> _loadFinancialData() async {
     setState(() => _isLoadingFinancials = true);
     try {
+      final dcState = ref.read(dcConsoleProvider);
+      final authUser = ref.read(authProvider).user;
+      final isSuperAdmin = authUser != null && (authUser.isSuperAdmin == true || authUser.role == 'super_admin' || authUser.role == 'admin');
+      final isGrandDc = dcState.isCurrentHubGrandDc;
+      final canViewCumulative = isSuperAdmin || isGrandDc;
+
+      final targetDcId = !canViewCumulative
+          ? (authUser?.distributionCenterId ?? dcState.activeHubId)
+          : _selectedDcId;
+
       final res = await _repo.fetchDcLogisticsDashboard(
-        dcId: _selectedDcId,
+        dcId: targetDcId,
         startDate: _startDate,
         endDate: _endDate,
       );
@@ -110,10 +132,22 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final dcState = ref.watch(dcConsoleProvider);
+    final ordersState = ref.watch(ordersProvider);
+    final financeState = ref.watch(financeProvider);
+
+    final authUser = ref.watch(authProvider).user;
+    final isSuperAdmin = authUser != null && (authUser.isSuperAdmin == true || authUser.role == 'super_admin' || authUser.role == 'admin');
+    final isGrandDc = dcState.isCurrentHubGrandDc;
+    final canViewCumulative = isSuperAdmin || isGrandDc;
+
     // 2-way sync with global DC provider
     ref.listen<String?>(
       dcConsoleProvider.select((s) => s.selectedDcId),
       (previous, next) {
+        if (!canViewCumulative) return;
         if (previous != next && next != _selectedDcId) {
           setState(() {
             _selectedDcId = next;
@@ -123,22 +157,21 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
       },
     );
 
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final dcState = ref.watch(dcConsoleProvider);
-    final ordersState = ref.watch(ordersProvider);
-    final financeState = ref.watch(financeProvider);
+    final effectiveDcId = !canViewCumulative
+        ? (authUser?.distributionCenterId ?? dcState.activeHubId)
+        : _selectedDcId;
 
     final allDcs = dcState.distributionCenters;
 
     // Selected DC resolution
-    final activeDc = _selectedDcId == null
+    final activeDc = effectiveDcId == null
         ? null
-        : allDcs.where((d) => d.id == _selectedDcId).firstOrNull;
+        : (allDcs.where((d) => d.id == effectiveDcId).firstOrNull ??
+            allDcs.where((d) => d.id == dcState.activeHubId).firstOrNull);
 
     // Filter orders according to selected DC scope
     final scopedOrders = ordersState.orders.where((o) {
-      if (_selectedDcId == null) {
+      if (effectiveDcId == null) {
         return true; // Cumulative Network View: all orders
       }
       if (activeDc != null) {
@@ -148,7 +181,7 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
           allDcs: allDcs,
         );
       }
-      return o.distributionCenterId == _selectedDcId;
+      return o.distributionCenterId == effectiveDcId;
     }).toList();
 
     // Order counts for the selected scope
@@ -162,10 +195,23 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
 
     // Filter drivers according to selected DC scope
     final scopedDrivers = dcState.drivers.where((d) {
-      if (_selectedDcId == null) return true; // All drivers across network
-      return d.distributionCenterId == _selectedDcId ||
+      if (effectiveDcId == null) return true; // All drivers across network
+      return d.distributionCenterId == effectiveDcId ||
           (activeDc != null && d.distributionCenterId == activeDc.code);
     }).toList();
+
+    // Scoped Pending COD Remittances
+    final scopedRemittances = financeState.remittances.where((r) {
+      if (effectiveDcId == null) return true;
+      if (r.distributionCenterId != null && r.distributionCenterId!.isNotEmpty) {
+        return r.distributionCenterId == effectiveDcId;
+      }
+      final driverIds = scopedDrivers.map((d) => d.id).toSet();
+      return driverIds.contains(r.deliveryAgentId);
+    }).toList();
+    final scopedPendingRemittance = scopedRemittances
+        .where((r) => r.isPending)
+        .fold(0.0, (sum, r) => sum + r.amount);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -190,7 +236,7 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
             inTransitCount: inTransitCount,
             unassignedCount: unassignedCount,
             pendingReturnsCount: pendingReturnsCount,
-            totalPendingRemittance: financeState.totalPendingRemittance,
+            totalPendingRemittance: scopedPendingRemittance,
           ),
 
           const SizedBox(height: 28),
@@ -203,6 +249,7 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
             activeDc: activeDc,
             scopedDrivers: scopedDrivers,
             activeHubId: dcState.activeHubId,
+            canViewCumulative: canViewCumulative,
           ),
 
           const SizedBox(height: 32),
@@ -291,50 +338,56 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
             ),
           ),
 
-          // Tactile Action Pills: + Record Station OpEx & + Onboard Rider
+          // Tactile Action Pills: Record OpEx & Onboard Rider
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final result = await ClientAddExpenditureModal.show(
-                    context,
-                    distributionCenterId: _selectedDcId ?? activeHubId,
-                    entityType: 'grand_dc',
-                  );
-                  if (result != null) {
-                    _loadFinancialData();
-                  }
-                },
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: Text(
-                  isCumulative ? 'Record Station OpEx' : 'Record ${activeDc?.code ?? "DC"} OpEx',
-                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF43F5E),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  elevation: 0,
+              NovaTooltip(
+                message: isCumulative ? 'Record network operational expenditures' : 'Record operational expenses for ${activeDc?.name ?? "this station"}',
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final result = await ClientAddExpenditureModal.show(
+                      context,
+                      distributionCenterId: _selectedDcId ?? activeHubId,
+                      entityType: 'grand_dc',
+                    );
+                    if (result != null) {
+                      _loadFinancialData();
+                    }
+                  },
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: Text(
+                    'Record OpEx',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF43F5E),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    elevation: 0,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
-              OutlinedButton.icon(
-                onPressed: () => DCOnboardRiderModal.show(context),
-                icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-                label: Text(
-                  'Onboard Rider',
-                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
-                  side: BorderSide(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                    width: 0.8,
+              NovaTooltip(
+                message: 'Onboard a new PDA or in-house delivery rider',
+                child: OutlinedButton.icon(
+                  onPressed: () => DCOnboardRiderModal.show(context),
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                  label: Text(
+                    'Onboard Rider',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                    side: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                      width: 0.8,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  ),
                 ),
               ),
             ],
@@ -453,12 +506,13 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                     Expanded(
                       flex: 3,
                       child: _buildFinancialFlowUnit(
-                        title: _selectedDcId == null ? 'Logistics Gross Revenue' : 'Station Handling Revenue',
+                        title: _selectedDcId == null ? 'Gross Revenue' : 'Station Revenue',
                         value: '₦${_currencyFormat.format(gross)}',
-                        subtext: 'Delivery Fee Billings Stream',
+                        subtext: 'Delivery Billings',
                         icon: Icons.local_shipping_rounded,
                         accentColor: const Color(0xFF10B981),
                         isDark: isDark,
+                        tooltip: 'Consolidated delivery fee billings and logistics revenue stream',
                       ),
                     ),
 
@@ -500,14 +554,24 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  'Net Platform Margin',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF38BDF8),
-                                    letterSpacing: 0.2,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Net Margin',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF38BDF8),
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const NovaInfoIcon(
+                                      tooltip: 'Consolidated operating profit after OpEx & payouts',
+                                      size: 13,
+                                      color: Color(0xFF38BDF8),
+                                    ),
+                                  ],
                                 ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -538,7 +602,7 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Consolidated Operating Profit after Hub OpEx',
+                              'Operating Margin',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -560,12 +624,13 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                     Expanded(
                       flex: 3,
                       child: _buildFinancialFlowUnit(
-                        title: _selectedDcId == null ? 'Network Operating OpEx' : 'Station Operating OpEx',
+                        title: _selectedDcId == null ? 'Network OpEx' : 'Station OpEx',
                         value: '₦${_currencyFormat.format(opex)}',
-                        subtext: 'Generator Diesel, Leases & Upkeep',
+                        subtext: 'Station Upkeep',
                         icon: Icons.receipt_long_rounded,
                         accentColor: const Color(0xFFF43F5E),
                         isDark: isDark,
+                        tooltip: 'Generator diesel, leases, utilities, and hub maintenance upkeep',
                       ),
                     ),
                   ],
@@ -574,12 +639,13 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                 return Column(
                   children: [
                     _buildFinancialFlowUnit(
-                      title: _selectedDcId == null ? 'Logistics Gross Revenue' : 'Station Handling Revenue',
+                      title: _selectedDcId == null ? 'Gross Revenue' : 'Station Revenue',
                       value: '₦${_currencyFormat.format(gross)}',
-                      subtext: 'Delivery Fee Billings Stream',
+                      subtext: 'Delivery Billings',
                       icon: Icons.local_shipping_rounded,
                       accentColor: const Color(0xFF10B981),
                       isDark: isDark,
+                      tooltip: 'Consolidated delivery fee billings and logistics revenue stream',
                     ),
                     const SizedBox(height: 16),
                     Container(
@@ -591,20 +657,27 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Net Platform Margin', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8))),
+                          Row(
+                            children: [
+                              Text('Net Margin', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8))),
+                              const SizedBox(width: 4),
+                              const NovaInfoIcon(tooltip: 'Consolidated operating profit after OpEx & payouts', size: 13, color: Color(0xFF38BDF8)),
+                            ],
+                          ),
                           Text('₦${_currencyFormat.format(netMargin)}', style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                          Text('$marginPct% Net Platform Profit', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                          Text('$marginPct% Net Profit', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF10B981), fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
                     _buildFinancialFlowUnit(
-                      title: _selectedDcId == null ? 'Network Operating OpEx' : 'Station Operating OpEx',
+                      title: _selectedDcId == null ? 'Network OpEx' : 'Station OpEx',
                       value: '₦${_currencyFormat.format(opex)}',
-                      subtext: 'Generator Diesel, Leases & Upkeep',
+                      subtext: 'Station Upkeep',
                       icon: Icons.receipt_long_rounded,
                       accentColor: const Color(0xFFF43F5E),
                       isDark: isDark,
+                      tooltip: 'Generator diesel, leases, utilities, and hub maintenance upkeep',
                     ),
                   ],
                 );
@@ -628,33 +701,36 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
             children: [
               // 1. Vault Stock
               _buildOperationalStreamPill(
-                label: 'Vault Stock Custody',
+                label: 'Vault Stock',
                 value: '$vault pcs',
-                subtext: 'In Warehouse Storage',
+                subtext: 'In Storage',
                 icon: Icons.warehouse_rounded,
                 color: const Color(0xFFF59E0B),
                 isDark: isDark,
+                tooltip: 'Total client and company inventory currently held in warehouse custody',
               ),
 
               // 2. Cash in Fleet Custody
               _buildOperationalStreamPill(
-                label: 'Cash in Fleet Custody',
+                label: 'Fleet Cash',
                 value: CurrencyFormatter.formatNaira(totalPendingRemittance),
-                subtext: 'Unremitted COD on Routes',
+                subtext: 'Pending COD',
                 icon: Icons.payments_rounded,
                 color: const Color(0xFF10B981),
                 isDark: isDark,
+                tooltip: 'Total unremitted Cash on Delivery (COD) collected by riders on active delivery routes',
                 onTap: () => ref.read(dcConsoleProvider.notifier).setActiveTab(2),
               ),
 
               // 3. Active Field Routes
               _buildOperationalStreamPill(
-                label: 'Active Field Routes',
-                value: '$inTransitCount In-Transit',
-                subtext: '$unassignedCount Pending Pickup',
+                label: 'Active Routes',
+                value: '$inTransitCount Active',
+                subtext: '$unassignedCount Pending',
                 icon: Icons.route_rounded,
                 color: const Color(0xFF38BDF8),
                 isDark: isDark,
+                tooltip: 'Live delivery routes currently being fulfilled across regional dispatch zones',
                 onTap: () => ref.read(dcConsoleProvider.notifier).setActiveTab(1),
               ),
 
@@ -662,21 +738,23 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
               _buildOperationalStreamPill(
                 label: 'Fleet Payouts',
                 value: '₦${_currencyFormat.format(riderPayout)}',
-                subtext: 'Driver Allowances & Fuel',
+                subtext: 'Allowances & Fuel',
                 icon: Icons.two_wheeler_rounded,
                 color: const Color(0xFFF97316),
                 isDark: isDark,
+                tooltip: 'Accrued rider commissions, drop allowances, and fuel compensation disbursements',
                 onTap: () => ref.read(dcConsoleProvider.notifier).setActiveTab(7),
               ),
 
               // 5. Consignments Handled
               _buildOperationalStreamPill(
-                label: 'Network Throughput',
+                label: 'Throughput',
                 value: '$parcels items',
-                subtext: 'Consignments Delivered',
+                subtext: 'Delivered',
                 icon: Icons.all_inbox_rounded,
                 color: const Color(0xFF8B5CF6),
                 isDark: isDark,
+                tooltip: 'Total successful delivery consignments completed across the logistics network',
               ),
             ],
           ),
@@ -692,8 +770,9 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
     required IconData icon,
     required Color accentColor,
     required bool isDark,
+    String? tooltip,
   }) {
-    return Row(
+    Widget content = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
@@ -709,13 +788,24 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (tooltip != null) ...[
+                    const SizedBox(width: 4),
+                    NovaInfoIcon(tooltip: tooltip, size: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                  ],
+                ],
               ),
               const SizedBox(height: 3),
               Text(
@@ -741,6 +831,11 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
         ),
       ],
     );
+
+    if (tooltip != null) {
+      return NovaTooltip(message: tooltip, child: content);
+    }
+    return content;
   }
 
   Widget _buildOperationalStreamPill({
@@ -750,9 +845,10 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
     required IconData icon,
     required Color color,
     required bool isDark,
+    String? tooltip,
     VoidCallback? onTap,
   }) {
-    return InkWell(
+    final pill = InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -803,6 +899,11 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
         ),
       ),
     );
+
+    if (tooltip != null) {
+      return NovaTooltip(message: tooltip, child: pill);
+    }
+    return pill;
   }
 
   // ===========================================================================
@@ -815,14 +916,20 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
     required DistributionCenter? activeDc,
     required List<DCFleetDriver> scopedDrivers,
     required String activeHubId,
+    bool canViewCumulative = false,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 960;
 
-        final leftWidget = _selectedDcId == null
+        final isCumulativeView = _selectedDcId == null && canViewCumulative;
+        final leftWidget = isCumulativeView
             ? _buildRegionalHubMatrixSurface(isDark: isDark, allDcs: allDcs)
-            : _buildStationProfileSurface(isDark: isDark, activeDc: activeDc);
+            : _buildStationProfileSurface(
+                isDark: isDark,
+                activeDc: activeDc,
+                canReturnToMatrix: canViewCumulative,
+              );
 
         final rightWidget = _buildSpatialTelemetryRadarSurface(
           isDark: isDark,
@@ -893,12 +1000,18 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Regional Logistics Network',
+                    'Hub Network',
                     style: GoogleFonts.outfit(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
                       color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
+                  ),
+                  const SizedBox(width: 6),
+                  const NovaInfoIcon(
+                    tooltip: 'Regional network performance across all registered distribution hubs',
+                    size: 14,
+                    color: Color(0xFF38BDF8),
                   ),
                 ],
               ),
@@ -909,7 +1022,7 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
-                  '${allDcs.length} Active Hubs',
+                  '${allDcs.length} Hubs',
                   style: GoogleFonts.inter(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
@@ -1032,7 +1145,7 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Focus Hub →',
+                              'Focus →',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 color: const Color(0xFF38BDF8),
@@ -1055,6 +1168,7 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
   Widget _buildStationProfileSurface({
     required bool isDark,
     required DistributionCenter? activeDc,
+    bool canReturnToMatrix = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1091,42 +1205,49 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Station Dispatch Focus',
+                    'Dispatch Focus',
                     style: GoogleFonts.outfit(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
                       color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  const NovaInfoIcon(
+                    tooltip: 'Scoped dispatch and operational telemetry for selected distribution center',
+                    size: 14,
+                    color: Color(0xFF10B981),
+                  ),
                 ],
               ),
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    _selectedDcId = null; // Return to Cumulative Network view
-                  });
-                  ref.read(dcConsoleProvider.notifier).selectDistributionCenter(null);
-                  _loadFinancialData();
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF38BDF8).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.arrow_back_rounded, size: 13, color: Color(0xFF38BDF8)),
-                      const SizedBox(width: 4),
-                      Text(
-                        'All Hubs',
-                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF38BDF8), fontWeight: FontWeight.bold),
-                      ),
-                    ],
+              if (canReturnToMatrix)
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedDcId = null; // Return to Cumulative Network view
+                    });
+                    ref.read(dcConsoleProvider.notifier).selectDistributionCenter(null);
+                    _loadFinancialData();
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.arrow_back_rounded, size: 13, color: Color(0xFF38BDF8)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'All Hubs',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF38BDF8), fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1155,7 +1276,7 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
           ),
           const SizedBox(height: 18),
           Text(
-            'Operating Jurisdiction Zones:',
+            'Jurisdiction Zones:',
             style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w600,

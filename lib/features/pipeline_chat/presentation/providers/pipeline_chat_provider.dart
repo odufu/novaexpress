@@ -40,7 +40,16 @@ class PipelineChatState {
       return recentConversations.where((c) => c.unreadRiderCount > 0).length;
     } else if (r.contains('client') || r.contains('merchant') || r.contains('closer') || r.contains('marketer')) {
       return recentConversations.where((c) => c.unreadClientCount > 0).length;
-    } else if (r.contains('dc') || r.contains('manager') || r.contains('operations') || r.contains('dispatcher')) {
+    } else if (r.contains('dc') ||
+        r.contains('manager') ||
+        r.contains('operations') ||
+        r.contains('dispatcher') ||
+        r.contains('stock') ||
+        r.contains('inventory') ||
+        r.contains('finance') ||
+        r.contains('remittance') ||
+        r.contains('accountant') ||
+        r.contains('ops')) {
       return recentConversations.where((c) => c.unreadDcCount > 0).length;
     }
     return 0;

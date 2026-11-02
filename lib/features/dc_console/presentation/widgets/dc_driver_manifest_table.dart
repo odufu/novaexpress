@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
+import '../providers/dc_console_provider.dart';
 import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 final manifestSearchProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -135,39 +137,28 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth >= 700;
-                final titleSection = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                final titleSection = Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF37021),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Delivery Personnel Manifest',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF031632),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Live fleet overview, route shift tracking, model classification, and driver operations.',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF64748B),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF37021),
+                        shape: BoxShape.circle,
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Fleet Manifest',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF031632),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const NovaInfoIcon(
+                      message: 'Live fleet overview, route shift tracking, model classification, and driver operations.',
                     ),
                   ],
                 );
@@ -177,26 +168,32 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                   runSpacing: 8,
                   children: [
                     if (widget.onAddDriver != null)
-                      ElevatedButton.icon(
-                        onPressed: widget.onAddDriver,
-                        icon: const Icon(Icons.person_add_rounded, size: 16, color: Colors.white),
-                        label: Text('Onboard Agent', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF031632),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          elevation: 0,
+                      NovaTooltip(
+                        message: 'Onboard a new rider or PDA driver',
+                        child: ElevatedButton.icon(
+                          onPressed: widget.onAddDriver,
+                          icon: const Icon(Icons.person_add_rounded, size: 16, color: Colors.white),
+                          label: Text('Onboard', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF031632),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
                         ),
                       ),
                     if (widget.onExportCSV != null)
-                      OutlinedButton.icon(
-                        onPressed: widget.onExportCSV,
-                        icon: const Icon(Icons.download_rounded, size: 16, color: Color(0xFF64748B)),
-                        label: Text('Export CSV', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : const Color(0xFF334155))),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          side: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
+                      NovaTooltip(
+                        message: 'Export rider roster and status to CSV',
+                        child: OutlinedButton.icon(
+                          onPressed: widget.onExportCSV,
+                          icon: const Icon(Icons.download_rounded, size: 16, color: Color(0xFF64748B)),
+                          label: Text('Export', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : const Color(0xFF334155))),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            side: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
+                          ),
                         ),
                       ),
                   ],
@@ -270,9 +267,9 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                 final modelFilters = Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildFilterChip(ref, 'All Models', 'all', isDark),
+                    _buildFilterChip(ref, 'All', 'all', isDark),
                     const SizedBox(width: 6),
-                    _buildFilterChip(ref, 'PDA Agents', 'pda', isDark, activeColor: const Color(0xFF2563EB)),
+                    _buildFilterChip(ref, 'PDAs', 'pda', isDark, activeColor: const Color(0xFF2563EB)),
                     const SizedBox(width: 6),
                     _buildFilterChip(ref, 'In-House', 'in_house', isDark, activeColor: const Color(0xFF10B981)),
                   ],
@@ -347,8 +344,8 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                   columns: [
                     ExcelColumnDef<DCFleetDriver>(
                       key: 'code',
-                      group: 'Agent Identity',
-                      label: 'AGENT CODE',
+                      group: 'Identity',
+                      label: 'CODE',
                       defaultWidth: 140,
                       minWidth: 100,
                       searchString: (d) => d.driverCode,
@@ -373,8 +370,8 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                     ),
                     ExcelColumnDef<DCFleetDriver>(
                       key: 'rider',
-                      group: 'Agent Identity',
-                      label: 'RIDER / AGENT',
+                      group: 'Identity',
+                      label: 'RIDER',
                       defaultWidth: 180,
                       minWidth: 140,
                       searchString: (d) => '${d.name} ${d.phone}',
@@ -420,7 +417,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                     ),
                     ExcelColumnDef<DCFleetDriver>(
                       key: 'model',
-                      group: 'Employment & Contract',
+                      group: 'Contract',
                       label: 'MODEL',
                       defaultWidth: 140,
                       minWidth: 110,
@@ -447,7 +444,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  driver.isPda ? 'PDA Agent' : 'In-House Fleet',
+                                  driver.isPda ? 'PDA' : 'In-House',
                                   style: GoogleFonts.inter(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -462,8 +459,8 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                     ),
                     ExcelColumnDef<DCFleetDriver>(
                       key: 'agreement',
-                      group: 'Employment & Contract',
-                      label: 'AGREEMENT',
+                      group: 'Contract',
+                      label: 'TERMS',
                       defaultWidth: 160,
                       minWidth: 120,
                       searchString: (d) => '₦${d.commissionRate.toInt()} + ₦${d.transportAllowance.toInt()}',
@@ -487,8 +484,8 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                     ),
                     ExcelColumnDef<DCFleetDriver>(
                       key: 'zone_vehicle',
-                      group: 'Field Assignment',
-                      label: 'ZONE & VEHICLE',
+                      group: 'Assignment',
+                      label: 'ZONE',
                       defaultWidth: 180,
                       minWidth: 130,
                       searchString: (d) => '${d.assignedZone} ${d.vehicleModel} ${d.vehiclePlate}',
@@ -524,7 +521,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                     ),
                     ExcelColumnDef<DCFleetDriver>(
                       key: 'status',
-                      group: 'Field Assignment',
+                      group: 'Assignment',
                       label: 'STATUS',
                       defaultWidth: 130,
                       minWidth: 100,
@@ -536,8 +533,8 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                     ),
                     ExcelColumnDef<DCFleetDriver>(
                       key: 'progress',
-                      group: 'Shift Performance',
-                      label: 'SHIFT PROGRESS',
+                      group: 'Performance',
+                      label: 'PROGRESS',
                       defaultWidth: 150,
                       minWidth: 120,
                       sortValue: (driver) {
@@ -615,8 +612,8 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                     ),
                     ExcelColumnDef<DCFleetDriver>(
                       key: 'live_cod',
-                      group: 'Shift Performance',
-                      label: 'LIVE COD',
+                      group: 'Performance',
+                      label: 'COD',
                       defaultWidth: 130,
                       minWidth: 100,
                       align: TextAlign.right,
@@ -635,7 +632,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                     ),
                     ExcelColumnDef<DCFleetDriver>(
                       key: 'stock',
-                      group: 'Shift Performance',
+                      group: 'Performance',
                       label: 'STOCK',
                       defaultWidth: 110,
                       minWidth: 90,
@@ -663,15 +660,31 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                       key: 'action',
                       group: 'Action',
                       label: 'ACTION',
-                      defaultWidth: 70,
-                      minWidth: 60,
+                      defaultWidth: 105,
+                      minWidth: 90,
                       cellBuilder: (context, driver, row, isDark, brand) {
-                        return Center(
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
-                            tooltip: 'Open Rider Financials & Order Breakdown',
-                            onPressed: () => widget.onDriverTap?.call(driver),
-                          ),
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            NovaTooltip(
+                              message: driver.isAvailable ? 'Deactivate Rider (Temporary Ban)' : 'Reactivate Rider (Restore Availability)',
+                              child: IconButton(
+                                icon: Icon(
+                                  driver.isAvailable ? Icons.toggle_on_rounded : Icons.toggle_off_rounded,
+                                  color: driver.isAvailable ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                                  size: 26,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                onPressed: () => _confirmToggleDriverAvailability(context, driver),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Color(0xFF64748B)),
+                              tooltip: 'Open Rider Financials & Order Breakdown',
+                              onPressed: () => widget.onDriverTap?.call(driver),
+                            ),
+                          ],
                         );
                       },
                     ),
@@ -784,8 +797,24 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    _buildStatusPill(driver.status),
+                    const SizedBox(width: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildStatusPill(driver.status),
+                        IconButton(
+                          icon: Icon(
+                            driver.isAvailable ? Icons.toggle_on_rounded : Icons.toggle_off_rounded,
+                            color: driver.isAvailable ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                            size: 26,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                          tooltip: driver.isAvailable ? 'Deactivate Rider (Temporary Ban)' : 'Reactivate Rider',
+                          onPressed: () => _confirmToggleDriverAvailability(context, driver),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -876,6 +905,64 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
     );
   }
 
+  void _confirmToggleDriverAvailability(BuildContext context, DCFleetDriver driver) {
+    final willEnable = !driver.isAvailable;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              willEnable ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded,
+              color: willEnable ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                willEnable ? 'Activate ${driver.name}?' : 'Ban / Deactivate ${driver.name}?',
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          willEnable
+              ? 'Are you sure you want to mark ${driver.name} (${driver.driverCode}) as Available? They will immediately receive new delivery runs from Central Dispatch.'
+              : 'Are you sure you want to deactivate / temporarily ban ${driver.name} (${driver.driverCode})? They will be tagged UNAVAILABLE and blocked from receiving orders.',
+          style: GoogleFonts.inter(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: willEnable ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await ref.read(dcConsoleProvider.notifier).toggleDriverAvailability(driver.id, willEnable);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(willEnable
+                        ? '✅ ${driver.name} is now ACTIVE and available for order assignment.'
+                        : '⛔ ${driver.name} is now UNAVAILABLE / DEACTIVATED. Order assignment is blocked.'),
+                    backgroundColor: willEnable ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: Text(willEnable ? 'Yes, Make Available' : 'Yes, Deactivate / Ban'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusPill(String status) {
     Color bg;
     Color fg;
@@ -883,33 +970,66 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
 
     switch (status.toLowerCase()) {
       case 'active':
-        bg = const Color(0xFF10B981).withValues(alpha: 0.12);
+      case 'available':
+      case 'online':
+        bg = const Color(0xFF10B981).withValues(alpha: 0.14);
         fg = const Color(0xFF059669);
+        label = 'ONLINE / READY';
         break;
       case 'delayed':
-        bg = const Color(0xFFEF4444).withValues(alpha: 0.12);
+        bg = const Color(0xFFEF4444).withValues(alpha: 0.14);
         fg = const Color(0xFFDC2626);
+        label = 'DELAYED';
+        break;
+      case 'banned':
+      case 'suspended':
+        bg = const Color(0xFFEF4444).withValues(alpha: 0.18);
+        fg = const Color(0xFFDC2626);
+        label = 'BANNED';
+        break;
+      case 'offline':
+      case 'unavailable':
+      case 'inactive':
+        bg = const Color(0xFF64748B).withValues(alpha: 0.16);
+        fg = const Color(0xFF475569);
+        label = 'OFF-DUTY / UNAVAIL';
         break;
       case 'at_rest':
       default:
-        bg = const Color(0xFFF59E0B).withValues(alpha: 0.12);
+        bg = const Color(0xFFF59E0B).withValues(alpha: 0.14);
         fg = const Color(0xFFD97706);
+        label = 'STANDBY';
         break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: fg.withValues(alpha: 0.3)),
       ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: fg,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: fg,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }

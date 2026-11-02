@@ -266,7 +266,14 @@ class OrderEntity {
   String get financeSettlementStatus => financialSettlementStatus;
   bool get isClientSettled {
     final fs = financialSettlementStatus.toLowerCase();
-    return fs == 'client_settled' || fs == 'settled';
+    final rr = (remittanceReference ?? '').trim().toLowerCase();
+    return fs == 'client_settled' ||
+        fs == 'settled' ||
+        fs == 'reconciled' ||
+        fs == 'cleared' ||
+        fs == 'pending_merchant_confirmation' ||
+        fs == 'in_settlement' ||
+        rr.startsWith('settle-');
   }
 
   double get netMerchantSettlement {

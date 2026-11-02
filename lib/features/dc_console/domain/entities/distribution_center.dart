@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'package:novexps/core/services/location_lookup_service.dart';
 
 /// 3-Tier Distribution Center Hierarchy
-/// - Grand DC: Apex National Distribution Center (Wuse Central branch default)
+/// - Grand DC: Apex National Central Command Distribution Center (DC-CMD-01)
 /// - Hub DC: Regional Hub Distribution Center serving clusters of satellite stations
 /// - General DC: Standard Local/Branch Distribution Center
 enum DistributionCenterTier {
-  grandDc,     // Grand DC (Wuse Central branch default)
+  grandDc,     // Grand DC (Central Command DC default)
   hubDc,       // Hub Distribution Center
   generalDc,   // General Distribution Center
 }
@@ -190,6 +190,7 @@ class DistributionCenter {
         json['isGrandDc'] == true ||
         rawType == 'grand_dc' ||
         rawType.contains('grand') ||
+        codeStr == 'DC-CMD-01' ||
         codeStr == 'DC-ABJ-01' ||
         codeStr == 'DC-WUSE-01' ||
         json['id'] == '22222222-2222-4222-8222-222222222222';

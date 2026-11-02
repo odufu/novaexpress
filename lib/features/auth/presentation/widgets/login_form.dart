@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
@@ -33,6 +31,16 @@ class _DevAccountOption {
 }
 
 const List<_DevAccountOption> _devTestAccounts = [
+  _DevAccountOption(
+    name: 'Joel Emerald (Super Admin)',
+    code: 'ADMIN-HQ-01',
+    roleBadge: 'SUPER ADMIN',
+    email: 'emeraldcodelines@gmail.com',
+    password: '@EmeraldXpress2026',
+    portalRoute: '/admin (National Governance & Hubs)',
+    icon: Icons.admin_panel_settings_rounded,
+    roleColor: Color(0xFFE11D48),
+  ),
   _DevAccountOption(
     name: 'Joel Supervisor (Novacare)',
     code: 'SUP-SALES-01',
@@ -79,8 +87,8 @@ const List<_DevAccountOption> _devTestAccounts = [
     roleBadge: 'DC MANAGER',
     email: 'dc.supervisor@novaxpress.ng',
     password: 'Password123!',
-    portalRoute: '/dc (Grand DC Console)',
-    icon: Icons.account_balance_rounded,
+    portalRoute: '/dc (Central Command DC)',
+    icon: Icons.apartment_rounded,
     roleColor: Color(0xFF1E3A8A),
   ),
   _DevAccountOption(
@@ -94,7 +102,7 @@ const List<_DevAccountOption> _devTestAccounts = [
     roleColor: Color(0xFFD97706),
   ),
   _DevAccountOption(
-    name: 'Prestige Godwin Uto',
+    name: 'Prestige Godwin Uto (Head Closer)',
     code: 'CLS-NOVA-106',
     roleBadge: 'CLOSER',
     email: 'prestige.godwin@novaxpress.net',
@@ -125,13 +133,23 @@ const List<_DevAccountOption> _devTestAccounts = [
   ),
   _DevAccountOption(
     name: 'Abigail Kooyon',
-    code: 'OPS-WUSE-01-159',
+    code: 'OPS-CMD-01-159',
     roleBadge: 'DC OPS',
     email: 'abigail.kooyon@novaxpress.net',
     password: 'CDV8pRxC#b',
-    portalRoute: '/ops (Wuse Grand Central)',
+    portalRoute: '/ops (Central Command DC)',
     icon: Icons.warehouse_rounded,
     roleColor: Color(0xFF059669),
+  ),
+  _DevAccountOption(
+    name: 'Samuel Accountant (Novacare Finance)',
+    code: 'ACC-NOVA-001',
+    roleBadge: 'MERCHANT ACC',
+    email: 'accountant@novacare.com',
+    password: 'Password123!',
+    portalRoute: '/merchant-settlements (Settlements App)',
+    icon: Icons.account_balance_wallet_outlined,
+    roleColor: Color(0xFF0D9488),
   ),
   _DevAccountOption(
     name: 'Oladele Omowaye',
@@ -157,11 +175,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   final _agentIdController = TextEditingController();
   final _passwordController = TextEditingController();
   _DevAccountOption? _selectedDevAccount;
-
-  bool get _isDevMode =>
-      kDebugMode ||
-      SupabaseConstants.supabaseUrl.contains('hwyqqjilcifxajruusoa') ||
-      !const bool.fromEnvironment('dart.vm.product');
 
   @override
   void dispose() {
@@ -233,283 +246,281 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Development Fast-Login Dropdown
-          if (_isDevMode) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 20),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _selectedDevAccount != null
-                      ? _selectedDevAccount!.roleColor.withValues(alpha: 0.4)
-                      : const Color(0xFFE2E8F0),
-                  width: 1.4,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+          Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _selectedDevAccount != null
+                    ? _selectedDevAccount!.roleColor.withValues(alpha: 0.4)
+                    : const Color(0xFFE2E8F0),
+                width: 1.4,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFFCD34D)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.flash_on_rounded, size: 13, color: Color(0xFFD97706)),
-                            const SizedBox(width: 4),
-                            Text(
-                              'DEV PILOT LOGIN',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF92400E),
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                          ],
-                        ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFFCD34D)),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Test Role Selector',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF475569),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (_selectedDevAccount != null)
-                        InkWell(
-                          onTap: _clearDevAccount,
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.close_rounded, size: 13, color: Color(0xFF64748B)),
-                                const SizedBox(width: 2),
-                                Text(
-                                  'Clear',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<_DevAccountOption>(
-                    value: _selectedDevAccount,
-                    isExpanded: true,
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                    hint: Row(
-                      children: [
-                        const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF94A3B8)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Choose test role to auto-populate...',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.flash_on_rounded, size: 13, color: Color(0xFFD97706)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'DEV PILOT LOGIN',
                             style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              color: const Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF92400E),
+                              letterSpacing: 0.4,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Test Role Selector',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF475569),
                         ),
-                      ],
-                    ),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    selectedItemBuilder: (BuildContext context) {
-                      return _devTestAccounts.map((acc) {
-                        return Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: acc.roleColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                acc.roleBadge,
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: acc.roleColor,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '${acc.name} (${acc.code})',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        );
-                      }).toList();
-                    },
-                    items: _devTestAccounts.map((acc) {
-                      return DropdownMenuItem<_DevAccountOption>(
-                        value: acc,
+                    if (_selectedDevAccount != null)
+                      InkWell(
+                        onTap: _clearDevAccount,
+                        borderRadius: BorderRadius.circular(4),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              CircleAvatar(
-                                radius: 15,
-                                backgroundColor: acc.roleColor.withValues(alpha: 0.12),
-                                child: Icon(acc.icon, size: 16, color: acc.roleColor),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            acc.name,
-                                            style: GoogleFonts.inter(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: const Color(0xFF0F172A),
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: acc.roleColor.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            acc.roleBadge,
-                                            style: GoogleFonts.inter(
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.w800,
-                                              color: acc.roleColor,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${acc.email} • ${acc.portalRoute}',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: const Color(0xFF64748B),
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
+                              const Icon(Icons.close_rounded, size: 13, color: Color(0xFF64748B)),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Clear',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF64748B),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (selected) {
-                      if (selected != null) {
-                        _selectDevAccount(selected);
-                      }
-                    },
-                  ),
-                  if (_selectedDevAccount != null) ...[
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Filled: ${_selectedDevAccount!.email}',
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF059669),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _selectedDevAccount!.roleColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          onPressed: authState.isLoading ? null : _submit,
-                          icon: const Icon(Icons.flash_on_rounded, size: 14),
-                          label: Text(
-                            'Quick Sign In',
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
                   ],
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<_DevAccountOption>(
+                  value: _selectedDevAccount,
+                  isExpanded: true,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                  hint: Row(
+                    children: [
+                      const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF94A3B8)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Choose test role to auto-populate...',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            color: const Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.white,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5),
+                    ),
+                  ),
+                  selectedItemBuilder: (BuildContext context) {
+                    return _devTestAccounts.map((acc) {
+                      return Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: acc.roleColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              acc.roleBadge,
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: acc.roleColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${acc.name} (${acc.code})',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF0F172A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList();
+                  },
+                  items: _devTestAccounts.map((acc) {
+                    return DropdownMenuItem<_DevAccountOption>(
+                      value: acc,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 15,
+                              backgroundColor: acc.roleColor.withValues(alpha: 0.12),
+                              child: Icon(acc.icon, size: 16, color: acc.roleColor),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          acc.name,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: const Color(0xFF0F172A),
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: acc.roleColor.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          acc.roleBadge,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: acc.roleColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${acc.email} • ${acc.portalRoute}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: const Color(0xFF64748B),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (selected) {
+                    if (selected != null) {
+                      _selectDevAccount(selected);
+                    }
+                  },
+                ),
+                if (_selectedDevAccount != null) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Filled: ${_selectedDevAccount!.email}',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF059669),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _selectedDevAccount!.roleColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        onPressed: authState.isLoading ? null : _submit,
+                        icon: const Icon(Icons.flash_on_rounded, size: 14),
+                        label: Text(
+                          'Quick Sign In',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
-              ),
+              ],
             ),
-          ],
+          ),
 
           if (authState.errorMessage != null) ...[
             Container(

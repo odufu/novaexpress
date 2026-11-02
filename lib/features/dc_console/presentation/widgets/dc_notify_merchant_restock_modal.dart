@@ -79,7 +79,7 @@ class _DCNotifyMerchantRestockModalState extends ConsumerState<DCNotifyMerchantR
   void _updateGeneratedMessage() {
     final units = _unitsController.text.trim().isEmpty ? '100' : _unitsController.text.trim();
     final merchantName = widget.item.ownerName.isNotEmpty ? widget.item.ownerName : 'Merchant Partner';
-    final dcName = widget.dcName.isNotEmpty ? widget.dcName : 'Wuse Grand Central Distribution Center';
+    final dcName = widget.dcName.isNotEmpty ? widget.dcName : 'Central Command Distribution Center';
 
     String urgencyTag;
     if (_selectedUrgency == 'CRITICAL') {

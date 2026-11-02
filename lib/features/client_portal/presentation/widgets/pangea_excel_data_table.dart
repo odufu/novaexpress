@@ -220,6 +220,12 @@ class PangeaExcelDataTable<T> extends StatefulWidget {
   /// Custom label for the date filter button when no range is selected (defaults to 'Date Range')
   final String dateFilterLabel;
 
+  /// Custom background color builder per row (e.g. For visually distinguishing completed orders)
+  final Color? Function(T item, bool isDark)? rowColorBuilder;
+
+  /// Custom left accent border per row (e.g. 3.5px emerald border on completed orders)
+  final BorderSide? Function(T item, bool isDark)? rowLeftBorderBuilder;
+
   const PangeaExcelDataTable({
     super.key,
     required this.items,
@@ -241,6 +247,8 @@ class PangeaExcelDataTable<T> extends StatefulWidget {
     this.onDateRangeChanged,
     this.showDateFilter,
     this.dateFilterLabel = 'Date Range',
+    this.rowColorBuilder,
+    this.rowLeftBorderBuilder,
   });
 
   @override
@@ -1028,6 +1036,8 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
           onRowTap: widget.onRowTap,
           showVerticalGridlines: prefs.showVerticalGridlines,
           showZebraStriping: prefs.showZebraStriping,
+          rowColorBuilder: widget.rowColorBuilder,
+          rowLeftBorderBuilder: widget.rowLeftBorderBuilder,
         ),
       ),
     );
@@ -1619,6 +1629,8 @@ class _PangeaExcelDataRow<T> extends StatefulWidget {
   final void Function(T item)? onRowTap;
   final bool showVerticalGridlines;
   final bool showZebraStriping;
+  final Color? Function(T item, bool isDark)? rowColorBuilder;
+  final BorderSide? Function(T item, bool isDark)? rowLeftBorderBuilder;
 
   const _PangeaExcelDataRow({
     super.key,
@@ -1634,6 +1646,8 @@ class _PangeaExcelDataRow<T> extends StatefulWidget {
     this.onRowTap,
     this.showVerticalGridlines = true,
     this.showZebraStriping = true,
+    this.rowColorBuilder,
+    this.rowLeftBorderBuilder,
   });
 
   @override
@@ -1646,11 +1660,18 @@ class _PangeaExcelDataRowState<T> extends State<_PangeaExcelDataRow<T>> {
   @override
   Widget build(BuildContext context) {
     final isEven = widget.rowNumber % 2 == 0;
+    final customBg = widget.rowColorBuilder?.call(widget.item, widget.isDark);
+    final leftBorder = widget.rowLeftBorderBuilder?.call(widget.item, widget.isDark);
+
     Color rowBg;
     if (_isHovered) {
-      rowBg = widget.isDark
-          ? widget.brandPrimary.withValues(alpha: 0.12)
-          : widget.brandPrimary.withValues(alpha: 0.06);
+      rowBg = customBg != null
+          ? Color.alphaBlend(widget.brandPrimary.withValues(alpha: 0.12), customBg)
+          : (widget.isDark
+              ? widget.brandPrimary.withValues(alpha: 0.12)
+              : widget.brandPrimary.withValues(alpha: 0.06));
+    } else if (customBg != null) {
+      rowBg = customBg;
     } else if (isEven && widget.showZebraStriping) {
       rowBg = widget.isDark
           ? const Color(0xFF1E293B).withValues(alpha: 0.5)
@@ -1671,7 +1692,10 @@ class _PangeaExcelDataRowState<T> extends State<_PangeaExcelDataRow<T>> {
           height: widget.rowHeight,
           decoration: BoxDecoration(
             color: rowBg,
-            border: Border(bottom: BorderSide(color: widget.borderColor, width: 0.8)),
+            border: Border(
+              left: leftBorder ?? BorderSide.none,
+              bottom: BorderSide(color: widget.borderColor, width: 0.8),
+            ),
           ),
           child: Row(
             children: widget.columns.map((col) {

@@ -35,7 +35,8 @@ class ClientRaiseStockInvoiceModal extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<ClientRaiseStockInvoiceModal> createState() => _ClientRaiseStockInvoiceModalState();
+  ConsumerState<ClientRaiseStockInvoiceModal> createState() =>
+      _ClientRaiseStockInvoiceModalState();
 }
 
 class _InvoiceItemDraft {
@@ -59,7 +60,8 @@ class _InvoiceItemDraft {
     this.handlingCost = 50.0,
   });
 
-  double get landedCostPerUnit => unitCost + packagingCost + freightCost + handlingCost;
+  double get landedCostPerUnit =>
+      unitCost + packagingCost + freightCost + handlingCost;
   double get lineTotalLandedCost => landedCostPerUnit * quantity;
   double get lineBaseCost => unitCost * quantity;
   double get linePackagingCost => packagingCost * quantity;
@@ -67,14 +69,15 @@ class _InvoiceItemDraft {
   double get lineHandlingCost => handlingCost * quantity;
 }
 
-class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockInvoiceModal> {
+class _ClientRaiseStockInvoiceModalState
+    extends ConsumerState<ClientRaiseStockInvoiceModal> {
   final _formKey = GlobalKey<FormState>();
   final _currencyFormat = NumberFormat('#,##0.00', 'en_US');
 
   String? _selectedSupplierId;
   String _invoiceNumber = '';
   String? _selectedDcId = '22222222-2222-4222-8222-222222222222';
-  String _targetWarehouse = 'Wuse Grand Central Distribution Center';
+  String _targetWarehouse = 'Central Command Distribution Center';
   String _paymentStatus = 'unpaid';
   final _notesController = TextEditingController();
   final _waybillRefController = TextEditingController();
@@ -87,7 +90,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
     super.initState();
     final now = DateTime.now();
     final randomSuffix = (now.millisecondsSinceEpoch % 9000 + 1000).toString();
-    _invoiceNumber = 'SI-${now.year}-${now.month.toString().padLeft(2, '0')}-$randomSuffix';
+    _invoiceNumber =
+        'SI-${now.year}-${now.month.toString().padLeft(2, '0')}-$randomSuffix';
     _waybillRefController.text = 'WB-${now.year}-$randomSuffix';
 
     // Prepopulate with at least one item from catalog or initial product
@@ -95,9 +99,11 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
       final state = ref.read(clientPortalProvider);
 
       // Supplier selection priority
-      if (widget.initialSupplierId != null && widget.initialSupplierId!.isNotEmpty) {
+      if (widget.initialSupplierId != null &&
+          widget.initialSupplierId!.isNotEmpty) {
         _selectedSupplierId = widget.initialSupplierId;
-      } else if (widget.initialProduct?.preferredSupplierId != null && widget.initialProduct!.preferredSupplierId!.isNotEmpty) {
+      } else if (widget.initialProduct?.preferredSupplierId != null &&
+          widget.initialProduct!.preferredSupplierId!.isNotEmpty) {
         _selectedSupplierId = widget.initialProduct!.preferredSupplierId;
       } else if (state.suppliers.isNotEmpty) {
         _selectedSupplierId = state.suppliers.first.id;
@@ -161,17 +167,24 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
   }
 
   int get _totalQuantity => _items.fold(0, (sum, i) => sum + i.quantity);
-  double get _totalBaseCost => _items.fold(0.0, (sum, i) => sum + i.lineBaseCost);
-  double get _totalPackagingCost => _items.fold(0.0, (sum, i) => sum + i.linePackagingCost);
-  double get _totalFreightCost => _items.fold(0.0, (sum, i) => sum + i.lineFreightCost);
-  double get _totalHandlingCost => _items.fold(0.0, (sum, i) => sum + i.lineHandlingCost);
-  double get _grandTotalLandedCost => _items.fold(0.0, (sum, i) => sum + i.lineTotalLandedCost);
+  double get _totalBaseCost =>
+      _items.fold(0.0, (sum, i) => sum + i.lineBaseCost);
+  double get _totalPackagingCost =>
+      _items.fold(0.0, (sum, i) => sum + i.linePackagingCost);
+  double get _totalFreightCost =>
+      _items.fold(0.0, (sum, i) => sum + i.lineFreightCost);
+  double get _totalHandlingCost =>
+      _items.fold(0.0, (sum, i) => sum + i.lineHandlingCost);
+  double get _grandTotalLandedCost =>
+      _items.fold(0.0, (sum, i) => sum + i.lineTotalLandedCost);
 
   void _addNewItemRow() {
     final state = ref.read(clientPortalProvider);
     if (state.products.isNotEmpty) {
       // Pick next unused product if available
-      final unused = state.products.where((p) => !_items.any((item) => item.productId == p.id)).toList();
+      final unused = state.products
+          .where((p) => !_items.any((item) => item.productId == p.id))
+          .toList();
       final p = unused.isNotEmpty ? unused.first : state.products.first;
       setState(() {
         _items.add(
@@ -219,7 +232,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
     setState(() => _isSubmitting = true);
     try {
       final state = ref.read(clientPortalProvider);
-      final supplier = state.suppliers.where((s) => s.id == _selectedSupplierId).firstOrNull;
+      final supplier =
+          state.suppliers.where((s) => s.id == _selectedSupplierId).firstOrNull;
 
       final invoiceItems = _items.map((draft) {
         return ClientStockInvoiceItem.calculate(
@@ -255,10 +269,11 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
         createdAt: DateTime.now(),
       );
 
-      final invoice = await ref.read(clientPortalProvider.notifier).raiseStockInvoice(
-            invoice: newInvoice,
-            items: invoiceItems,
-          );
+      final invoice =
+          await ref.read(clientPortalProvider.notifier).raiseStockInvoice(
+                invoice: newInvoice,
+                items: invoiceItems,
+              );
 
       // Refresh destination DC inbound consignments in background
       try {
@@ -268,16 +283,26 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
             : defaultDistributionCenters;
         final targetDc = allDcs.firstWhere(
           (d) => d.id == _selectedDcId,
-          orElse: () => allDcs.where((d) =>
-              _targetWarehouse.toLowerCase().contains(d.name.toLowerCase()) ||
-              d.name.toLowerCase().contains(_targetWarehouse.toLowerCase())
-          ).firstOrNull ?? allDcs.first,
+          orElse: () =>
+              allDcs
+                  .where((d) =>
+                      _targetWarehouse
+                          .toLowerCase()
+                          .contains(d.name.toLowerCase()) ||
+                      d.name
+                          .toLowerCase()
+                          .contains(_targetWarehouse.toLowerCase()))
+                  .firstOrNull ??
+              allDcs.first,
         );
 
         // Immediate background refresh of DC inbound stock transfers
-        await ref.read(stockProvider.notifier).fetchStockTransfers(dcId: targetDc.id);
+        await ref
+            .read(stockProvider.notifier)
+            .fetchStockTransfers(dcId: targetDc.id);
       } catch (consignmentErr) {
-        debugPrint('[INTAKE_MODAL] ℹ️ Handshake consignment sync notice: $consignmentErr');
+        debugPrint(
+            '[INTAKE_MODAL] ℹ️ Handshake consignment sync notice: $consignmentErr');
       }
 
       if (mounted) {
@@ -286,15 +311,18 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
           SnackBar(
             backgroundColor: const Color(0xFF10B981),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             content: Row(
               children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const Icon(Icons.check_circle_rounded,
+                    color: Colors.white, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Stock Entry Invoice "${invoice.invoiceNumber}" posted! ₦${_currencyFormat.format(invoice.grandTotalLandedCost)} added to inventory ledger.',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600, color: Colors.white),
                   ),
                 ),
               ],
@@ -369,10 +397,13 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               decoration: BoxDecoration(
                 color: const Color(0xFF0D9488).withValues(alpha: 0.08),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(18)),
                 border: Border(
                   bottom: BorderSide(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0),
                   ),
                 ),
               ),
@@ -384,7 +415,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                       color: const Color(0xFF0D9488).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.post_add_rounded, color: Color(0xFF0D9488), size: 24),
+                    child: const Icon(Icons.post_add_rounded,
+                        color: Color(0xFF0D9488), size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -398,14 +430,18 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                               style: GoogleFonts.inter(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                                color: const Color(0xFF0D9488)
+                                    .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -451,10 +487,14 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                          color: isDark
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0),
                           ),
                         ),
                         child: Column(
@@ -468,14 +508,19 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      _buildLabel('Procurement Supplier *', isDark),
+                                      _buildLabel(
+                                          'Procurement Supplier *', isDark),
                                       InkWell(
                                         onTap: () async {
-                                          final s = await ClientAddSupplierModal.show(context);
+                                          final s =
+                                              await ClientAddSupplierModal.show(
+                                                  context);
                                           if (s != null && mounted) {
-                                            setState(() => _selectedSupplierId = s.id);
+                                            setState(() =>
+                                                _selectedSupplierId = s.id);
                                           }
                                         },
                                         child: Text(
@@ -491,13 +536,20 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                   ),
                                   const SizedBox(height: 6),
                                   DropdownButtonFormField<String>(
-                                    value: state.suppliers.any((s) => s.id == _selectedSupplierId)
+                                    value: state.suppliers.any(
+                                            (s) => s.id == _selectedSupplierId)
                                         ? _selectedSupplierId
-                                        : (state.suppliers.isNotEmpty ? state.suppliers.first.id : null),
+                                        : (state.suppliers.isNotEmpty
+                                            ? state.suppliers.first.id
+                                            : null),
                                     isExpanded: true,
-                                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                    dropdownColor: isDark
+                                        ? const Color(0xFF1E293B)
+                                        : Colors.white,
                                     style: TextStyle(
-                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
                                       fontSize: 13,
                                     ),
                                     decoration: _inputDecoration(
@@ -514,7 +566,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                         ),
                                       );
                                     }).toList(),
-                                    onChanged: (val) => setState(() => _selectedSupplierId = val),
+                                    onChanged: (val) => setState(
+                                        () => _selectedSupplierId = val),
                                   ),
                                 ],
                               ),
@@ -526,7 +579,9 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                   TextFormField(
                                     initialValue: _invoiceNumber,
                                     style: TextStyle(
-                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
                                       fontSize: 13,
                                     ),
                                     decoration: _inputDecoration(
@@ -535,13 +590,15 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                       isDark: isDark,
                                     ),
                                     onChanged: (v) => _invoiceNumber = v,
-                                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                                    validator: (v) =>
+                                        (v == null || v.trim().isEmpty)
+                                            ? 'Required'
+                                            : null,
                                   ),
                                 ],
                               ),
                             ),
                             const SizedBox(height: 14),
-
                             _buildFieldPair(
                               isCompact: isCompact,
                               firstFlex: 3,
@@ -549,16 +606,25 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                               first: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildLabel('Receiving Warehouse / Station Hub', isDark),
+                                  _buildLabel(
+                                      'Receiving Warehouse / Station Hub',
+                                      isDark),
                                   const SizedBox(height: 6),
                                   DropdownButtonFormField<String>(
-                                    value: allDcs.any((d) => d.id == _selectedDcId)
-                                        ? _selectedDcId
-                                        : (allDcs.isNotEmpty ? allDcs.first.id : null),
+                                    value:
+                                        allDcs.any((d) => d.id == _selectedDcId)
+                                            ? _selectedDcId
+                                            : (allDcs.isNotEmpty
+                                                ? allDcs.first.id
+                                                : null),
                                     isExpanded: true,
-                                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                    dropdownColor: isDark
+                                        ? const Color(0xFF1E293B)
+                                        : Colors.white,
                                     style: TextStyle(
-                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
                                       fontSize: 13,
                                     ),
                                     decoration: _inputDecoration(
@@ -572,17 +638,31 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                         child: Row(
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 5,
+                                                      vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: (dc.isGrand
-                                                        ? const Color(0xFF8B5CF6)
-                                                        : (dc.isHubDc ? const Color(0xFF3B82F6) : const Color(0xFF0D9488)))
+                                                        ? const Color(
+                                                            0xFF8B5CF6)
+                                                        : (dc.isHubDc
+                                                            ? const Color(
+                                                                0xFF3B82F6)
+                                                            : const Color(
+                                                                0xFF0D9488)))
                                                     .withValues(alpha: 0.12),
-                                                borderRadius: BorderRadius.circular(4),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                                 border: Border.all(
                                                   color: (dc.isGrand
-                                                          ? const Color(0xFF8B5CF6)
-                                                          : (dc.isHubDc ? const Color(0xFF3B82F6) : const Color(0xFF0D9488)))
+                                                          ? const Color(
+                                                              0xFF8B5CF6)
+                                                          : (dc.isHubDc
+                                                              ? const Color(
+                                                                  0xFF3B82F6)
+                                                              : const Color(
+                                                                  0xFF0D9488)))
                                                       .withValues(alpha: 0.3),
                                                 ),
                                               ),
@@ -593,7 +673,11 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                                   fontWeight: FontWeight.w700,
                                                   color: dc.isGrand
                                                       ? const Color(0xFF8B5CF6)
-                                                      : (dc.isHubDc ? const Color(0xFF3B82F6) : const Color(0xFF0D9488)),
+                                                      : (dc.isHubDc
+                                                          ? const Color(
+                                                              0xFF3B82F6)
+                                                          : const Color(
+                                                              0xFF0D9488)),
                                                 ),
                                               ),
                                             ),
@@ -610,7 +694,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                     }).toList(),
                                     onChanged: (val) {
                                       if (val != null) {
-                                        final dc = allDcs.firstWhere((d) => d.id == val);
+                                        final dc = allDcs
+                                            .firstWhere((d) => d.id == val);
                                         setState(() {
                                           _selectedDcId = val;
                                           _targetWarehouse = dc.name;
@@ -623,12 +708,15 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                               second: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildLabel('Waybill / Consignment Ref', isDark),
+                                  _buildLabel(
+                                      'Waybill / Consignment Ref', isDark),
                                   const SizedBox(height: 6),
                                   TextFormField(
                                     controller: _waybillRefController,
                                     style: TextStyle(
-                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
                                       fontSize: 13,
                                     ),
                                     decoration: _inputDecoration(
@@ -657,7 +745,9 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                 style: GoogleFonts.inter(
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.w800,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A),
                                 ),
                               ),
                               Text(
@@ -674,13 +764,16 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                             icon: const Icon(Icons.add_rounded, size: 16),
                             label: Text(
                               '+ Add Product Item',
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                              style: GoogleFonts.inter(
+                                  fontSize: 12, fontWeight: FontWeight.w700),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF0D9488),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
                             ),
                           ),
                         ],
@@ -691,7 +784,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                       ..._items.asMap().entries.map((entry) {
                         final index = entry.key;
                         final item = entry.value;
-                        return _buildItemRowCard(index, item, isDark, state, isCompact);
+                        return _buildItemRowCard(
+                            index, item, isDark, state, isCompact);
                       }),
                       const SizedBox(height: 20),
 
@@ -705,14 +799,16 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF0D9488), width: 1.5),
+                          border: Border.all(
+                              color: const Color(0xFF0D9488), width: 1.5),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.calculate_rounded, color: Color(0xFF2DD4BF), size: 22),
+                                const Icon(Icons.calculate_rounded,
+                                    color: Color(0xFF2DD4BF), size: 22),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -727,7 +823,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                 ),
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(6),
@@ -752,19 +849,27 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                 runSpacing: 14,
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  _buildSummaryMetric('Base Procurement', '₦${_currencyFormat.format(_totalBaseCost)}'),
-                                  _buildSummaryMetric('Total Packaging', '₦${_currencyFormat.format(_totalPackagingCost)}'),
-                                  _buildSummaryMetric('Haulage & Freight', '₦${_currencyFormat.format(_totalFreightCost)}'),
-                                  _buildSummaryMetric('Handling & Port', '₦${_currencyFormat.format(_totalHandlingCost)}'),
+                                  _buildSummaryMetric('Base Procurement',
+                                      '₦${_currencyFormat.format(_totalBaseCost)}'),
+                                  _buildSummaryMetric('Total Packaging',
+                                      '₦${_currencyFormat.format(_totalPackagingCost)}'),
+                                  _buildSummaryMetric('Haulage & Freight',
+                                      '₦${_currencyFormat.format(_totalFreightCost)}'),
+                                  _buildSummaryMetric('Handling & Port',
+                                      '₦${_currencyFormat.format(_totalHandlingCost)}'),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF2DD4BF).withValues(alpha: 0.2),
+                                      color: const Color(0xFF2DD4BF)
+                                          .withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFF2DD4BF)),
+                                      border: Border.all(
+                                          color: const Color(0xFF2DD4BF)),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'TOTAL LANDED COST',
@@ -790,21 +895,30 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                               )
                             else
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  _buildSummaryMetric('Base Procurement', '₦${_currencyFormat.format(_totalBaseCost)}'),
-                                  _buildSummaryMetric('Total Packaging', '₦${_currencyFormat.format(_totalPackagingCost)}'),
-                                  _buildSummaryMetric('Haulage & Freight', '₦${_currencyFormat.format(_totalFreightCost)}'),
-                                  _buildSummaryMetric('Handling & Port', '₦${_currencyFormat.format(_totalHandlingCost)}'),
+                                  _buildSummaryMetric('Base Procurement',
+                                      '₦${_currencyFormat.format(_totalBaseCost)}'),
+                                  _buildSummaryMetric('Total Packaging',
+                                      '₦${_currencyFormat.format(_totalPackagingCost)}'),
+                                  _buildSummaryMetric('Haulage & Freight',
+                                      '₦${_currencyFormat.format(_totalFreightCost)}'),
+                                  _buildSummaryMetric('Handling & Port',
+                                      '₦${_currencyFormat.format(_totalHandlingCost)}'),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF2DD4BF).withValues(alpha: 0.2),
+                                      color: const Color(0xFF2DD4BF)
+                                          .withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFF2DD4BF)),
+                                      border: Border.all(
+                                          color: const Color(0xFF2DD4BF)),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
                                       children: [
                                         Text(
                                           'TOTAL LANDED COST',
@@ -845,9 +959,13 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
                               value: _paymentStatus,
-                              dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              dropdownColor: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : Colors.white,
                               style: TextStyle(
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A),
                                 fontSize: 13,
                               ),
                               decoration: _inputDecoration(
@@ -856,12 +974,19 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                 isDark: isDark,
                               ),
                               items: const [
-                                DropdownMenuItem(value: 'unpaid', child: Text('Unpaid (Accounts Payable)')),
-                                DropdownMenuItem(value: 'partially_paid', child: Text('Partially Paid')),
-                                DropdownMenuItem(value: 'paid', child: Text('Fully Paid')),
+                                DropdownMenuItem(
+                                    value: 'unpaid',
+                                    child: Text('Unpaid (Accounts Payable)')),
+                                DropdownMenuItem(
+                                    value: 'partially_paid',
+                                    child: Text('Partially Paid')),
+                                DropdownMenuItem(
+                                    value: 'paid', child: Text('Fully Paid')),
                               ],
                               onChanged: (val) {
-                                if (val != null) setState(() => _paymentStatus = val);
+                                if (val != null) {
+                                  setState(() => _paymentStatus = val);
+                                }
                               },
                             ),
                           ],
@@ -869,16 +994,20 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                         second: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('Batch Notes & Quality Control', isDark),
+                            _buildLabel(
+                                'Batch Notes & Quality Control', isDark),
                             const SizedBox(height: 6),
                             TextFormField(
                               controller: _notesController,
                               style: TextStyle(
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A),
                                 fontSize: 13,
                               ),
                               decoration: _inputDecoration(
-                                hintText: 'e.g. Lab tested, packaging verified...',
+                                hintText:
+                                    'e.g. Lab tested, packaging verified...',
                                 icon: Icons.notes_rounded,
                                 isDark: isDark,
                               ),
@@ -896,11 +1025,15 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
+                color:
+                    isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(18)),
                 border: Border(
                   top: BorderSide(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0),
                   ),
                 ),
               ),
@@ -920,12 +1053,17 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                   ),
                   const SizedBox(width: 12),
                   OutlinedButton(
-                    onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                    child: Text('Cancel',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
@@ -934,18 +1072,23 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
                           )
                         : const Icon(Icons.check_circle_rounded, size: 18),
                     label: Text(
-                      _isSubmitting ? 'Posting Ledger...' : 'Post Stock Entry & Landed Cost',
+                      _isSubmitting
+                          ? 'Posting Ledger...'
+                          : 'Post Stock Entry & Landed Cost',
                       style: GoogleFonts.inter(fontWeight: FontWeight.w700),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0D9488),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 22, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                 ],
@@ -957,7 +1100,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
     );
   }
 
-  Widget _buildItemRowCard(int index, _InvoiceItemDraft item, bool isDark, ClientPortalState state, bool isCompact) {
+  Widget _buildItemRowCard(int index, _InvoiceItemDraft item, bool isDark,
+      ClientPortalState state, bool isCompact) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -975,7 +1119,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0D9488).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
@@ -991,7 +1136,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                 ),
                 if (_items.length > 1)
                   IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        color: Color(0xFFEF4444), size: 20),
                     tooltip: 'Remove Row',
                     onPressed: () => setState(() => _items.removeAt(index)),
                   ),
@@ -1004,21 +1150,27 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                         ? item.productId
                         : state.products.first.id,
                     isExpanded: true,
-                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    dropdownColor:
+                        isDark ? const Color(0xFF1E293B) : Colors.white,
                     style: TextStyle(
                       color: isDark ? Colors.white : const Color(0xFF0F172A),
                       fontSize: 13,
                     ),
-                    decoration: _inputDecoration(hintText: 'Product', icon: Icons.inventory_2_rounded, isDark: isDark),
+                    decoration: _inputDecoration(
+                        hintText: 'Product',
+                        icon: Icons.inventory_2_rounded,
+                        isDark: isDark),
                     items: state.products.map((p) {
                       return DropdownMenuItem(
                         value: p.id,
-                        child: Text('${p.name} (${p.sku})', overflow: TextOverflow.ellipsis),
+                        child: Text('${p.name} (${p.sku})',
+                            overflow: TextOverflow.ellipsis),
                       );
                     }).toList(),
                     onChanged: (val) {
                       if (val != null) {
-                        final match = state.products.firstWhere((p) => p.id == val);
+                        final match =
+                            state.products.firstWhere((p) => p.id == val);
                         setState(() {
                           item.productId = match.id;
                           item.productName = match.name;
@@ -1029,16 +1181,26 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                   )
                 : TextFormField(
                     initialValue: item.productName,
-                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
-                    decoration: _inputDecoration(hintText: 'Product Name', icon: Icons.inventory_2_rounded, isDark: isDark),
+                    style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontSize: 13),
+                    decoration: _inputDecoration(
+                        hintText: 'Product Name',
+                        icon: Icons.inventory_2_rounded,
+                        isDark: isDark),
                     onChanged: (v) => item.productName = v,
                   ),
             const SizedBox(height: 8),
             TextFormField(
               initialValue: item.quantity.toString(),
               keyboardType: TextInputType.number,
-              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
-              decoration: _inputDecoration(hintText: 'Quantity (Units)', icon: Icons.numbers_rounded, isDark: isDark),
+              style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  fontSize: 13),
+              decoration: _inputDecoration(
+                  hintText: 'Quantity (Units)',
+                  icon: Icons.numbers_rounded,
+                  isDark: isDark),
               onChanged: (v) {
                 setState(() {
                   item.quantity = int.tryParse(v) ?? 0;
@@ -1049,7 +1211,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0D9488).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
@@ -1070,25 +1233,33 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                   flex: 4,
                   child: state.products.isNotEmpty
                       ? DropdownButtonFormField<String>(
-                          value: state.products.any((p) => p.id == item.productId)
-                              ? item.productId
-                              : state.products.first.id,
+                          value:
+                              state.products.any((p) => p.id == item.productId)
+                                  ? item.productId
+                                  : state.products.first.id,
                           isExpanded: true,
-                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          dropdownColor:
+                              isDark ? const Color(0xFF1E293B) : Colors.white,
                           style: TextStyle(
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            color:
+                                isDark ? Colors.white : const Color(0xFF0F172A),
                             fontSize: 13,
                           ),
-                          decoration: _inputDecoration(hintText: 'Product', icon: Icons.inventory_2_rounded, isDark: isDark),
+                          decoration: _inputDecoration(
+                              hintText: 'Product',
+                              icon: Icons.inventory_2_rounded,
+                              isDark: isDark),
                           items: state.products.map((p) {
                             return DropdownMenuItem(
                               value: p.id,
-                              child: Text('${p.name} (${p.sku})', overflow: TextOverflow.ellipsis),
+                              child: Text('${p.name} (${p.sku})',
+                                  overflow: TextOverflow.ellipsis),
                             );
                           }).toList(),
                           onChanged: (val) {
                             if (val != null) {
-                              final match = state.products.firstWhere((p) => p.id == val);
+                              final match =
+                                  state.products.firstWhere((p) => p.id == val);
                               setState(() {
                                 item.productId = match.id;
                                 item.productName = match.name;
@@ -1099,8 +1270,15 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                         )
                       : TextFormField(
                           initialValue: item.productName,
-                          style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
-                          decoration: _inputDecoration(hintText: 'Product Name', icon: Icons.inventory_2_rounded, isDark: isDark),
+                          style: TextStyle(
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A),
+                              fontSize: 13),
+                          decoration: _inputDecoration(
+                              hintText: 'Product Name',
+                              icon: Icons.inventory_2_rounded,
+                              isDark: isDark),
                           onChanged: (v) => item.productName = v,
                         ),
                 ),
@@ -1112,8 +1290,13 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                   child: TextFormField(
                     initialValue: item.quantity.toString(),
                     keyboardType: TextInputType.number,
-                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
-                    decoration: _inputDecoration(hintText: 'Qty', icon: Icons.numbers_rounded, isDark: isDark),
+                    style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontSize: 13),
+                    decoration: _inputDecoration(
+                        hintText: 'Qty',
+                        icon: Icons.numbers_rounded,
+                        isDark: isDark),
                     onChanged: (v) {
                       setState(() {
                         item.quantity = int.tryParse(v) ?? 0;
@@ -1125,7 +1308,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
 
                 // Remove button
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      color: Color(0xFFEF4444), size: 20),
                   tooltip: 'Remove Row',
                   onPressed: _items.length > 1
                       ? () {
@@ -1154,14 +1338,24 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('1. Base Unit (₦)', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                                Text('1. Base Unit (₦)',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF64748B))),
                                 const SizedBox(height: 4),
                                 TextFormField(
-                                  initialValue: item.unitCost.toStringAsFixed(0),
+                                  initialValue:
+                                      item.unitCost.toStringAsFixed(0),
                                   keyboardType: TextInputType.number,
-                                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 12.5),
+                                  style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
+                                      fontSize: 12.5),
                                   decoration: _denseInputDecoration(isDark),
-                                  onChanged: (v) => setState(() => item.unitCost = double.tryParse(v) ?? 0),
+                                  onChanged: (v) => setState(() =>
+                                      item.unitCost = double.tryParse(v) ?? 0),
                                 ),
                               ],
                             ),
@@ -1171,14 +1365,24 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('2. Packaging / Unit (₦)', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                                Text('2. Packaging / Unit (₦)',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF64748B))),
                                 const SizedBox(height: 4),
                                 TextFormField(
-                                  initialValue: item.packagingCost.toStringAsFixed(0),
+                                  initialValue:
+                                      item.packagingCost.toStringAsFixed(0),
                                   keyboardType: TextInputType.number,
-                                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 12.5),
+                                  style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
+                                      fontSize: 12.5),
                                   decoration: _denseInputDecoration(isDark),
-                                  onChanged: (v) => setState(() => item.packagingCost = double.tryParse(v) ?? 0),
+                                  onChanged: (v) => setState(() => item
+                                      .packagingCost = double.tryParse(v) ?? 0),
                                 ),
                               ],
                             ),
@@ -1192,14 +1396,24 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('3. Freight / Unit (₦)', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                                Text('3. Freight / Unit (₦)',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF64748B))),
                                 const SizedBox(height: 4),
                                 TextFormField(
-                                  initialValue: item.freightCost.toStringAsFixed(0),
+                                  initialValue:
+                                      item.freightCost.toStringAsFixed(0),
                                   keyboardType: TextInputType.number,
-                                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 12.5),
+                                  style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
+                                      fontSize: 12.5),
                                   decoration: _denseInputDecoration(isDark),
-                                  onChanged: (v) => setState(() => item.freightCost = double.tryParse(v) ?? 0),
+                                  onChanged: (v) => setState(() => item
+                                      .freightCost = double.tryParse(v) ?? 0),
                                 ),
                               ],
                             ),
@@ -1209,14 +1423,24 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('4. Handling / Unit (₦)', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                                Text('4. Handling / Unit (₦)',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF64748B))),
                                 const SizedBox(height: 4),
                                 TextFormField(
-                                  initialValue: item.handlingCost.toStringAsFixed(0),
+                                  initialValue:
+                                      item.handlingCost.toStringAsFixed(0),
                                   keyboardType: TextInputType.number,
-                                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 12.5),
+                                  style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
+                                      fontSize: 12.5),
                                   decoration: _denseInputDecoration(isDark),
-                                  onChanged: (v) => setState(() => item.handlingCost = double.tryParse(v) ?? 0),
+                                  onChanged: (v) => setState(() => item
+                                      .handlingCost = double.tryParse(v) ?? 0),
                                 ),
                               ],
                             ),
@@ -1226,11 +1450,15 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                          color:
+                              const Color(0xFF0D9488).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3)),
+                          border: Border.all(
+                              color: const Color(0xFF0D9488)
+                                  .withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1248,7 +1476,9 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                               style: GoogleFonts.inter(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A),
                               ),
                             ),
                           ],
@@ -1262,14 +1492,23 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('1. Base Unit (₦)', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                            Text('1. Base Unit (₦)',
+                                style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B))),
                             const SizedBox(height: 4),
                             TextFormField(
                               initialValue: item.unitCost.toStringAsFixed(0),
                               keyboardType: TextInputType.number,
-                              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 12.5),
+                              style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A),
+                                  fontSize: 12.5),
                               decoration: _denseInputDecoration(isDark),
-                              onChanged: (v) => setState(() => item.unitCost = double.tryParse(v) ?? 0),
+                              onChanged: (v) => setState(() =>
+                                  item.unitCost = double.tryParse(v) ?? 0),
                             ),
                           ],
                         ),
@@ -1279,14 +1518,24 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('2. Packaging / Unit (₦)', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                            Text('2. Packaging / Unit (₦)',
+                                style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B))),
                             const SizedBox(height: 4),
                             TextFormField(
-                              initialValue: item.packagingCost.toStringAsFixed(0),
+                              initialValue:
+                                  item.packagingCost.toStringAsFixed(0),
                               keyboardType: TextInputType.number,
-                              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 12.5),
+                              style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A),
+                                  fontSize: 12.5),
                               decoration: _denseInputDecoration(isDark),
-                              onChanged: (v) => setState(() => item.packagingCost = double.tryParse(v) ?? 0),
+                              onChanged: (v) => setState(() =>
+                                  item.packagingCost = double.tryParse(v) ?? 0),
                             ),
                           ],
                         ),
@@ -1296,14 +1545,23 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('3. Freight / Unit (₦)', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                            Text('3. Freight / Unit (₦)',
+                                style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B))),
                             const SizedBox(height: 4),
                             TextFormField(
                               initialValue: item.freightCost.toStringAsFixed(0),
                               keyboardType: TextInputType.number,
-                              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 12.5),
+                              style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A),
+                                  fontSize: 12.5),
                               decoration: _denseInputDecoration(isDark),
-                              onChanged: (v) => setState(() => item.freightCost = double.tryParse(v) ?? 0),
+                              onChanged: (v) => setState(() =>
+                                  item.freightCost = double.tryParse(v) ?? 0),
                             ),
                           ],
                         ),
@@ -1313,14 +1571,24 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('4. Handling / Unit (₦)', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                            Text('4. Handling / Unit (₦)',
+                                style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B))),
                             const SizedBox(height: 4),
                             TextFormField(
-                              initialValue: item.handlingCost.toStringAsFixed(0),
+                              initialValue:
+                                  item.handlingCost.toStringAsFixed(0),
                               keyboardType: TextInputType.number,
-                              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 12.5),
+                              style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A),
+                                  fontSize: 12.5),
                               decoration: _denseInputDecoration(isDark),
-                              onChanged: (v) => setState(() => item.handlingCost = double.tryParse(v) ?? 0),
+                              onChanged: (v) => setState(() =>
+                                  item.handlingCost = double.tryParse(v) ?? 0),
                             ),
                           ],
                         ),
@@ -1329,11 +1597,15 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
 
                       // Effective Landed Cost Badge
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                          color:
+                              const Color(0xFF0D9488).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3)),
+                          border: Border.all(
+                              color: const Color(0xFF0D9488)
+                                  .withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1351,7 +1623,9 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                               style: GoogleFonts.inter(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A),
                               ),
                             ),
                           ],
@@ -1407,18 +1681,21 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+      hintStyle:
+          GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
       prefixIcon: Icon(icon, size: 18, color: const Color(0xFF0D9488)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       filled: true,
       fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+        borderSide: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+        borderSide: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -1435,11 +1712,13 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
       fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+        borderSide: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+        borderSide: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),

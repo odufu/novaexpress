@@ -124,7 +124,8 @@ class DCExpendituresState {
   /// Total Logistics Gross Revenue (from delivered orders in period)
   double get totalRevenue {
     if (liveRevenueTotal > 0) return liveRevenueTotal;
-    return 7635000.0; // Baseline fallback matching September report
+    if (selectedDcId != 'all') return 0.0;
+    return 7635000.0; // Baseline fallback matching September report for cumulative view
   }
 
   /// 1. Direct Costs Breakdown: Riders / PDA Salary & Wages
@@ -134,6 +135,7 @@ class DCExpendituresState {
         .fold(0.0, (sum, e) => sum + e.amount);
     if (expSum > 0) return expSum;
     if (liveRiderEntitlements > 0) return liveRiderEntitlements;
+    if (selectedDcId != 'all') return 0.0;
     return 1794600.0; // September benchmark
   }
 
@@ -144,7 +146,9 @@ class DCExpendituresState {
             e.category == ExpenditureCategory.dieselFuel ||
             e.category == ExpenditureCategory.equipmentMaintenance)
         .fold(0.0, (sum, e) => sum + e.amount);
-    return expSum > 0 ? expSum : 995400.0; // September benchmark
+    if (expSum > 0) return expSum;
+    if (selectedDcId != 'all') return 0.0;
+    return 995400.0; // September benchmark
   }
 
   /// 3. Direct Costs Breakdown: Airtime, Data & Dispatch Logistics
@@ -154,7 +158,9 @@ class DCExpendituresState {
             e.category == ExpenditureCategory.stationery ||
             e.category == ExpenditureCategory.logistics)
         .fold(0.0, (sum, e) => sum + e.amount);
-    return expSum > 0 ? expSum : 54000.0; // September benchmark
+    if (expSum > 0) return expSum;
+    if (selectedDcId != 'all') return 0.0;
+    return 54000.0; // September benchmark
   }
 
   /// Total Direct Operating Costs (Cost of Services)
@@ -174,7 +180,9 @@ class DCExpendituresState {
     final expSum = filteredExpenditures
         .where((e) => e.category == ExpenditureCategory.salaries)
         .fold(0.0, (sum, e) => sum + e.amount);
-    return expSum > 0 ? expSum : 2470000.0; // September benchmark
+    if (expSum > 0) return expSum;
+    if (selectedDcId != 'all') return 0.0;
+    return 2470000.0; // September benchmark
   }
 
   /// 5. OPEX: Office Expenses / Management Airtime
@@ -182,7 +190,9 @@ class DCExpendituresState {
     final expSum = filteredExpenditures
         .where((e) => e.category == ExpenditureCategory.rentUtilities)
         .fold(0.0, (sum, e) => sum + e.amount);
-    return expSum > 0 ? expSum : 96000.0; // September benchmark
+    if (expSum > 0) return expSum;
+    if (selectedDcId != 'all') return 0.0;
+    return 96000.0; // September benchmark
   }
 
   /// 6. OPEX: Other Expenses & Strategic Investments (Power, Equipment, Expansion, Handling, Packaging)
@@ -194,14 +204,16 @@ class DCExpendituresState {
             e.category == ExpenditureCategory.security ||
             e.category == ExpenditureCategory.other)
         .fold(0.0, (sum, e) => sum + e.amount);
-    return expSum > 0 ? expSum : 2202900.0; // September benchmark
+    if (expSum > 0) return expSum;
+    if (selectedDcId != 'all') return 0.0;
+    return 2202900.0; // September benchmark
   }
 
   /// Strategic Expansion Capex (e.g. Lagos project)
-  double get expansionCapex => 1000000.0;
+  double get expansionCapex => selectedDcId == 'all' ? 1000000.0 : 0.0;
 
   /// Equipment Capex (e.g. Phone for social media/scanners)
-  double get equipmentCapex => 680000.0;
+  double get equipmentCapex => selectedDcId == 'all' ? 680000.0 : 0.0;
 
   /// TOTAL OPERATIONAL EXPENSES (OPEX)
   double get totalOpex => adminSalaries + officeExpenses + otherExpenses;
@@ -225,8 +237,8 @@ class DCExpendituresState {
   // UNIT ECONOMICS & DELIVERY PERFORMANCE
   // ----------------------------------------------------
 
-  int get totalOrdersAssigned => liveOrdersAssigned > 0 ? liveOrdersAssigned : 1709;
-  int get totalOrdersDelivered => liveOrdersDelivered > 0 ? liveOrdersDelivered : 1224;
+  int get totalOrdersAssigned => liveOrdersAssigned > 0 ? liveOrdersAssigned : (selectedDcId == 'all' ? 1709 : 0);
+  int get totalOrdersDelivered => liveOrdersDelivered > 0 ? liveOrdersDelivered : (selectedDcId == 'all' ? 1224 : 0);
   int get totalOrdersUndelivered => (totalOrdersAssigned - totalOrdersDelivered).clamp(0, 999999);
 
   double get deliverySuccessRate =>
@@ -465,11 +477,11 @@ class DCExpendituresNotifier extends StateNotifier<DCExpendituresState> {
     if (dc == null) return false;
     final name = dc.name.toLowerCase();
     final code = dc.code.toLowerCase();
-    return name.contains('wuse') ||
-        name.contains('abuja') ||
-        code.contains('wuse') ||
-        code == 'dc-wuse-01' ||
-        dc.isPrimaryHub;
+    return dc.isGrandDc ||
+        code == 'dc-cmd-01' ||
+        code == 'dc-abj-01' ||
+        name.contains('central command') ||
+        name.contains('grand dc');
   }
 
   Future<void> loadExpenditures() async {
@@ -497,9 +509,15 @@ class DCExpendituresNotifier extends StateNotifier<DCExpendituresState> {
       double riderEntitlements = 0.0;
 
       try {
-        var query = Supabase.instance.client
-            .from('orders')
-            .select('id, status, client_delivery_fee, total_amount, agent_entitlement, distribution_center_id, created_at');
+        SupabaseClient? client;
+        try {
+          client = Supabase.instance.client;
+        } catch (_) {}
+
+        if (client != null) {
+          var query = client
+              .from('orders')
+              .select('id, status, client_delivery_fee, total_amount, agent_entitlement, distribution_center_id, created_at');
 
         if (effectiveDcId != 'all' && effectiveDcId.isNotEmpty) {
           query = query.eq('distribution_center_id', effectiveDcId);
@@ -526,9 +544,10 @@ class DCExpendituresNotifier extends StateNotifier<DCExpendituresState> {
             riderEntitlements += entitlement;
           }
         }
-      } catch (e) {
-        debugPrint('Note: Live orders query fallback to benchmark: $e');
       }
+    } catch (e) {
+      debugPrint('Note: Live orders query fallback to benchmark: $e');
+    }
 
       state = state.copyWith(
         expenditures: list,

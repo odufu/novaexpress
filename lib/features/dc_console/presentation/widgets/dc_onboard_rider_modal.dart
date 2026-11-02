@@ -64,7 +64,9 @@ class DCOnboardDraftState {
       vehicleType: vehicleType ?? this.vehicleType,
       compensationType: compensationType ?? this.compensationType,
       selectedBank: selectedBank ?? this.selectedBank,
-      createdCredentialsSlip: createdCredentialsSlip != null ? createdCredentialsSlip() : this.createdCredentialsSlip,
+      createdCredentialsSlip: createdCredentialsSlip != null
+          ? createdCredentialsSlip()
+          : this.createdCredentialsSlip,
     );
   }
 }
@@ -73,9 +75,12 @@ class DCOnboardDraftNotifier extends StateNotifier<DCOnboardDraftState> {
   DCOnboardDraftNotifier() : super(const DCOnboardDraftState());
 
   void setStep(int step) => state = state.copyWith(currentStep: step);
-  void nextStep() => state = state.copyWith(currentStep: (state.currentStep + 1).clamp(0, 4));
-  void previousStep() => state = state.copyWith(currentStep: (state.currentStep - 1).clamp(0, 4));
-  void setPersonnelType(String type) => state = state.copyWith(personnelType: type);
+  void nextStep() =>
+      state = state.copyWith(currentStep: (state.currentStep + 1).clamp(0, 4));
+  void previousStep() =>
+      state = state.copyWith(currentStep: (state.currentStep - 1).clamp(0, 4));
+  void setPersonnelType(String type) =>
+      state = state.copyWith(personnelType: type);
   void setSelectedDc(String dcId, String stateName, List<String> dcLgas) {
     state = state.copyWith(
       selectedDcId: () => dcId,
@@ -84,6 +89,7 @@ class DCOnboardDraftNotifier extends StateNotifier<DCOnboardDraftState> {
       selectedLgas: List.from(dcLgas),
     );
   }
+
   void toggleLga(String lga) {
     final current = List<String>.from(state.selectedLgas);
     if (current.contains(lga)) {
@@ -96,23 +102,32 @@ class DCOnboardDraftNotifier extends StateNotifier<DCOnboardDraftState> {
       assignedZone: current.isNotEmpty ? current.first : state.assignedZone,
     );
   }
+
   void setSelectedLgas(List<String> lgas) {
     state = state.copyWith(
       selectedLgas: lgas,
       assignedZone: lgas.isNotEmpty ? lgas.first : state.assignedZone,
     );
   }
-  void setOperatingLocation(String stateVal, String zoneVal) => state = state.copyWith(operatingState: stateVal, assignedZone: zoneVal);
-  void setAssignedZone(String zone) => state = state.copyWith(assignedZone: zone);
-  void setMustChangePassword(bool val) => state = state.copyWith(mustChangePassword: val);
+
+  void setOperatingLocation(String stateVal, String zoneVal) =>
+      state = state.copyWith(operatingState: stateVal, assignedZone: zoneVal);
+  void setAssignedZone(String zone) =>
+      state = state.copyWith(assignedZone: zone);
+  void setMustChangePassword(bool val) =>
+      state = state.copyWith(mustChangePassword: val);
   void setVehicleType(String type) => state = state.copyWith(vehicleType: type);
-  void setCompensationType(String type) => state = state.copyWith(compensationType: type);
-  void setSelectedBank(String bank) => state = state.copyWith(selectedBank: bank);
+  void setCompensationType(String type) =>
+      state = state.copyWith(compensationType: type);
+  void setSelectedBank(String bank) =>
+      state = state.copyWith(selectedBank: bank);
   void setSubmitting(bool val) => state = state.copyWith(isSubmitting: val);
-  void setCredentialsSlip(Map<String, dynamic> slip) => state = state.copyWith(isSubmitting: false, createdCredentialsSlip: () => slip);
+  void setCredentialsSlip(Map<String, dynamic> slip) => state =
+      state.copyWith(isSubmitting: false, createdCredentialsSlip: () => slip);
 }
 
-final dcOnboardDraftProvider = StateNotifierProvider.autoDispose<DCOnboardDraftNotifier, DCOnboardDraftState>((ref) {
+final dcOnboardDraftProvider = StateNotifierProvider.autoDispose<
+    DCOnboardDraftNotifier, DCOnboardDraftState>((ref) {
   return DCOnboardDraftNotifier();
 });
 
@@ -128,7 +143,8 @@ class DCOnboardRiderModal extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<DCOnboardRiderModal> createState() => _DCOnboardRiderModalState();
+  ConsumerState<DCOnboardRiderModal> createState() =>
+      _DCOnboardRiderModalState();
 }
 
 class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
@@ -145,9 +161,11 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   final _tempPinController = TextEditingController(text: '1234');
 
   // Step 3: Vehicle & Asset Setup
-  final _vehicleModelController = TextEditingController(text: 'Bajaj Boxer 100 (Personal)');
+  final _vehicleModelController =
+      TextEditingController(text: 'Bajaj Boxer 100 (Personal)');
   final _vehiclePlateController = TextEditingController(text: 'ABJ-304-XY');
-  final _licenseOrAssetTagController = TextEditingController(text: 'LIC-2026-9912');
+  final _licenseOrAssetTagController =
+      TextEditingController(text: 'LIC-2026-9912');
   final _fuelCardController = TextEditingController(text: 'FUEL-VOUCH-882');
 
   // Step 4: Unique Compensation Agreement
@@ -210,7 +228,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     // Local fleet check
     final dcDrivers = ref.read(dcConsoleProvider).dcDrivers;
     if (dcDrivers.any((d) => d.phone.trim() == phone)) {
-      setState(() => _phoneError = 'This phone number is already registered to an active driver.');
+      setState(() => _phoneError =
+          'This phone number is already registered to an active driver.');
       return;
     }
 
@@ -226,11 +245,15 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
       setState(() => _isCheckingPhone = true);
       try {
-        final exists = await ref.read(authRemoteDataSourceProvider).checkPhoneExists(phone);
+        final exists = await ref
+            .read(authRemoteDataSourceProvider)
+            .checkPhoneExists(phone);
         if (mounted && _phoneController.text.trim() == phone) {
           setState(() {
             _isCheckingPhone = false;
-            _phoneError = exists ? 'This phone number is already registered to another account.' : null;
+            _phoneError = exists
+                ? 'This phone number is already registered to another account.'
+                : null;
           });
         }
       } catch (_) {
@@ -252,7 +275,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
     final dcDrivers = ref.read(dcConsoleProvider).dcDrivers;
     if (dcDrivers.any((d) => d.phone.trim() == phone)) {
-      setState(() => _phoneError = 'This phone number is already registered to an active driver.');
+      setState(() => _phoneError =
+          'This phone number is already registered to an active driver.');
       return false;
     }
 
@@ -260,11 +284,14 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
     setState(() => _isCheckingPhone = true);
     try {
-      final exists = await ref.read(authRemoteDataSourceProvider).checkPhoneExists(phone);
+      final exists =
+          await ref.read(authRemoteDataSourceProvider).checkPhoneExists(phone);
       if (mounted) {
         setState(() {
           _isCheckingPhone = false;
-          _phoneError = exists ? 'This phone number is already registered to another account.' : null;
+          _phoneError = exists
+              ? 'This phone number is already registered to another account.'
+              : null;
         });
       }
       return !exists;
@@ -294,7 +321,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     // Local fleet check
     final dcDrivers = ref.read(dcConsoleProvider).dcDrivers;
     if (dcDrivers.any((d) => d.email.trim().toLowerCase() == email)) {
-      setState(() => _emailError = 'This email is already registered to an active driver.');
+      setState(() => _emailError =
+          'This email is already registered to an active driver.');
       return;
     }
 
@@ -310,11 +338,15 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
       setState(() => _isCheckingEmail = true);
       try {
-        final exists = await ref.read(authRemoteDataSourceProvider).checkEmailExists(email);
+        final exists = await ref
+            .read(authRemoteDataSourceProvider)
+            .checkEmailExists(email);
         if (mounted && _emailController.text.trim().toLowerCase() == email) {
           setState(() {
             _isCheckingEmail = false;
-            _emailError = exists ? 'This email is already taken. Please enter a unique email address.' : null;
+            _emailError = exists
+                ? 'This email is already taken. Please enter a unique email address.'
+                : null;
           });
         }
       } catch (_) {
@@ -337,7 +369,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
     final dcDrivers = ref.read(dcConsoleProvider).dcDrivers;
     if (dcDrivers.any((d) => d.email.trim().toLowerCase() == email)) {
-      setState(() => _emailError = 'This email is already registered to an active driver.');
+      setState(() => _emailError =
+          'This email is already registered to an active driver.');
       return false;
     }
 
@@ -345,11 +378,14 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
     setState(() => _isCheckingEmail = true);
     try {
-      final exists = await ref.read(authRemoteDataSourceProvider).checkEmailExists(email);
+      final exists =
+          await ref.read(authRemoteDataSourceProvider).checkEmailExists(email);
       if (mounted) {
         setState(() {
           _isCheckingEmail = false;
-          _emailError = exists ? 'This email is already taken. Please enter a unique email address.' : null;
+          _emailError = exists
+              ? 'This email is already taken. Please enter a unique email address.'
+              : null;
         });
       }
       return !exists;
@@ -360,11 +396,13 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   }
 
   void _autoUpdateEmail() {
-    if (_emailController.text.isEmpty || _emailController.text.contains('@novaxpress.ng')) {
+    if (_emailController.text.isEmpty ||
+        _emailController.text.contains('@novaxpress.ng')) {
       final f = _firstNameController.text.trim().toLowerCase();
       final l = _lastNameController.text.trim().toLowerCase();
       if (f.isNotEmpty || l.isNotEmpty) {
-        final prefix = '${f.isNotEmpty ? f : "rider"}.${l.isNotEmpty ? l : "agent"}';
+        final prefix =
+            '${f.isNotEmpty ? f : "rider"}.${l.isNotEmpty ? l : "agent"}';
         _emailController.text = '$prefix@novaxpress.ng';
       }
     }
@@ -425,7 +463,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       ref.read(dcOnboardDraftProvider.notifier).setStep(0);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('⚠️ Please provide a valid, unique email address before proceeding.'),
+          content: Text(
+              '⚠️ Please provide a valid, unique email address before proceeding.'),
           backgroundColor: Color(0xFFEF4444),
           duration: Duration(seconds: 3),
         ),
@@ -437,31 +476,57 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     final notifier = ref.read(dcOnboardDraftProvider.notifier);
     notifier.setSubmitting(true);
 
-    final firstName = _firstNameController.text.trim().isEmpty ? 'Samuel' : _firstNameController.text.trim();
-    final lastName = _lastNameController.text.trim().isEmpty ? 'Okon' : _lastNameController.text.trim();
+    final firstName = _firstNameController.text.trim().isEmpty
+        ? 'Samuel'
+        : _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim().isEmpty
+        ? 'Okon'
+        : _lastNameController.text.trim();
     final fullName = '$firstName $lastName';
-    final phone = _phoneController.text.trim().isEmpty ? '08031234567' : _phoneController.text.trim();
+    final phone = _phoneController.text.trim().isEmpty
+        ? '08031234567'
+        : _phoneController.text.trim();
     final email = _emailController.text.trim().toLowerCase().isEmpty
         ? '${firstName.toLowerCase()}.${lastName.toLowerCase()}@novaxpress.ng'
         : _emailController.text.trim().toLowerCase();
-    final tempPassword = _tempPasswordController.text.trim().isEmpty ? 'Password123!' : _tempPasswordController.text.trim();
-    final tempPin = _tempPinController.text.trim().isEmpty ? '1234' : _tempPinController.text.trim();
+    final tempPassword = _tempPasswordController.text.trim().isEmpty
+        ? 'Password123!'
+        : _tempPasswordController.text.trim();
+    final tempPin = _tempPinController.text.trim().isEmpty
+        ? '1234'
+        : _tempPinController.text.trim();
 
     final isPda = draftState.personnelType == 'pda';
-    final randomSuffix = (100 + (DateTime.now().millisecondsSinceEpoch % 899)).toString();
+    final randomSuffix =
+        (100 + (DateTime.now().millisecondsSinceEpoch % 899)).toString();
     final driverCode = isPda ? 'PDA-7$randomSuffix' : 'RDR-$randomSuffix';
 
-    final commission = double.tryParse(_commissionController.text) ?? (isPda ? 1000.0 : 500.0);
-    final transport = double.tryParse(_transportAllowanceController.text) ?? (isPda ? 1500.0 : 800.0);
+    final commission =
+        double.tryParse(_commissionController.text) ?? (isPda ? 1000.0 : 500.0);
+    final transport = double.tryParse(_transportAllowanceController.text) ??
+        (isPda ? 1500.0 : 800.0);
     final failed = double.tryParse(_failedAllowanceController.text) ?? 500.0;
-    final salary = double.tryParse(_baseSalaryController.text) ?? (isPda ? 0.0 : 120000.0);
+    final salary =
+        double.tryParse(_baseSalaryController.text) ?? (isPda ? 0.0 : 120000.0);
     final upsell = double.tryParse(_upsellBonusController.text) ?? 10.0;
 
     String finalDriverCode = driverCode;
     String finalDriverId = 'drv-${DateTime.now().millisecondsSinceEpoch}';
 
     final dcState = ref.read(dcConsoleProvider);
-    final targetDcId = draftState.selectedDcId ?? dcState.activeHubId;
+    final currentUser = ref.read(authProvider).user;
+    final isSuperAdmin = currentUser != null && (currentUser.isSuperAdmin || currentUser.role == 'super_admin' || currentUser.role == 'admin');
+    final isUserFromGrandDc = currentUser != null && (
+        currentUser.distributionCenterId == '22222222-2222-4222-8222-222222222222' ||
+        currentUser.distributionCenterId == 'DC-CMD-01' ||
+        (currentUser.distributionCenterId != null && dcState.distributionCenters.any((d) => (d.id == currentUser.distributionCenterId || d.code == currentUser.distributionCenterId) && d.isGrandDc))
+    );
+    final isGrandDcAdmin = (currentUser?.role == 'dc_admin' || currentUser?.role == 'dc_manager' || currentUser?.isDcManager == true) && isUserFromGrandDc;
+    final canManageOtherDcs = isSuperAdmin || isGrandDcAdmin;
+
+    final targetDcId = canManageOtherDcs
+        ? (draftState.selectedDcId ?? dcState.activeHubId)
+        : (currentUser?.distributionCenterId ?? dcState.activeHubId);
     final targetDc = dcState.distributionCenters.firstWhere(
       (dc) => dc.id == targetDcId,
       orElse: () => dcState.distributionCenters.isNotEmpty
@@ -471,38 +536,46 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
     final riderLgas = draftState.selectedLgas.isNotEmpty
         ? draftState.selectedLgas
-        : (targetDc.coveredLgas.isNotEmpty ? targetDc.coveredLgas : [draftState.assignedZone]);
+        : (targetDc.coveredLgas.isNotEmpty
+            ? targetDc.coveredLgas
+            : [draftState.assignedZone]);
 
     // 1. Register rider in database & authentication system
     try {
-      final createdUser = await ref.read(authRemoteDataSourceProvider).registerDeliveryAgent(
-        email: email,
-        password: tempPassword,
-        firstName: firstName,
-        lastName: lastName,
-        phone: phone,
-        personnelType: draftState.personnelType,
-        compensationType: draftState.compensationType,
-        commissionRate: commission,
-        transportAllowance: transport,
-        fuelAllowance: isPda ? 0.0 : 800.0,
-        failedDeliveryAllowance: failed,
-        baseSalary: salary,
-        vehicleType: draftState.vehicleType,
-        vehiclePlateNumber: _vehiclePlateController.text.trim(),
-        bankName: draftState.selectedBank,
-        bankAccountNumber: _accountNumberController.text.trim().isEmpty ? '2019847291' : _accountNumberController.text.trim(),
-        bankAccountName: _accountNameController.text.trim().isEmpty ? fullName : _accountNameController.text.trim(),
-        distributionCenterId: targetDc.id,
-        assignedZone: riderLgas.first,
-      );
+      final createdUser =
+          await ref.read(authRemoteDataSourceProvider).registerDeliveryAgent(
+                email: email,
+                password: tempPassword,
+                firstName: firstName,
+                lastName: lastName,
+                phone: phone,
+                personnelType: draftState.personnelType,
+                compensationType: draftState.compensationType,
+                commissionRate: commission,
+                transportAllowance: transport,
+                fuelAllowance: isPda ? 0.0 : 800.0,
+                failedDeliveryAllowance: failed,
+                baseSalary: salary,
+                vehicleType: draftState.vehicleType,
+                vehiclePlateNumber: _vehiclePlateController.text.trim(),
+                bankName: draftState.selectedBank,
+                bankAccountNumber: _accountNumberController.text.trim().isEmpty
+                    ? '2019847291'
+                    : _accountNumberController.text.trim(),
+                bankAccountName: _accountNameController.text.trim().isEmpty
+                    ? fullName
+                    : _accountNameController.text.trim(),
+                distributionCenterId: targetDc.id,
+                assignedZone: riderLgas.first,
+              );
       if (createdUser.deliveryAgentCode?.isNotEmpty == true) {
         finalDriverCode = createdUser.deliveryAgentCode!;
       }
       if (createdUser.deliveryAgentId?.isNotEmpty == true) {
         finalDriverId = createdUser.deliveryAgentId!;
       }
-      debugPrint('[DC_ONBOARD] 🚀 Delivery agent registered: ${createdUser.email} ($finalDriverCode)');
+      debugPrint(
+          '[DC_ONBOARD] 🚀 Delivery agent registered: ${createdUser.email} ($finalDriverCode)');
     } catch (e) {
       debugPrint('[DC_ONBOARD] ❌ Registration error: $e');
       if (mounted) {
@@ -549,10 +622,18 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       baseSalary: salary,
       upsellBonusPercent: upsell,
       bankName: draftState.selectedBank,
-      bankAccountNumber: _accountNumberController.text.trim().isEmpty ? '2019847291' : _accountNumberController.text.trim(),
-      bankAccountName: _accountNameController.text.trim().isEmpty ? fullName : _accountNameController.text.trim(),
-      guarantorName: _guarantorNameController.text.trim().isEmpty ? 'Dr. Chidi Okafor' : _guarantorNameController.text.trim(),
-      guarantorPhone: _guarantorPhoneController.text.trim().isEmpty ? '08034567890' : _guarantorPhoneController.text.trim(),
+      bankAccountNumber: _accountNumberController.text.trim().isEmpty
+          ? '2019847291'
+          : _accountNumberController.text.trim(),
+      bankAccountName: _accountNameController.text.trim().isEmpty
+          ? fullName
+          : _accountNameController.text.trim(),
+      guarantorName: _guarantorNameController.text.trim().isEmpty
+          ? 'Dr. Chidi Okafor'
+          : _guarantorNameController.text.trim(),
+      guarantorPhone: _guarantorPhoneController.text.trim().isEmpty
+          ? '08034567890'
+          : _guarantorPhoneController.text.trim(),
     );
 
     // 2. Save to DC provider and sync from live database
@@ -566,10 +647,14 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       'email': email,
       'password': tempPassword,
       'pin': tempPin,
-      'personnelType': isPda ? 'PDA (Personal Vehicle)' : 'In-House Rider (Company Fleet)',
-      'hub': 'Wuse Distribution Center (DC-WUSE-01)',
-      'agreement': '₦${commission.toInt()} Comm. + ₦${transport.toInt()} Transport',
-      'salary': salary > 0 ? CurrencyFormatter.formatNaira(salary) : 'Commission Only',
+      'personnelType':
+          isPda ? 'PDA (Personal Vehicle)' : 'In-House Rider (Company Fleet)',
+      'hub': 'Central Command Distribution Center (DC-CMD-01)',
+      'agreement':
+          '₦${commission.toInt()} Comm. + ₦${transport.toInt()} Transport',
+      'salary': salary > 0
+          ? CurrencyFormatter.formatNaira(salary)
+          : 'Commission Only',
     });
   }
 
@@ -580,7 +665,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     final draftState = ref.watch(dcOnboardDraftProvider);
 
     if (draftState.createdCredentialsSlip != null) {
-      return _buildCredentialsSuccessSlip(isDark, draftState.createdCredentialsSlip!);
+      return _buildCredentialsSuccessSlip(
+          isDark, draftState.createdCredentialsSlip!);
     }
 
     final screenWidth = MediaQuery.of(context).size.width;
@@ -617,7 +703,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                           color: const Color(0xFF031632),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFFF37021), size: 24),
+                        child: const Icon(Icons.person_add_alt_1_rounded,
+                            color: Color(0xFFF37021), size: 24),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -629,12 +716,15 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                               style: GoogleFonts.inter(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : const Color(0xFF031632),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF031632),
                               ),
                             ),
                             Text(
                               'Configure identity, generate login credentials, assign vehicle assets, and set unique rate agreements',
-                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                              style: GoogleFonts.inter(
+                                  fontSize: 12, color: const Color(0xFF64748B)),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -657,15 +747,20 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildStepTab(0, '1. Role & Identity', Icons.badge_outlined, draftState.currentStep),
+                  _buildStepTab(0, '1. Role & Identity', Icons.badge_outlined,
+                      draftState.currentStep),
                   const SizedBox(width: 8),
-                  _buildStepTab(1, '2. Login & Security', Icons.lock_outline_rounded, draftState.currentStep),
+                  _buildStepTab(1, '2. Login & Security',
+                      Icons.lock_outline_rounded, draftState.currentStep),
                   const SizedBox(width: 8),
-                  _buildStepTab(2, '3. Vehicle & Asset', Icons.two_wheeler_rounded, draftState.currentStep),
+                  _buildStepTab(2, '3. Vehicle & Asset',
+                      Icons.two_wheeler_rounded, draftState.currentStep),
                   const SizedBox(width: 8),
-                  _buildStepTab(3, '4. Agreement', Icons.handshake_outlined, draftState.currentStep),
+                  _buildStepTab(3, '4. Agreement', Icons.handshake_outlined,
+                      draftState.currentStep),
                   const SizedBox(width: 8),
-                  _buildStepTab(4, '5. Payout Bank', Icons.account_balance_outlined, draftState.currentStep),
+                  _buildStepTab(4, '5. Payout Bank',
+                      Icons.account_balance_outlined, draftState.currentStep),
                 ],
               ),
             ),
@@ -691,7 +786,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               children: [
                 if (draftState.currentStep > 0)
                   OutlinedButton.icon(
-                    onPressed: () => ref.read(dcOnboardDraftProvider.notifier).previousStep(),
+                    onPressed: () => ref
+                        .read(dcOnboardDraftProvider.notifier)
+                        .previousStep(),
                     icon: const Icon(Icons.arrow_back_rounded, size: 16),
                     label: const Text('Previous'),
                   )
@@ -708,30 +805,46 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     if (draftState.currentStep < 4)
                       ElevatedButton.icon(
                         onPressed: () async {
-                          if (draftState.currentStep == 0 || draftState.currentStep == 1) {
+                          if (draftState.currentStep == 0 ||
+                              draftState.currentStep == 1) {
                             final emailValid = await _validateEmailField();
                             final phoneValid = await _validatePhoneField();
                             if (!emailValid || !phoneValid) return;
                           }
                           ref.read(dcOnboardDraftProvider.notifier).nextStep();
                         },
-                        icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
-                        label: const Text('Next Step', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        icon: const Icon(Icons.arrow_forward_rounded,
+                            size: 16, color: Colors.white),
+                        label: const Text('Next Step',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF031632),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 12),
                         ),
                       )
                     else
                       ElevatedButton.icon(
-                        onPressed: draftState.isSubmitting ? null : _submitOnboarding,
+                        onPressed:
+                            draftState.isSubmitting ? null : _submitOnboarding,
                         icon: draftState.isSubmitting
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
-                        label: const Text('Issue Credentials & Activate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.check_circle_rounded,
+                                size: 18, color: Colors.white),
+                        label: const Text('Issue Credentials & Activate',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF059669),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 12),
                         ),
                       ),
                   ],
@@ -744,7 +857,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     );
   }
 
-  Widget _buildStepTab(int stepIdx, String label, IconData icon, int currentStep) {
+  Widget _buildStepTab(
+      int stepIdx, String label, IconData icon, int currentStep) {
     final isActive = currentStep == stepIdx;
     final isDone = currentStep > stepIdx;
 
@@ -757,7 +871,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           color: isActive ? const Color(0xFF031632) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isActive ? const Color(0xFF031632) : (isDone ? const Color(0xFF10B981) : const Color(0xFFCBD5E1)),
+            color: isActive
+                ? const Color(0xFF031632)
+                : (isDone ? const Color(0xFF10B981) : const Color(0xFFCBD5E1)),
             width: isActive ? 1.5 : 1,
           ),
         ),
@@ -767,7 +883,11 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             Icon(
               isDone ? Icons.check_circle_rounded : icon,
               size: 16,
-              color: isDone ? const Color(0xFF10B981) : (isActive ? const Color(0xFFF37021) : const Color(0xFF64748B)),
+              color: isDone
+                  ? const Color(0xFF10B981)
+                  : (isActive
+                      ? const Color(0xFFF37021)
+                      : const Color(0xFF64748B)),
             ),
             const SizedBox(width: 6),
             Text(
@@ -818,7 +938,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         LayoutBuilder(
           builder: (context, constraints) {
             final isNarrow = constraints.maxWidth < 600;
-            final double cardWidth = isNarrow ? constraints.maxWidth : (constraints.maxWidth - 12) / 2;
+            final double cardWidth = isNarrow
+                ? constraints.maxWidth
+                : (constraints.maxWidth - 12) / 2;
 
             return Wrap(
               spacing: 12,
@@ -830,7 +952,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     typeKey: 'pda',
                     title: 'PDA (Personal Distribution Agent)',
                     badge: 'Own Vehicle',
-                    description: 'Uses personal motorcycle, car, or bicycle. Carries distributed client inventory. Compensated on custom commission & transport allowance.',
+                    description:
+                        'Uses personal motorcycle, car, or bicycle. Carries distributed client inventory. Compensated on custom commission & transport allowance.',
                     icon: Icons.two_wheeler_rounded,
                     isSelected: draftState.personnelType == 'pda',
                     onTap: () => _onPersonnelTypeChanged('pda'),
@@ -842,7 +965,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     typeKey: 'in_house_rider',
                     title: 'In-House Delivery Rider',
                     badge: 'Company Bike',
-                    description: 'Uses NovaXpress company fleet vehicle. Operates on base salary + fuel allowance & delivery milestone bonuses.',
+                    description:
+                        'Uses NovaXpress company fleet vehicle. Operates on base salary + fuel allowance & delivery milestone bonuses.',
                     icon: Icons.delivery_dining_rounded,
                     isSelected: draftState.personnelType == 'in_house_rider',
                     onTap: () => _onPersonnelTypeChanged('in_house_rider'),
@@ -855,13 +979,23 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
         const SizedBox(height: 20),
 
-        Text('Personal & Identity Details', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+        Text('Personal & Identity Details',
+            style:
+                GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: TextField(controller: _firstNameController, decoration: const InputDecoration(labelText: 'First Name', hintText: 'e.g. Samuel'))),
+            Expanded(
+                child: TextField(
+                    controller: _firstNameController,
+                    decoration: const InputDecoration(
+                        labelText: 'First Name', hintText: 'e.g. Samuel'))),
             const SizedBox(width: 12),
-            Expanded(child: TextField(controller: _lastNameController, decoration: const InputDecoration(labelText: 'Last Name', hintText: 'e.g. Okon'))),
+            Expanded(
+                child: TextField(
+                    controller: _lastNameController,
+                    decoration: const InputDecoration(
+                        labelText: 'Last Name', hintText: 'e.g. Okon'))),
           ],
         ),
         const SizedBox(height: 12),
@@ -876,14 +1010,32 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                   hintText: '08031234567',
                   prefixIcon: const Icon(Icons.phone_outlined, size: 18),
                   suffixIcon: _isCheckingPhone
-                      ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(strokeWidth: 2)))
                       : (_phoneError != null
-                          ? const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 20)
-                          : (_phoneController.text.isNotEmpty ? const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 20) : null)),
+                          ? const Icon(Icons.error_outline_rounded,
+                              color: Color(0xFFEF4444), size: 20)
+                          : (_phoneController.text.isNotEmpty
+                              ? const Icon(Icons.check_circle_outline_rounded,
+                                  color: Color(0xFF10B981), size: 20)
+                              : null)),
                   errorText: _phoneError,
-                  errorStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFEF4444), fontWeight: FontWeight.w600),
-                  errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
-                  focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2.0)),
+                  errorStyle: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: const Color(0xFFEF4444),
+                      fontWeight: FontWeight.w600),
+                  errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFEF4444), width: 1.5)),
+                  focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFEF4444), width: 2.0)),
                 ),
               ),
             ),
@@ -897,14 +1049,32 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                   hintText: 'samuel.okon@novaxpress.ng',
                   prefixIcon: const Icon(Icons.email_outlined, size: 18),
                   suffixIcon: _isCheckingEmail
-                      ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(strokeWidth: 2)))
                       : (_emailError != null
-                          ? const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 20)
-                          : (_emailController.text.isNotEmpty ? const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 20) : null)),
+                          ? const Icon(Icons.error_outline_rounded,
+                              color: Color(0xFFEF4444), size: 20)
+                          : (_emailController.text.isNotEmpty
+                              ? const Icon(Icons.check_circle_outline_rounded,
+                                  color: Color(0xFF10B981), size: 20)
+                              : null)),
                   errorText: _emailError,
-                  errorStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFEF4444), fontWeight: FontWeight.w600),
-                  errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
-                  focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2.0)),
+                  errorStyle: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: const Color(0xFFEF4444),
+                      fontWeight: FontWeight.w600),
+                  errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFEF4444), width: 1.5)),
+                  focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                          color: Color(0xFFEF4444), width: 2.0)),
                 ),
               ),
             ),
@@ -917,61 +1087,148 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         Builder(
           builder: (context) {
             final dcState = ref.watch(dcConsoleProvider);
-            final dcs = dcState.distributionCenters.isNotEmpty ? dcState.distributionCenters : defaultDistributionCenters;
-            final currentDcId = draftState.selectedDcId ?? dcState.activeHubId;
+            final currentUser = ref.watch(authProvider).user;
+            final isSuperAdmin = currentUser != null && (currentUser.isSuperAdmin || currentUser.role == 'super_admin' || currentUser.role == 'admin');
+            final isUserFromGrandDc = currentUser != null && (
+                currentUser.distributionCenterId == '22222222-2222-4222-8222-222222222222' ||
+                currentUser.distributionCenterId == 'DC-CMD-01' ||
+                (currentUser.distributionCenterId != null && dcState.distributionCenters.any((d) => (d.id == currentUser.distributionCenterId || d.code == currentUser.distributionCenterId) && d.isGrandDc))
+            );
+            final isGrandDcAdmin = (currentUser?.role == 'dc_admin' || currentUser?.role == 'dc_manager' || currentUser?.isDcManager == true) && isUserFromGrandDc;
+            final canManageOtherDcs = isSuperAdmin || isGrandDcAdmin;
+
+            final dcs = dcState.distributionCenters.isNotEmpty
+                ? dcState.distributionCenters
+                : defaultDistributionCenters;
+            final currentDcId = canManageOtherDcs
+                ? (draftState.selectedDcId ?? dcState.activeHubId)
+                : (currentUser?.distributionCenterId ?? dcState.activeHubId);
             final currentDc = dcs.firstWhere(
               (dc) => dc.id == currentDcId,
               orElse: () => dcs.first,
             );
 
-            final dcLgas = currentDc.coveredLgas.isNotEmpty ? currentDc.coveredLgas : [currentDc.city];
+            final dcLgas = currentDc.coveredLgas.isNotEmpty
+                ? currentDc.coveredLgas
+                : [currentDc.city];
             final selectedLgas = draftState.selectedLgas.isNotEmpty
-                ? draftState.selectedLgas.where((l) => dcLgas.contains(l)).toList()
+                ? draftState.selectedLgas
+                    .where((l) => dcLgas.contains(l))
+                    .toList()
                 : List<String>.from(dcLgas);
 
             return Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                color:
+                    isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                border: Border.all(
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.apartment_rounded, size: 18, color: Color(0xFF2563EB)),
+                      const Icon(Icons.apartment_rounded,
+                          size: 18, color: Color(0xFF2563EB)),
                       const SizedBox(width: 8),
                       Text(
                         'Assigned Distribution Center & Territory',
-                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                        style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF0F172A)),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: currentDc.id,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Parent Distribution Hub *'),
-                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    items: dcs.map((dc) {
-                      return DropdownMenuItem<String>(
-                        value: dc.id,
-                        child: Text('${dc.name} (${dc.state}) - ${dc.coveredLgas.length} LGAs', style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
-                      );
-                    }).toList(),
-                    onChanged: (newDcId) {
-                      if (newDcId != null) {
-                        final found = dcs.firstWhere((dc) => dc.id == newDcId);
-                        ref.read(dcOnboardDraftProvider.notifier).setSelectedDc(
-                          found.id,
-                          found.state,
-                          found.coveredLgas,
+                  if (canManageOtherDcs)
+                    DropdownButtonFormField<String>(
+                      value: currentDc.id,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                          labelText: 'Parent Distribution Hub *'),
+                      dropdownColor:
+                          isDark ? const Color(0xFF1E293B) : Colors.white,
+                      items: dcs.map((dc) {
+                        return DropdownMenuItem<String>(
+                          value: dc.id,
+                          child: Text(
+                              '${dc.name} (${dc.state}) - ${dc.coveredLgas.length} LGAs',
+                              style: const TextStyle(fontSize: 13),
+                              overflow: TextOverflow.ellipsis),
                         );
-                      }
-                    },
-                  ),
+                      }).toList(),
+                      onChanged: (newDcId) {
+                        if (newDcId != null) {
+                          final found = dcs.firstWhere((dc) => dc.id == newDcId);
+                          ref.read(dcOnboardDraftProvider.notifier).setSelectedDc(
+                                found.id,
+                                found.state,
+                                found.coveredLgas,
+                              );
+                        }
+                      },
+                    )
+                  else
+                    Tooltip(
+                      message: 'Riders are strictly assigned to your operational facility.',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warehouse_rounded, size: 16, color: Color(0xFF2563EB)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${currentDc.name} (${currentDc.state}) • ${currentDc.code}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.lock_rounded, size: 11, color: Color(0xFF2563EB)),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'LOCKED',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 14),
 
                   // Restricted LGA Selection Banner & Chips
@@ -984,18 +1241,25 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.shield_outlined, size: 14, color: Color(0xFFF37021)),
+                                const Icon(Icons.shield_outlined,
+                                    size: 14, color: Color(0xFFF37021)),
                                 const SizedBox(width: 5),
                                 Text(
                                   'Restricted Rider LGA Coverage *',
-                                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A)),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 2),
                             Text(
                               'Coverage restricted strictly to LGAs attached to ${currentDc.name}',
-                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                              style: GoogleFonts.inter(
+                                  fontSize: 11, color: const Color(0xFF64748B)),
                             ),
                           ],
                         ),
@@ -1004,17 +1268,29 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                         children: [
                           TextButton(
                             onPressed: () {
-                              ref.read(dcOnboardDraftProvider.notifier).setSelectedLgas(List.from(dcLgas));
+                              ref
+                                  .read(dcOnboardDraftProvider.notifier)
+                                  .setSelectedLgas(List.from(dcLgas));
                             },
-                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
-                            child: const Text('Select All', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            style: TextButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 6)),
+                            child: const Text('Select All',
+                                style: TextStyle(
+                                    fontSize: 11, fontWeight: FontWeight.bold)),
                           ),
                           TextButton(
                             onPressed: () {
-                              ref.read(dcOnboardDraftProvider.notifier).setSelectedLgas([]);
+                              ref
+                                  .read(dcOnboardDraftProvider.notifier)
+                                  .setSelectedLgas([]);
                             },
-                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
-                            child: const Text('Clear', style: TextStyle(fontSize: 11, color: Color(0xFFEF4444))),
+                            style: TextButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 6)),
+                            child: const Text('Clear',
+                                style: TextStyle(
+                                    fontSize: 11, color: Color(0xFFEF4444))),
                           ),
                         ],
                       ),
@@ -1031,15 +1307,31 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                         children: dcLgas.map((lga) {
                           final isSelected = selectedLgas.contains(lga);
                           return FilterChip(
-                            label: Text(lga, style: TextStyle(fontSize: 11.5, color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)))),
+                            label: Text(lga,
+                                style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : (isDark
+                                            ? Colors.white70
+                                            : const Color(0xFF334155)))),
                             selected: isSelected,
                             selectedColor: const Color(0xFF2563EB),
                             checkmarkColor: Colors.white,
-                            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            side: BorderSide(color: isSelected ? const Color(0xFF2563EB) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                            backgroundColor:
+                                isDark ? const Color(0xFF1E293B) : Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6)),
+                            side: BorderSide(
+                                color: isSelected
+                                    ? const Color(0xFF2563EB)
+                                    : (isDark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFCBD5E1))),
                             onSelected: (selected) {
-                              ref.read(dcOnboardDraftProvider.notifier).toggleLga(lga);
+                              ref
+                                  .read(dcOnboardDraftProvider.notifier)
+                                  .toggleLga(lga);
                             },
                           );
                         }).toList(),
@@ -1052,13 +1344,26 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           },
         ),
         const SizedBox(height: 16),
-        Text('Emergency Contact & Guarantor', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+        Text('Emergency Contact & Guarantor',
+            style:
+                GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: TextField(controller: _guarantorNameController, decoration: const InputDecoration(labelText: 'Guarantor Full Name', hintText: 'e.g. Dr. Chidi Okafor'))),
+            Expanded(
+                child: TextField(
+                    controller: _guarantorNameController,
+                    decoration: const InputDecoration(
+                        labelText: 'Guarantor Full Name',
+                        hintText: 'e.g. Dr. Chidi Okafor'))),
             const SizedBox(width: 12),
-            Expanded(child: TextField(controller: _guarantorPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Guarantor Phone', hintText: '08034567890'))),
+            Expanded(
+                child: TextField(
+                    controller: _guarantorPhoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                        labelText: 'Guarantor Phone',
+                        hintText: '08034567890'))),
           ],
         ),
       ],
@@ -1075,7 +1380,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isSelected ? const Color(0xFF031632).withValues(alpha: 0.06) : Colors.transparent,
+      color: isSelected
+          ? const Color(0xFF031632).withValues(alpha: 0.06)
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -1085,7 +1392,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isSelected ? const Color(0xFFF37021) : const Color(0xFFCBD5E1),
+              color: isSelected
+                  ? const Color(0xFFF37021)
+                  : const Color(0xFFCBD5E1),
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -1098,16 +1407,25 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF031632) : const Color(0xFFE2E8F0),
+                      color: isSelected
+                          ? const Color(0xFF031632)
+                          : const Color(0xFFE2E8F0),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, size: 18, color: isSelected ? const Color(0xFFF37021) : const Color(0xFF64748B)),
+                    child: Icon(icon,
+                        size: 18,
+                        color: isSelected
+                            ? const Color(0xFFF37021)
+                            : const Color(0xFF64748B)),
                   ),
                   Flexible(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFF37021) : const Color(0xFFE2E8F0),
+                        color: isSelected
+                            ? const Color(0xFFF37021)
+                            : const Color(0xFFE2E8F0),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -1115,7 +1433,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                         style: GoogleFonts.inter(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.white : const Color(0xFF64748B),
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF64748B),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1124,9 +1444,13 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                 ],
               ),
               const SizedBox(height: 10),
-              Text(title, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+              Text(title,
+                  style: GoogleFonts.inter(
+                      fontSize: 13, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              Text(description, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+              Text(description,
+                  style: GoogleFonts.inter(
+                      fontSize: 11, color: const Color(0xFF64748B))),
             ],
           ),
         ),
@@ -1149,10 +1473,10 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         const SizedBox(height: 6),
         Text(
           'The credentials configured here will be used by the delivery agent to log into the NovaXpress Rider App.',
-          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+          style:
+              GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
         ),
         const SizedBox(height: 16),
-
         TextField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
@@ -1161,18 +1485,35 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             hintText: 'e.g. samuel.okon@novaxpress.ng',
             prefixIcon: const Icon(Icons.email_outlined, size: 18),
             suffixIcon: _isCheckingEmail
-                ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(strokeWidth: 2)))
                 : (_emailError != null
-                    ? const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 20)
-                    : (_emailController.text.isNotEmpty ? const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 20) : null)),
+                    ? const Icon(Icons.error_outline_rounded,
+                        color: Color(0xFFEF4444), size: 20)
+                    : (_emailController.text.isNotEmpty
+                        ? const Icon(Icons.check_circle_outline_rounded,
+                            color: Color(0xFF10B981), size: 20)
+                        : null)),
             errorText: _emailError,
-            errorStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFEF4444), fontWeight: FontWeight.w600),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
-            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2.0)),
+            errorStyle: GoogleFonts.inter(
+                fontSize: 11,
+                color: const Color(0xFFEF4444),
+                fontWeight: FontWeight.w600),
+            errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
+            focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: Color(0xFFEF4444), width: 2.0)),
           ),
         ),
         const SizedBox(height: 14),
-
         Row(
           children: [
             Expanded(
@@ -1191,7 +1532,11 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                 controller: _tempPinController,
                 keyboardType: TextInputType.number,
                 maxLength: 4,
-                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                buildCounter: (context,
+                        {required currentLength,
+                        required isFocused,
+                        maxLength}) =>
+                    null,
                 decoration: const InputDecoration(
                   labelText: 'Security PIN (4 Digits)',
                   hintText: '1234',
@@ -1201,30 +1546,38 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             ),
           ],
         ),
-
         const SizedBox(height: 14),
-
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: const Color(0xFFF37021).withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFF37021).withValues(alpha: 0.3)),
+            border: Border.all(
+                color: const Color(0xFFF37021).withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
               Checkbox(
                 value: draftState.mustChangePassword,
                 activeColor: const Color(0xFF031632),
-                onChanged: (val) => ref.read(dcOnboardDraftProvider.notifier).setMustChangePassword(val ?? true),
+                onChanged: (val) => ref
+                    .read(dcOnboardDraftProvider.notifier)
+                    .setMustChangePassword(val ?? true),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Require Password Change on First Login', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF031632))),
-                    Text('Forces the agent to change their default temporary password when they first log into the mobile app.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                    Text('Require Password Change on First Login',
+                        style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF031632))),
+                    Text(
+                        'Forces the agent to change their default temporary password when they first log into the mobile app.',
+                        style: GoogleFonts.inter(
+                            fontSize: 11, color: const Color(0xFF64748B))),
                   ],
                 ),
               ),
@@ -1238,14 +1591,17 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   // ---------------------------------------------------------------------------
   // STEP 3: VEHICLE & ASSET SETUP
   // ---------------------------------------------------------------------------
-  Widget _buildStep3VehicleAndAssets(bool isDark, DCOnboardDraftState draftState) {
+  Widget _buildStep3VehicleAndAssets(
+      bool isDark, DCOnboardDraftState draftState) {
     final isPda = draftState.personnelType == 'pda';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          isPda ? 'Personal Vehicle Details (PDA)' : 'Company Vehicle & Fleet Asset Assignment (In-House)',
+          isPda
+              ? 'Personal Vehicle Details (PDA)'
+              : 'Company Vehicle & Fleet Asset Assignment (In-House)',
           style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
@@ -1255,13 +1611,20 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               child: DropdownButtonFormField<String>(
                 value: draftState.vehicleType,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Vehicle Category'),
+                decoration:
+                    const InputDecoration(labelText: 'Vehicle Category'),
                 items: ['Motorcycle', 'Car', 'Van', 'Tricycle', 'Bicycle']
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis)))
+                    .map((v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(v,
+                            style: GoogleFonts.inter(fontSize: 13),
+                            overflow: TextOverflow.ellipsis)))
                     .toList(),
                 onChanged: (val) {
                   if (val != null) {
-                    ref.read(dcOnboardDraftProvider.notifier).setVehicleType(val);
+                    ref
+                        .read(dcOnboardDraftProvider.notifier)
+                        .setVehicleType(val);
                   }
                 },
               ),
@@ -1271,7 +1634,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               child: TextField(
                 controller: _vehicleModelController,
                 decoration: InputDecoration(
-                  labelText: isPda ? 'Personal Make & Model' : 'Company Fleet Model',
+                  labelText:
+                      isPda ? 'Personal Make & Model' : 'Company Fleet Model',
                   hintText: isPda ? 'e.g. Bajaj Boxer 100' : 'e.g. Haojue 125',
                 ),
               ),
@@ -1295,7 +1659,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               child: TextField(
                 controller: _licenseOrAssetTagController,
                 decoration: InputDecoration(
-                  labelText: isPda ? "Driver's License Number" : 'Fleet Asset Tracker Tag',
+                  labelText: isPda
+                      ? "Driver's License Number"
+                      : 'Fleet Asset Tracker Tag',
                   hintText: isPda ? 'e.g. LIC-2026-9912' : 'e.g. TRK-ASSET-09',
                 ),
               ),
@@ -1319,9 +1685,11 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   // ---------------------------------------------------------------------------
   // STEP 4: COMPENSATION AGREEMENT
   // ---------------------------------------------------------------------------
-  Widget _buildStep4CompensationAgreement(bool isDark, DCOnboardDraftState draftState) {
+  Widget _buildStep4CompensationAgreement(
+      bool isDark, DCOnboardDraftState draftState) {
     final comm = double.tryParse(_commissionController.text) ?? 0.0;
-    final transport = double.tryParse(_transportAllowanceController.text) ?? 0.0;
+    final transport =
+        double.tryParse(_transportAllowanceController.text) ?? 0.0;
     final totalPerOrder = comm + transport;
 
     return Column(
@@ -1334,7 +1702,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         const SizedBox(height: 6),
         Text(
           'Rates configured here snapshot into the order ledger and accumulate into the agent\'s "My Balance" upon successful delivery completion.',
-          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+          style:
+              GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
         ),
         const SizedBox(height: 16),
 
@@ -1344,7 +1713,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           decoration: BoxDecoration(
             color: const Color(0xFF10B981).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+            border: Border.all(
+                color: const Color(0xFF10B981).withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1352,14 +1722,23 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               Expanded(
                 child: Row(
                   children: [
-                    const Icon(Icons.stars_rounded, color: Color(0xFF10B981), size: 24),
+                    const Icon(Icons.stars_rounded,
+                        color: Color(0xFF10B981), size: 24),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Per-Delivery Entitlement Calculation', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF065F46))),
-                          Text('Commission (${CurrencyFormatter.formatNaira(comm)}) + Transport Allowance (${CurrencyFormatter.formatNaira(transport)})', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF047857)), overflow: TextOverflow.ellipsis),
+                          Text('Per-Delivery Entitlement Calculation',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF065F46))),
+                          Text(
+                              'Commission (${CurrencyFormatter.formatNaira(comm)}) + Transport Allowance (${CurrencyFormatter.formatNaira(transport)})',
+                              style: GoogleFonts.inter(
+                                  fontSize: 11, color: const Color(0xFF047857)),
+                              overflow: TextOverflow.ellipsis),
                         ],
                       ),
                     ),
@@ -1369,7 +1748,10 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               const SizedBox(width: 10),
               Text(
                 CurrencyFormatter.formatNaira(totalPerOrder),
-                style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: const Color(0xFF059669)),
+                style: GoogleFonts.inter(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF059669)),
               ),
             ],
           ),
@@ -1380,15 +1762,27 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         DropdownButtonFormField<String>(
           value: draftState.compensationType,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Compensation Model Structure'),
+          decoration:
+              const InputDecoration(labelText: 'Compensation Model Structure'),
           items: const [
-            DropdownMenuItem(value: 'commission', child: Text('Commission & Transport Allowance (Per Drop)', overflow: TextOverflow.ellipsis)),
-            DropdownMenuItem(value: 'salary', child: Text('Fixed Monthly Salary + Fuel Allowance', overflow: TextOverflow.ellipsis)),
-            DropdownMenuItem(value: 'hybrid', child: Text('Hybrid: Base Salary + Per Drop Commission', overflow: TextOverflow.ellipsis)),
+            DropdownMenuItem(
+                value: 'commission',
+                child: Text('Commission & Transport Allowance (Per Drop)',
+                    overflow: TextOverflow.ellipsis)),
+            DropdownMenuItem(
+                value: 'salary',
+                child: Text('Fixed Monthly Salary + Fuel Allowance',
+                    overflow: TextOverflow.ellipsis)),
+            DropdownMenuItem(
+                value: 'hybrid',
+                child: Text('Hybrid: Base Salary + Per Drop Commission',
+                    overflow: TextOverflow.ellipsis)),
           ],
           onChanged: (val) {
             if (val != null) {
-              ref.read(dcOnboardDraftProvider.notifier).setCompensationType(val);
+              ref
+                  .read(dcOnboardDraftProvider.notifier)
+                  .setCompensationType(val);
             }
           },
         ),
@@ -1405,7 +1799,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     controller: _commissionController,
                     keyboardType: TextInputType.number,
                     onChanged: (_) {
-                      ref.read(dcOnboardDraftProvider.notifier).setCompensationType(draftState.compensationType);
+                      ref
+                          .read(dcOnboardDraftProvider.notifier)
+                          .setCompensationType(draftState.compensationType);
                     },
                     decoration: const InputDecoration(
                       labelText: 'Base Commission (₦ per drop)',
@@ -1417,17 +1813,23 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     spacing: 6,
                     runSpacing: 4,
                     children: [500, 1000, 1200, 1500].map((rate) {
-                      final isSel = _commissionController.text == rate.toString();
+                      final isSel =
+                          _commissionController.text == rate.toString();
                       return InkWell(
                         onTap: () {
                           _commissionController.text = rate.toString();
-                          ref.read(dcOnboardDraftProvider.notifier).setCompensationType(draftState.compensationType);
+                          ref
+                              .read(dcOnboardDraftProvider.notifier)
+                              .setCompensationType(draftState.compensationType);
                         },
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: isSel ? const Color(0xFF031632) : const Color(0xFFE2E8F0),
+                            color: isSel
+                                ? const Color(0xFF031632)
+                                : const Color(0xFFE2E8F0),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -1435,7 +1837,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: isSel ? Colors.white : const Color(0xFF334155),
+                              color: isSel
+                                  ? Colors.white
+                                  : const Color(0xFF334155),
                             ),
                           ),
                         ),
@@ -1454,7 +1858,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     controller: _transportAllowanceController,
                     keyboardType: TextInputType.number,
                     onChanged: (_) {
-                      ref.read(dcOnboardDraftProvider.notifier).setCompensationType(draftState.compensationType);
+                      ref
+                          .read(dcOnboardDraftProvider.notifier)
+                          .setCompensationType(draftState.compensationType);
                     },
                     decoration: const InputDecoration(
                       labelText: 'Transport / Fuel Allowance (₦ per drop)',
@@ -1466,17 +1872,23 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     spacing: 6,
                     runSpacing: 4,
                     children: [800, 1200, 1500, 2000].map((rate) {
-                      final isSel = _transportAllowanceController.text == rate.toString();
+                      final isSel =
+                          _transportAllowanceController.text == rate.toString();
                       return InkWell(
                         onTap: () {
                           _transportAllowanceController.text = rate.toString();
-                          ref.read(dcOnboardDraftProvider.notifier).setCompensationType(draftState.compensationType);
+                          ref
+                              .read(dcOnboardDraftProvider.notifier)
+                              .setCompensationType(draftState.compensationType);
                         },
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: isSel ? const Color(0xFF031632) : const Color(0xFFE2E8F0),
+                            color: isSel
+                                ? const Color(0xFF031632)
+                                : const Color(0xFFE2E8F0),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -1484,7 +1896,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: isSel ? Colors.white : const Color(0xFF334155),
+                              color: isSel
+                                  ? Colors.white
+                                  : const Color(0xFF334155),
                             ),
                           ),
                         ),
@@ -1554,7 +1968,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         const SizedBox(height: 6),
         Text(
           'Earnings accumulated from Monnify direct-transfer and cash orders will be disbursed to this verified bank account upon DC approval.',
-          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+          style:
+              GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
         ),
         const SizedBox(height: 16),
 
@@ -1562,7 +1977,13 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           value: draftState.selectedBank,
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Destination Bank Name'),
-          items: _banks.map((b) => DropdownMenuItem(value: b, child: Text(b, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
+          items: _banks
+              .map((b) => DropdownMenuItem(
+                  value: b,
+                  child: Text(b,
+                      style: GoogleFonts.inter(fontSize: 13),
+                      overflow: TextOverflow.ellipsis)))
+              .toList(),
           onChanged: (val) {
             if (val != null) {
               ref.read(dcOnboardDraftProvider.notifier).setSelectedBank(val);
@@ -1577,7 +1998,11 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                 controller: _accountNumberController,
                 keyboardType: TextInputType.number,
                 maxLength: 10,
-                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                buildCounter: (context,
+                        {required currentLength,
+                        required isFocused,
+                        maxLength}) =>
+                    null,
                 decoration: const InputDecoration(
                   labelText: '10-Digit NUBAN Account Number',
                   hintText: 'e.g. 2019847291',
@@ -1605,19 +2030,31 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
+            border: Border.all(
+                color:
+                    isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Summary of Onboarding Terms', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+              Text('Summary of Onboarding Terms',
+                  style: GoogleFonts.inter(
+                      fontSize: 13, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              _buildSummaryRow('Personnel Model:', draftState.personnelType == 'pda' ? 'PDA (Personal Vehicle)' : 'In-House Rider (Company Fleet)'),
-              _buildSummaryRow('Operational Hub:', 'Wuse Distribution Center (DC-WUSE-01)'),
+              _buildSummaryRow(
+                  'Personnel Model:',
+                  draftState.personnelType == 'pda'
+                      ? 'PDA (Personal Vehicle)'
+                      : 'In-House Rider (Company Fleet)'),
+              _buildSummaryRow('Operational Hub:',
+                  'Central Command Distribution Center (DC-CMD-01)'),
               _buildSummaryRow('Assigned Zone:', draftState.assignedZone),
-              _buildSummaryRow('Delivery Commission:', '₦${_commissionController.text} per drop'),
-              _buildSummaryRow('Transport Allowance:', '₦${_transportAllowanceController.text} per drop'),
-              _buildSummaryRow('Payout Destination:', '${draftState.selectedBank} • ${_accountNumberController.text.isEmpty ? '2019847291' : _accountNumberController.text}'),
+              _buildSummaryRow('Delivery Commission:',
+                  '₦${_commissionController.text} per drop'),
+              _buildSummaryRow('Transport Allowance:',
+                  '₦${_transportAllowanceController.text} per drop'),
+              _buildSummaryRow('Payout Destination:',
+                  '${draftState.selectedBank} • ${_accountNumberController.text.isEmpty ? '2019847291' : _accountNumberController.text}'),
             ],
           ),
         ),
@@ -1654,15 +2091,21 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                       color: const Color(0xFF10B981).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
+                    child: const Icon(Icons.check_circle_rounded,
+                        color: Color(0xFF10B981), size: 28),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Rider Onboarded Successfully!', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold)),
-                        Text('Credentials issued for ${slip['name']}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                        Text('Rider Onboarded Successfully!',
+                            style: GoogleFonts.inter(
+                                fontSize: 17, fontWeight: FontWeight.bold)),
+                        Text('Credentials issued for ${slip['name']}',
+                            style: GoogleFonts.inter(
+                                fontSize: 12, color: const Color(0xFF64748B)),
+                            overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),
@@ -1676,20 +2119,29 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                  color: isDark
+                      ? const Color(0xFF0B1021)
+                      : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+                  border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF2E3D6B)
+                          : const Color(0xFFE2E8F0)),
                 ),
                 child: Column(
                   children: [
-                    _buildSlipRow('Agent Identification:', slip['driverCode'], isBold: true, isCode: true),
+                    _buildSlipRow('Agent Identification:', slip['driverCode'],
+                        isBold: true, isCode: true),
                     _buildSlipRow('Operator Name:', slip['name']),
                     _buildSlipRow('Personnel Model:', slip['personnelType']),
                     _buildSlipRow('Operational Hub:', slip['hub']),
-                    _buildSlipRow('Rate Agreement:', slip['agreement'], isBold: true),
+                    _buildSlipRow('Rate Agreement:', slip['agreement'],
+                        isBold: true),
                     const Divider(height: 16),
-                    _buildSlipRow('Mobile Login Email:', slip['email'], isCode: true),
-                    _buildSlipRow('Temporary Password:', slip['password'], isCode: true),
+                    _buildSlipRow('Mobile Login Email:', slip['email'],
+                        isCode: true),
+                    _buildSlipRow('Temporary Password:', slip['password'],
+                        isCode: true),
                     _buildSlipRow('Security PIN:', slip['pin'], isCode: true),
                   ],
                 ),
@@ -1705,13 +2157,18 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     runSpacing: 10,
                     children: [
                       SizedBox(
-                        width: isNarrow ? double.infinity : (btnConstraints.maxWidth - 12) / 2,
+                        width: isNarrow
+                            ? double.infinity
+                            : (btnConstraints.maxWidth - 12) / 2,
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            final credText = 'NovaXpress Rider Credentials\nAgent Code: ${slip['driverCode']}\nName: ${slip['name']}\nEmail: ${slip['email']}\nTemporary Password: ${slip['password']}\nSecurity PIN: ${slip['pin']}\nHub: ${slip['hub']}';
+                            final credText =
+                                'NovaXpress Rider Credentials\nAgent Code: ${slip['driverCode']}\nName: ${slip['name']}\nEmail: ${slip['email']}\nTemporary Password: ${slip['password']}\nSecurity PIN: ${slip['pin']}\nHub: ${slip['hub']}';
                             Clipboard.setData(ClipboardData(text: credText));
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('📋 Credentials copied to clipboard!')),
+                              const SnackBar(
+                                  content: Text(
+                                      '📋 Credentials copied to clipboard!')),
                             );
                           },
                           icon: const Icon(Icons.copy_rounded, size: 16),
@@ -1722,11 +2179,17 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                         ),
                       ),
                       SizedBox(
-                        width: isNarrow ? double.infinity : (btnConstraints.maxWidth - 12) / 2,
+                        width: isNarrow
+                            ? double.infinity
+                            : (btnConstraints.maxWidth - 12) / 2,
                         child: ElevatedButton.icon(
                           onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.check_rounded, size: 18, color: Colors.white),
-                          label: const Text('Save & Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          icon: const Icon(Icons.check_rounded,
+                              size: 18, color: Colors.white),
+                          label: const Text('Save & Close',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF031632),
                             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1744,7 +2207,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     );
   }
 
-  Widget _buildSlipRow(String label, String val, {bool isBold = false, bool isCode = false}) {
+  Widget _buildSlipRow(String label, String val,
+      {bool isBold = false, bool isCode = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1754,7 +2218,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             flex: 2,
             child: Text(
               label,
-              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+              style: GoogleFonts.inter(
+                  fontSize: 12, color: const Color(0xFF64748B)),
             ),
           ),
           const SizedBox(width: 8),
@@ -1764,21 +2229,28 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               alignment: Alignment.centerRight,
               child: isCode
                   ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: const Color(0xFF031632).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         val,
-                        style: GoogleFonts.firaCode(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF031632)),
+                        style: GoogleFonts.firaCode(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF031632)),
                         overflow: TextOverflow.ellipsis,
                       ),
                     )
                   : Text(
                       val,
                       textAlign: TextAlign.end,
-                      style: GoogleFonts.inter(fontSize: 12, fontWeight: isBold ? FontWeight.bold : FontWeight.w600),
+                      style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight:
+                              isBold ? FontWeight.bold : FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                     ),
             ),
@@ -1798,7 +2270,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             flex: 2,
             child: Text(
               label,
-              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+              style: GoogleFonts.inter(
+                  fontSize: 12, color: const Color(0xFF64748B)),
             ),
           ),
           const SizedBox(width: 8),
@@ -1807,7 +2280,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             child: Text(
               val,
               textAlign: TextAlign.end,
-              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+              style:
+                  GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
           ),

@@ -468,7 +468,9 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                               ? 'EDIT TELESALES CLOSER PROFILE'
                               : (widget.user.isMarketer
                                   ? 'EDIT DIGITAL MARKETER PROFILE'
-                                  : (widget.user.isClientAdmin ? 'EDIT MERCHANT PROFILE' : 'EDIT RIDER PROFILE'))),
+                                  : (widget.user.isMerchantAccountant
+                                      ? 'EDIT ACCOUNTANT PROFILE'
+                                      : (widget.user.isClientAdmin ? 'EDIT MERCHANT PROFILE' : 'EDIT RIDER PROFILE')))),
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -498,6 +500,8 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
               const Tab(text: 'Settlement Bank', icon: Icon(Icons.account_balance_wallet_outlined, size: 18)),
               if (widget.user.isRider)
                 const Tab(text: 'Vehicle & Fleet', icon: Icon(Icons.two_wheeler_rounded, size: 18))
+              else if (widget.user.isMerchantAccountant)
+                const Tab(text: 'Scope & Client', icon: Icon(Icons.business_rounded, size: 18))
               else
                 const Tab(text: 'Region & Hub', icon: Icon(Icons.map_rounded, size: 18)),
             ],

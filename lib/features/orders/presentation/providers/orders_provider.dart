@@ -194,10 +194,10 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       final isGrand = dcId == '22222222-2222-4222-8222-222222222222';
       currentDc = DistributionCenter(
         id: dcId,
-        name: isGrand ? 'Wuse Central Distribution Hub' : 'Distribution Center',
-        code: isGrand ? 'DC-WUSE-01' : 'DC-LOCAL',
-        state: isGrand ? 'Abuja (FCT)' : '',
-        city: isGrand ? 'Wuse 2' : '',
+        name: isGrand ? 'Central Command Distribution Center' : 'Distribution Center',
+        code: isGrand ? 'DC-CMD-01' : 'DC-LOCAL',
+        state: isGrand ? 'Federal Capital Territory' : '',
+        city: isGrand ? 'Central Command Hub' : '',
         address: '',
         isGrandDc: isGrand,
         isHub: isGrand,

@@ -165,8 +165,12 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
     }
     final allDrivers = scopedDrivers.isNotEmpty ? scopedDrivers : [...dcState.dcDrivers];
 
-    // Order by lightest workload first
-    allDrivers.sort((a, b) => a.totalAssignedOrders.compareTo(b.totalAssignedOrders));
+    // Order: Available drivers first (by lightest workload), Unavailable/Off-duty drivers pushed to bottom
+    allDrivers.sort((a, b) {
+      if (a.isAvailable && !b.isAvailable) return -1;
+      if (!a.isAvailable && b.isAvailable) return 1;
+      return a.totalAssignedOrders.compareTo(b.totalAssignedOrders);
+    });
 
     final filteredDrivers = allDrivers.where((d) {
       if (_driverSearchQuery.trim().isEmpty) return true;
@@ -517,12 +521,25 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
 
                   final activeCount = driver.totalAssignedOrders;
                   final isLightWorkload = activeCount == 0;
-                  final workloadText = driver.status == 'active'
+                  final isAvailable = driver.isAvailable;
+                  final workloadText = isAvailable
                       ? (isLightWorkload ? 'Available (0 Active)' : 'Active ($activeCount Active)')
-                      : 'Unavailable';
+                      : (driver.status.toLowerCase() == 'banned' ? 'Banned / Blocked' : 'Unavailable (Off-Duty)');
 
                   return InkWell(
                     onTap: () {
+                      if (!isAvailable) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '⚠️ Cannot dispatch: ${driver.name} is currently UNAVAILABLE / OFF-DUTY. Dispatching is restricted to active riders.',
+                            ),
+                            backgroundColor: const Color(0xFFEF4444),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
                       if (!hasSufficientStock) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -549,16 +566,20 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? const Color(0xFFF37021).withValues(alpha: isDark ? 0.18 : 0.08)
-                            : (!hasSufficientStock
-                                ? (isDark ? const Color(0xFF1E1A22) : const Color(0xFFFFF7F7))
-                                : (isDark ? const Color(0xFF1E293B) : Colors.white)),
+                            : (!isAvailable
+                                ? (isDark ? const Color(0xFF1F171A) : const Color(0xFFFFF1F2))
+                                : (!hasSufficientStock
+                                    ? (isDark ? const Color(0xFF1E1A22) : const Color(0xFFFFF7F7))
+                                    : (isDark ? const Color(0xFF1E293B) : Colors.white))),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
                               ? const Color(0xFFF37021)
-                              : (!hasSufficientStock
-                                  ? const Color(0xFFFCA5A5).withValues(alpha: 0.5)
-                                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+                              : (!isAvailable
+                                  ? const Color(0xFFEF4444).withValues(alpha: 0.4)
+                                  : (!hasSufficientStock
+                                      ? const Color(0xFFFCA5A5).withValues(alpha: 0.5)
+                                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)))),
                           width: isSelected ? 1.8 : 1,
                         ),
                       ),
@@ -567,7 +588,7 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                           Radio<String>(
                             value: driver.id,
                             groupValue: _selectedDriverId,
-                            onChanged: hasSufficientStock
+                            onChanged: (isAvailable && hasSufficientStock)
                                 ? (val) {
                                     setState(() {
                                       _selectedDriverId = driver.id;
@@ -619,9 +640,11 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                       decoration: BoxDecoration(
-                                        color: isLightWorkload
-                                            ? const Color(0xFFDCFCE7)
-                                            : const Color(0xFFFEF3C7),
+                                        color: !isAvailable
+                                            ? const Color(0xFFEF4444).withValues(alpha: 0.15)
+                                            : (isLightWorkload
+                                                ? const Color(0xFFDCFCE7)
+                                                : const Color(0xFFFEF3C7)),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
@@ -629,9 +652,11 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                                         style: GoogleFonts.jetBrainsMono(
                                           fontSize: 8.5,
                                           fontWeight: FontWeight.bold,
-                                          color: isLightWorkload
-                                              ? const Color(0xFF16A34A)
-                                              : const Color(0xFFB45309),
+                                          color: !isAvailable
+                                              ? const Color(0xFFDC2626)
+                                              : (isLightWorkload
+                                                  ? const Color(0xFF16A34A)
+                                                  : const Color(0xFFB45309)),
                                         ),
                                       ),
                                     ),

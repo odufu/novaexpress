@@ -196,6 +196,32 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       return _currentUser!;
     }
 
+    if (clean == 'emeraldcodelines@gmail.com' ||
+        clean == 'admin@novaxpress.ng' ||
+        clean == 'superadmin@novaxpress.ng') {
+      if (password != '@EmeraldXpress2026' &&
+          password != 'Password123!' &&
+          password != 'AdminPass123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: 'b961785b-6003-4378-92d4-b5742b5b7e66',
+        email: 'emeraldcodelines@gmail.com',
+        firstName: 'Joel',
+        lastName: 'Emerald',
+        phone: '+234 800 000 0001',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-01',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'NovaXpress HQ Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      );
+      return _currentUser!;
+    }
+
     if (clean == 'dc.supervisor@novaxpress.ng') {
       if (password != 'Password123!') {
         throw AppAuthException(
@@ -209,9 +235,9 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         phone: '+234 802 345 6789',
         role: 'dc_manager',
         distributionCenterId: '22222222-2222-4222-8222-222222222222',
-        distributionCenterName: 'Wuse Central Distribution Hub',
+        distributionCenterName: 'Central Command Distribution Center',
         operatingState: 'Federal Capital Territory',
-        operatingCity: 'Wuse 2',
+        operatingCity: 'Central Command Hub',
       );
       return _currentUser!;
     }
@@ -221,6 +247,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         clean == 'operations@novaxpress.ng' ||
         clean == 'abigail@novaxpress.ng' ||
         clean == 'ops-wuse-01-748' ||
+        clean == 'ops-cmd-01-748' ||
         clean == 'ops-wuse-01') {
       if (password != 'Password123!' &&
           password != 'OpsPass123!' &&
@@ -235,11 +262,11 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         lastName: 'Operations',
         phone: '+234 803 987 6543',
         role: 'dc_operations',
-        deliveryAgentCode: 'OPS-WUSE-01-748',
+        deliveryAgentCode: 'OPS-CMD-01-748',
         distributionCenterId: '22222222-2222-4222-8222-222222222222',
-        distributionCenterName: 'Wuse Grand Central Distribution Center',
+        distributionCenterName: 'Central Command Distribution Center',
         operatingState: 'Federal Capital Territory',
-        operatingCity: 'Wuse 2',
+        operatingCity: 'Central Command Hub',
       );
       return _currentUser!;
     }
@@ -256,11 +283,11 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         lastName: 'Finances',
         phone: '08087968576',
         role: 'dc_finance_admin',
-        deliveryAgentCode: 'FIN-WUSE-01-830',
+        deliveryAgentCode: 'FIN-CMD-01-830',
         distributionCenterId: '22222222-2222-4222-8222-222222222222',
-        distributionCenterName: 'Wuse Grand Central Distribution Center',
+        distributionCenterName: 'Central Command Distribution Center',
         operatingState: 'Federal Capital Territory',
-        operatingCity: 'Abuja',
+        operatingCity: 'Central Command Hub',
       );
       return _currentUser!;
     }
@@ -277,11 +304,11 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         lastName: 'StockAdmin',
         phone: '08098765432',
         role: 'dc_stock_admin',
-        deliveryAgentCode: 'STK-WUSE-01-102',
+        deliveryAgentCode: 'STK-CMD-01-102',
         distributionCenterId: '22222222-2222-4222-8222-222222222222',
-        distributionCenterName: 'Wuse Grand Central Distribution Center',
+        distributionCenterName: 'Central Command Distribution Center',
         operatingState: 'Federal Capital Territory',
-        operatingCity: 'Abuja',
+        operatingCity: 'Central Command Hub',
       );
       return _currentUser!;
     }
@@ -322,6 +349,30 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         role: 'delivery_agent',
         deliveryAgentId: 'b1111111-1111-4111-8111-111111111111',
         deliveryAgentCode: 'PDA-7000',
+      );
+      return _currentUser!;
+    }
+
+    if (clean == 'accountant@novacare.com' ||
+        clean == 'samuel.accountant@novacare.com' ||
+        clean.startsWith('acc-nova-')) {
+      if (password != 'AccountantPass123!' && password != 'Password123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: 'acc-77777777-7777-4777-8777-777777777777',
+        email: 'accountant@novacare.com',
+        firstName: 'Samuel',
+        lastName: 'Accountant',
+        phone: '08099887766',
+        role: 'merchant_accountant',
+        accountantId: 'acc-77777777-7777-4777-8777-777777777777',
+        accountantCode: 'ACC-NOVA-001',
+        clientId: '00000000-0000-4000-8000-789382731303',
+        clientCompanyName: 'Novacare Health & Wellness Ltd',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
       );
       return _currentUser!;
     }
@@ -411,7 +462,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       phone: phone.trim(),
-      role: 'dc_operations',
+      role: role,
       deliveryAgentCode: code,
       distributionCenterId: distributionCenterId,
       distributionCenterName: distributionCenterName,
@@ -533,12 +584,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         cleanInput.startsWith('rdr-') ||
         cleanInput.startsWith('cls-') ||
         cleanInput.startsWith('cli-') ||
-        cleanInput.startsWith('ops-')) {
+        cleanInput.startsWith('ops-') ||
+        cleanInput.startsWith('acc-') ||
+        cleanInput.startsWith('mkt-')) {
       resolvedAgentCode = rawInput.toUpperCase();
-      // Check in-memory registered accounts by agent code or closer code
+      // Check in-memory registered accounts by agent code or closer code or accountant code or marketer code
       for (final user in _registeredUsers.values) {
         if (user.deliveryAgentCode?.toUpperCase() == resolvedAgentCode ||
-            user.closerCode?.toUpperCase() == resolvedAgentCode) {
+            user.closerCode?.toUpperCase() == resolvedAgentCode ||
+            user.accountantCode?.toUpperCase() == resolvedAgentCode ||
+            user.marketerCode?.toUpperCase() == resolvedAgentCode) {
           lookupEmail = user.email.toLowerCase();
           break;
         }
@@ -603,6 +658,28 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 .maybeSingle();
             if (clientRes != null && clientRes['email'] != null) {
               lookupEmail = clientRes['email'].toString().toLowerCase();
+            }
+          }
+          // Check client_accountants
+          if (!lookupEmail.contains('@')) {
+            final accountantRes = await dbClient
+                .from('client_accountants')
+                .select('email')
+                .ilike('accountant_code', resolvedAgentCode)
+                .maybeSingle();
+            if (accountantRes != null && accountantRes['email'] != null) {
+              lookupEmail = accountantRes['email'].toString().toLowerCase();
+            }
+          }
+          // Check client_marketers
+          if (!lookupEmail.contains('@')) {
+            final marketerRes = await dbClient
+                .from('client_marketers')
+                .select('email')
+                .ilike('marketer_code', resolvedAgentCode)
+                .maybeSingle();
+            if (marketerRes != null && marketerRes['email'] != null) {
+              lookupEmail = marketerRes['email'].toString().toLowerCase();
             }
           }
         } catch (e) {
@@ -1993,11 +2070,32 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } catch (_) {}
       }
       if (rawRole.isEmpty) {
-        if (cleanEmail.contains('sales_supervisor') ||
+        try {
+          final isAccountantRow = await dbClient
+              .from('client_accountants')
+              .select('id')
+              .ilike('email', cleanEmail)
+              .maybeSingle();
+          if (isAccountantRow != null) rawRole = 'merchant_accountant';
+        } catch (_) {}
+      }
+      if (rawRole.isEmpty) {
+        if (cleanEmail == 'emeraldcodelines@gmail.com' ||
+            cleanEmail.contains('admin') ||
+            cleanEmail.contains('superadmin')) {
+          rawRole = 'super_admin';
+        } else if (cleanEmail.contains('sales_supervisor') ||
             cleanEmail.contains('joelsupervisor') ||
             cleanEmail.contains('closer_supervisor') ||
             cleanEmail.contains('sales_rep_supervisor')) {
           rawRole = 'sales_supervisor';
+        } else if ((cleanEmail.contains('accountant') ||
+                cleanEmail.contains('accounting') ||
+                cleanEmail.contains('finance')) &&
+            (cleanEmail.contains('client') ||
+                cleanEmail.contains('merchant') ||
+                cleanEmail.contains('novacare'))) {
+          rawRole = 'merchant_accountant';
         } else if (cleanEmail.contains('client') || cleanEmail.contains('merchant')) {
           rawRole = 'client';
         } else if (cleanEmail.contains('closer')) {
@@ -2028,46 +2126,56 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
       }
 
-      final isCloserSupervisor = rawRole == 'sales_supervisor' ||
+      final isSuperAdmin = rawRole == 'super_admin' ||
+          rawRole == 'admin' ||
+          rawRole == 'platform_admin' ||
+          rawRole == 'system_admin' ||
+          cleanEmail == 'emeraldcodelines@gmail.com';
+      final isCloserSupervisor = (rawRole == 'sales_supervisor' ||
           rawRole == 'closer_supervisor' ||
           rawRole == 'sales_rep_supervisor' ||
           cleanEmail.contains('joelsupervisor') ||
           (rawRole == 'closer' &&
               (userRes?['is_supervisor'] == true ||
-                  userRes?['is_supervisor'] == 'true'));
+                  userRes?['is_supervisor'] == 'true'))) && !isSuperAdmin;
       final isCloser = (rawRole == 'closer' || rawRole == 'client_closer') &&
-          !isCloserSupervisor;
-      final isMarketer = rawRole == 'marketer' || rawRole == 'digital_marketer';
+          !isCloserSupervisor && !isSuperAdmin;
+      final isMarketer = (rawRole == 'marketer' || rawRole == 'digital_marketer') && !isSuperAdmin;
       final isClientAdmin =
-          rawRole == 'client' || rawRole == 'merchant' || rawRole == 'seller';
+          (rawRole == 'client' || rawRole == 'merchant' || rawRole == 'seller') && !isSuperAdmin;
+      final isMerchantAccountant = (rawRole == 'merchant_accountant' ||
+          rawRole == 'client_accountant' ||
+          rawRole == 'client_finance' ||
+          rawRole == 'merchant_finance') && !isSuperAdmin;
       final isDcStaff = (rawRole == 'dc_manager' ||
-          rawRole == 'dc_supervisor' ||
-          rawRole == 'super_admin') && !isCloserSupervisor;
-      final isDcOperations = rawRole == 'dc_operations' ||
+          rawRole == 'dc_supervisor') && !isCloserSupervisor && !isSuperAdmin;
+      final isDcOperations = (rawRole == 'dc_operations' ||
           rawRole == 'operations_officer' ||
           rawRole == 'dispatcher' ||
           rawRole == 'ops_officer' ||
           rawRole == 'operations' ||
           rawRole == 'dc_orders_admin' ||
-          rawRole == 'orders_admin';
-      final isDcStockAdmin = rawRole == 'dc_stock_admin' ||
+          rawRole == 'orders_admin') && !isSuperAdmin;
+      final isDcStockAdmin = (rawRole == 'dc_stock_admin' ||
           rawRole == 'dc_stock_officer' ||
           rawRole == 'stock_admin' ||
           rawRole == 'stock_officer' ||
-          rawRole == 'inventory_officer';
-      final isDcFinanceAdmin = rawRole == 'dc_finance_admin' ||
+          rawRole == 'inventory_officer') && !isSuperAdmin;
+      final isDcFinanceAdmin = (rawRole == 'dc_finance_admin' ||
           rawRole == 'dc_finance_officer' ||
           rawRole == 'finance_admin' ||
           rawRole == 'finance_officer' ||
-          rawRole == 'remittance_officer';
-      final isGeneralAccountant = rawRole == 'general_accountant' ||
+          rawRole == 'remittance_officer') && !isSuperAdmin;
+      final isGeneralAccountant = (rawRole == 'general_accountant' ||
           rawRole == 'chief_accountant' ||
           rawRole == 'accountant' ||
-          rawRole == 'finance_director';
-      final isNonRider = isCloserSupervisor ||
+          rawRole == 'finance_director') && !isSuperAdmin;
+      final isNonRider = isSuperAdmin ||
+          isCloserSupervisor ||
           isCloser ||
           isMarketer ||
           isClientAdmin ||
+          isMerchantAccountant ||
           isDcStaff ||
           isDcOperations ||
           isDcStockAdmin ||
@@ -2077,7 +2185,38 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       String? deliveryAgentId;
       Map<String, dynamic>? agentRes;
 
-      if (isCloserSupervisor) {
+      if (isSuperAdmin) {
+        merged['role'] = 'super_admin';
+        merged['is_supervisor'] = true;
+        merged['delivery_agent_id'] = null;
+        merged['delivery_agent_code'] = 'ADMIN-HQ-01';
+        merged['first_name'] = userRes?['first_name'] ?? 'Joel';
+        merged['last_name'] = userRes?['last_name'] ?? 'Emerald';
+        merged['phone_number'] ??= userRes?['phone_number'] ?? '+2348000000001';
+        merged['distribution_center_id'] ??=
+            userRes?['distribution_center_id'] ?? '22222222-2222-4222-8222-222222222222';
+        merged['distribution_center_name'] ??=
+            userRes?['distribution_center_name'] ?? 'Central Command Distribution Center';
+
+        // Auto-heal / synchronize to public.users table so it is permanently persisted
+        try {
+          await dbClient.from(SupabaseConstants.usersTable).upsert({
+            'id': userId,
+            'company_id': '11111111-1111-4111-8111-111111111111',
+            'email': cleanEmail,
+            'phone_number': merged['phone_number'] ?? '',
+            'first_name': merged['first_name'],
+            'last_name': merged['last_name'],
+            'role': 'super_admin',
+            'distribution_center_id': merged['distribution_center_id'],
+            'is_active': true,
+          });
+          debugPrint(
+              '[AUTH_DATASOURCE] ✅ Self-healed public.users entry for Super Admin ($userId, $cleanEmail)');
+        } catch (e) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Super admin users upsert notice: $e');
+        }
+      } else if (isCloserSupervisor) {
         merged['role'] = 'sales_supervisor';
         merged['is_supervisor'] = true;
         merged['delivery_agent_id'] = null;
@@ -2410,8 +2549,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         merged['distribution_center_id'] =
             assignedDcId ?? '22222222-2222-4222-8222-222222222222';
         merged['distribution_center_name'] =
-            assignedDcName ?? 'Wuse Grand Central Distribution Center';
-        merged['delivery_agent_code'] = assignedDcCode ?? 'OPS-WUSE-01-748';
+            assignedDcName ?? 'Central Command Distribution Center';
+        merged['delivery_agent_code'] = assignedDcCode ?? 'OPS-CMD-01-748';
 
         // Auto-heal / synchronize to public.users table so it is permanently persisted
         try {
@@ -2474,8 +2613,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         merged['distribution_center_id'] =
             assignedDcId ?? '22222222-2222-4222-8222-222222222222';
         merged['distribution_center_name'] =
-            assignedDcName ?? 'Wuse Grand Central Distribution Center';
-        merged['delivery_agent_code'] = assignedDcCode ?? 'STK-WUSE-01-102';
+            assignedDcName ?? 'Central Command Distribution Center';
+        merged['delivery_agent_code'] = assignedDcCode ?? 'STK-CMD-01-102';
 
         // Auto-heal / synchronize to public.users table so it is permanently persisted
         try {
@@ -2538,8 +2677,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         merged['distribution_center_id'] =
             assignedDcId ?? '22222222-2222-4222-8222-222222222222';
         merged['distribution_center_name'] =
-            assignedDcName ?? 'Wuse Grand Central Distribution Center';
-        merged['delivery_agent_code'] = assignedDcCode ?? 'FIN-WUSE-01-830';
+            assignedDcName ?? 'Central Command Distribution Center';
+        merged['delivery_agent_code'] = assignedDcCode ?? 'FIN-CMD-01-830';
 
         // Auto-heal / synchronize to public.users table so it is permanently persisted
         try {
@@ -2593,6 +2732,86 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           });
           debugPrint(
               '[AUTH_DATASOURCE] ✅ Self-healed public.users entry for General Accountant ($userId, $cleanEmail)');
+        } catch (healErr) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Self-heal notice: $healErr');
+        }
+      } else if (isMerchantAccountant) {
+        merged['role'] = 'merchant_accountant';
+        merged['delivery_agent_id'] = null;
+
+        try {
+          final accountantRes = await dbClient
+              .from('client_accountants')
+              .select()
+              .or('email.ilike.$cleanEmail,id.eq.$userId,user_id.eq.$userId')
+              .maybeSingle();
+          if (accountantRes != null) {
+            merged['accountant_id'] = accountantRes['id'];
+            merged['accountant_code'] = accountantRes['accountant_code'];
+            merged['phone'] =
+                accountantRes['phone'] ?? merged['phone'] ?? merged['phone_number'];
+            if (accountantRes['avatar_url'] != null &&
+                accountantRes['avatar_url'].toString().isNotEmpty) {
+              merged['avatar_url'] = accountantRes['avatar_url'];
+            }
+            if (accountantRes['full_name'] != null) {
+              final parts =
+                  accountantRes['full_name'].toString().trim().split(' ');
+              merged['first_name'] = parts.first;
+              merged['last_name'] =
+                  parts.length > 1 ? parts.sublist(1).join(' ') : '';
+            }
+            final clientId = accountantRes['client_id'] ?? userRes?['client_id'];
+            if (clientId != null) {
+              final clientRes = await dbClient
+                  .from('clients')
+                  .select('id, name')
+                  .eq('id', clientId)
+                  .maybeSingle();
+              if (clientRes != null) {
+                merged['client_id'] = clientRes['id'];
+                merged['client_company_name'] = clientRes['name'];
+                merged['company_name'] = clientRes['name'];
+              }
+            }
+          } else {
+            final linkedClientId = userRes?['client_id'];
+            if (linkedClientId != null) {
+              merged['client_id'] = linkedClientId;
+              final clientRes = await dbClient
+                  .from('clients')
+                  .select('id, name')
+                  .eq('id', linkedClientId)
+                  .maybeSingle();
+              if (clientRes != null) {
+                merged['client_company_name'] = clientRes['name'];
+                merged['company_name'] = clientRes['name'];
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Merchant accountant profile query notice ($e)');
+        }
+
+        merged['first_name'] ??= userRes?['first_name'] ?? 'Samuel';
+        merged['last_name'] ??= userRes?['last_name'] ?? 'Accountant';
+        merged['accountant_code'] ??= userRes?['accountant_code'] ?? 'ACC-NOVA-001';
+        merged['client_company_name'] ??= 'Novacare Health & Wellness Ltd';
+
+        // Auto-heal / synchronize to public.users table so it is permanently persisted
+        try {
+          await dbClient.from(SupabaseConstants.usersTable).upsert({
+            'id': userId,
+            'email': cleanEmail,
+            'phone_number': merged['phone_number'] ?? merged['phone'] ?? '',
+            'first_name': merged['first_name'],
+            'last_name': merged['last_name'],
+            'role': 'merchant_accountant',
+            'client_id': merged['client_id'] ?? '00000000-0000-4000-8000-789382731303',
+            'is_active': true,
+          });
+          debugPrint(
+              '[AUTH_DATASOURCE] ✅ Self-healed public.users entry for Merchant Accountant ($userId, $cleanEmail)');
         } catch (healErr) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Self-heal notice: $healErr');
         }

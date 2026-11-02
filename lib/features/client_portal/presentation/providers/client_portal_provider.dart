@@ -32,6 +32,7 @@ import '../../domain/entities/stock_holder_custody.dart';
 import '../../domain/entities/client_marketer.dart';
 import '../../domain/entities/client_marketer_payout.dart';
 import '../../domain/entities/lead_form.dart';
+import '../../domain/entities/client_accountant.dart';
 
 /// Financial metrics summary per product or aggregate
 class ClientProductFinanceSummary {
@@ -198,6 +199,7 @@ class ClientPortalState {
   final List<ClientCloserPayout> closerPayouts;
   final List<ClientMarketerPayout> marketerPayouts;
   final List<ClientMarketer> marketers;
+  final List<ClientAccountant> accountants;
   final List<LeadForm> leadForms;
   final String selectedInventoryWarehouseFilter; // 'all' or specific warehouse
   final String selectedInventoryItemFilter; // 'all' or specific item
@@ -216,6 +218,7 @@ class ClientPortalState {
     this.closerPayouts = const [],
     this.marketerPayouts = const [],
     this.marketers = const [],
+    this.accountants = const [],
     this.leadForms = const [],
     this.assetCustodyData = const {},
     this.isLoading = false,
@@ -249,6 +252,7 @@ class ClientPortalState {
     List<ClientCloserPayout>? closerPayouts,
     List<ClientMarketerPayout>? marketerPayouts,
     List<ClientMarketer>? marketers,
+    List<ClientAccountant>? accountants,
     List<LeadForm>? leadForms,
     Map<String, dynamic>? assetCustodyData,
     bool? isLoading,
@@ -281,6 +285,7 @@ class ClientPortalState {
       closerPayouts: closerPayouts ?? this.closerPayouts,
       marketerPayouts: marketerPayouts ?? this.marketerPayouts,
       marketers: marketers ?? this.marketers,
+      accountants: accountants ?? this.accountants,
       leadForms: leadForms ?? this.leadForms,
       assetCustodyData: assetCustodyData ?? this.assetCustodyData,
       isLoading: isLoading ?? this.isLoading,
@@ -536,6 +541,24 @@ class ClientPortalState {
   double get pendingCodRemittances => orders
       .where((o) => o.isDelivered && o.isPod)
       .fold(0.0, (sum, o) => sum + o.totalAmount);
+
+  // Merchant Accountant KPIs
+  int get totalAccountantsCount => accountants.length;
+  int get activeAccountantsCount => accountants.where((a) => a.isActive).length;
+  int get inactiveAccountantsCount => accountants.where((a) => !a.isActive).length;
+  int get totalSettlementsValidatedByAccountants => accountants.fold(0, (sum, a) => sum + a.totalSettlementsValidated);
+  double get totalSettlementAmountValidated => accountants.fold(0.0, (sum, a) => sum + a.totalAmountValidated);
+
+  List<ClientAccountant> get filteredAccountants {
+    if (searchQuery.trim().isEmpty) return accountants;
+    final q = searchQuery.trim().toLowerCase();
+    return accountants.where((a) {
+      return a.fullName.toLowerCase().contains(q) ||
+          a.email.toLowerCase().contains(q) ||
+          a.phone.toLowerCase().contains(q) ||
+          a.accountantCode.toLowerCase().contains(q);
+    }).toList();
+  }
 
   // Closer & Telesales KPIs
   int get totalClosersCount => closers.length;
@@ -1515,6 +1538,13 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         debugPrint('[CLIENT_PORTAL] ℹ️ Marketers/forms/payouts sync notice: $mktErr');
       }
 
+      List<ClientAccountant> clientAccountants = [];
+      try {
+        clientAccountants = await _repository.getAccountants(clientId);
+      } catch (accErr) {
+        debugPrint('[CLIENT_PORTAL] ℹ️ Accountants sync notice: $accErr');
+      }
+
       if (!mounted) return;
       state = state.copyWith(
         clientProfile: profileToUse,
@@ -1527,6 +1557,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         closerPayouts: closerPayouts,
         marketerPayouts: marketerPayouts,
         marketers: clientMarketers,
+        accountants: clientAccountants,
         leadForms: clientForms,
         assetCustodyData: custodyData,
         suppliers: suppliers,
@@ -1759,6 +1790,94 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     } catch (e) {
       debugPrint('[CLIENT_PORTAL] ⚠️ Error updating closer products: $e');
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  // ==========================================
+  // MERCHANT ACCOUNTANTS
+  // ==========================================
+
+  /// Onboard a new Merchant Accountant
+  Future<ClientAccountant> createAccountant({
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? accountantCode,
+    bool canApproveSettlements = true,
+    bool canManageExpenses = true,
+    bool canDisbursePayouts = true,
+    String? avatarUrl,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final newAccountant = await _repository.createAccountant(
+        clientId: state.clientProfile.id,
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password: password,
+        accountantCode: accountantCode,
+        canApproveSettlements: canApproveSettlements,
+        canManageExpenses: canManageExpenses,
+        canDisbursePayouts: canDisbursePayouts,
+        avatarUrl: avatarUrl,
+      );
+
+      final updatedAccountants = [
+        newAccountant,
+        ...state.accountants.where((a) => a.id != newAccountant.id),
+      ];
+      state = state.copyWith(
+        accountants: updatedAccountants,
+        isLoading: false,
+      );
+      return newAccountant;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error onboarding accountant: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Toggle Merchant Accountant Active/Inactive Status
+  Future<void> toggleAccountantStatus({
+    required String accountantId,
+    required bool isActive,
+  }) async {
+    try {
+      await _repository.toggleAccountantStatus(
+        accountantId: accountantId,
+        isActive: isActive,
+      );
+      final updated = state.accountants.map((a) {
+        if (a.id == accountantId) {
+          return a.copyWith(isActive: isActive);
+        }
+        return a;
+      }).toList();
+      state = state.copyWith(accountants: updated);
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] Error updating accountant status: $e');
+      rethrow;
+    }
+  }
+
+  /// Reset Merchant Accountant Password
+  Future<void> resetAccountantPassword({
+    required String accountantId,
+    String? userId,
+    required String newPassword,
+  }) async {
+    try {
+      await _repository.resetAccountantPassword(
+        accountantId: accountantId,
+        userId: userId,
+        newPassword: newPassword,
+      );
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] Error resetting accountant password: $e');
       rethrow;
     }
   }
@@ -2738,7 +2857,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
               ? allDcs.firstWhere((dc) => dc.isGrandDc || dc.isHub, orElse: () => allDcs.first).id
               : '22222222-2222-4222-8222-222222222222');
       final String assignedDcName = routingResult.distributionCenter?.name ??
-          (allDcs.where((dc) => dc.id == assignedDcId).firstOrNull?.name ?? 'Wuse Central Distribution Hub');
+          (allDcs.where((dc) => dc.id == assignedDcId).firstOrNull?.name ?? 'Central Command Distribution Center');
 
       String? assignedDriverId;
       String? assignedDriverName;

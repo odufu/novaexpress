@@ -3,13 +3,15 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../data/datasources/dc_console_remote_datasource.dart';
 import '../../data/repositories/dc_console_repository_impl.dart';
 import '../../domain/repositories/dc_console_repository.dart';
+import '../../../../core/services/audit_logging_service.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/data/datasources/auth_remote_datasource.dart';
 import '../../../auth/data/models/user_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
 import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../../domain/entities/dc_finance_settings.dart';
@@ -20,22 +22,22 @@ import '../../domain/entities/dc_transaction_record.dart';
 import '../../domain/entities/distribution_center.dart';
 
 final List<DistributionCenter> defaultDistributionCenters = [
-  // 1. Grand DC (Apex Central DC - Wuse Grand Central Hub)
+  // 1. Grand DC (Apex Central DC - Central Command Distribution Center)
   DistributionCenter(
     id: '22222222-2222-4222-8222-222222222222',
     companyId: '11111111-1111-4111-8111-111111111111',
-    name: 'Wuse Grand Central Distribution Center',
-    code: 'DC-WUSE-01',
-    state: 'Abuja (FCT)',
-    city: 'Wuse 2',
-    address: 'Plot 402 Aminu Kano Crescent, Wuse 2, Abuja',
+    name: 'Central Command Distribution Center',
+    code: 'DC-CMD-01',
+    state: 'Federal Capital Territory',
+    city: 'Central Command Hub',
+    address: 'Plot 100 Command Boulevard, Central District',
     contactPhone: '+2348023456789',
     contactEmail: 'dc.supervisor@novaxpress.ng',
     managerName: 'Ahmed Bello',
     isGrandDc: true,
     isHub: true,
     isActive: true,
-    operatingZones: const ['Abuja Municipal (AMAC)', 'AMAC', 'Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
+    operatingZones: const ['Central Business District', 'Abuja Municipal (AMAC)', 'AMAC', 'Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
     storageCapacityUnits: 25000,
     totalAssignedRiders: 0,
     activeInventoryBatches: 0,
@@ -44,7 +46,29 @@ final List<DistributionCenter> defaultDistributionCenters = [
   ),
 ];
 
-const List<DCFleetDriver> defaultFleetDrivers = [];
+final List<DCFleetDriver> defaultFleetDrivers = [
+  const DCFleetDriver(
+    id: 'b1111111-1111-4111-8111-111111111111',
+    driverCode: 'PDA-7000',
+    name: 'Emeka Rider',
+    phone: '08012345678',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    vehicleModel: 'Honda Ace 125',
+    vehiclePlate: 'ABJ-789-XY',
+    vehicleType: 'Motorcycle',
+    status: 'active',
+    assignedZone: 'Abuja Municipal (AMAC)',
+    distributionCenterId: '22222222-2222-4222-8222-222222222222',
+    coveredLgas: ['Abuja Municipal (AMAC)', 'Bwari', 'Gwagwalada', 'Kuje', 'Kwali'],
+    totalAssignedOrders: 0,
+    completedOrders: 0,
+    routeProgressPercent: 0.0,
+    efficiencyRating: 98.4,
+    cashInCustody: 0.0,
+    itemsInCustody: 0,
+    personnelType: 'pda',
+  ),
+];
 
 const List<ClientProfile> defaultRegisteredClients = [];
 
@@ -237,8 +261,8 @@ class DCConsoleState {
 
   const DCConsoleState({
     this.activeHubId = '22222222-2222-4222-8222-222222222222',
-    this.activeHubName = 'Wuse Central Distribution Hub',
-    this.activeHubCode = 'DC-ABJ-01',
+    this.activeHubName = 'Central Command Distribution Center',
+    this.activeHubCode = 'DC-CMD-01',
     this.activeTabIndex = 0,
     this.isSidebarCollapsed = false,
     this.searchQuery = '',
@@ -369,8 +393,35 @@ class DCConsoleState {
     return list;
   }
 
+  List<DCPayoutClaim> get dcPayoutClaims {
+    if (isCurrentHubGrandDc && selectedDcId == null) {
+      return payoutClaims;
+    }
+    final allowedRiderIds = dcDrivers.map((d) => d.id).toSet();
+    return payoutClaims.where((c) => allowedRiderIds.contains(c.riderId)).toList();
+  }
+
+  List<DCReturnItem> get dcReturnItems {
+    if (isCurrentHubGrandDc && selectedDcId == null) {
+      return returnItems;
+    }
+    final allowedRiderNames = dcDrivers.map((d) => d.name.toLowerCase()).toSet();
+    return returnItems.where((r) => allowedRiderNames.contains(r.riderName.toLowerCase())).toList();
+  }
+
+  List<DCTransactionRecord> get dcTransactions {
+    if (isCurrentHubGrandDc && selectedDcId == null) {
+      return transactions;
+    }
+    final allowedRiderIds = dcDrivers.map((d) => d.id).toSet();
+    final allowedRiderCodes = dcDrivers.map((d) => d.driverCode.toLowerCase()).toSet();
+    return transactions.where((t) =>
+        allowedRiderIds.contains(t.riderId) ||
+        allowedRiderCodes.contains(t.riderCode.toLowerCase())).toList();
+  }
+
   List<DCTransactionRecord> get filteredTransactions {
-    var list = transactions;
+    var list = dcTransactions;
     if (transactionFilter != 'all') {
       if (transactionFilter == 'paystack') {
         list = list.where((t) => t.isPaystack).toList();
@@ -406,14 +457,33 @@ class DCConsoleState {
     return list;
   }
 
+  DistributionCenter get activeHub => distributionCenters.firstWhere(
+    (d) => d.id == activeHubId || d.code == activeHubCode,
+    orElse: () => DistributionCenter(
+      id: activeHubId,
+      code: activeHubCode,
+      name: activeHubName,
+      isGrandDc: isCurrentHubGrandDc,
+      isHub: isCurrentHubGrandDc,
+      state: '',
+      city: '',
+      address: '',
+    ),
+  );
+
   bool get isCurrentHubGrandDc =>
+      activeHubCode == 'DC-CMD-01' ||
       activeHubCode == 'DC-ABJ-01' ||
       activeHubId == '22222222-2222-4222-8222-222222222222' ||
+      activeHubName.toLowerCase().contains('central command') ||
       activeHubName.toLowerCase().contains('wuse central') ||
       activeHubName.toLowerCase().contains('grand dc');
 
   List<DCFleetDriver> get dcDrivers {
     return drivers.where((d) {
+      if (isCurrentHubGrandDc && selectedDcId == null) {
+        return true;
+      }
       if (isCurrentHubGrandDc) {
         return d.distributionCenterId == activeHubId ||
                d.distributionCenterId == activeHubCode ||
@@ -428,7 +498,11 @@ class DCConsoleState {
   List<DCFleetDriver> get filteredDrivers {
     var list = dcDrivers;
     if (fleetFilter != 'all') {
-      list = list.where((d) => d.status.toLowerCase() == fleetFilter.toLowerCase()).toList();
+      if (fleetFilter.toLowerCase() == 'unavailable' || fleetFilter.toLowerCase() == 'offline') {
+        list = list.where((d) => d.isUnavailable).toList();
+      } else {
+        list = list.where((d) => d.status.toLowerCase() == fleetFilter.toLowerCase()).toList();
+      }
     }
     if (searchQuery.trim().isNotEmpty) {
       final q = searchQuery.toLowerCase().trim();
@@ -443,6 +517,9 @@ class DCConsoleState {
 
   List<DCOperationsOfficer> get dcOperationsOfficers {
     return operationsOfficers.where((o) {
+      if (isCurrentHubGrandDc && selectedDcId == null) {
+        return true;
+      }
       if (isCurrentHubGrandDc) {
         return o.distributionCenterId == activeHubId ||
                o.distributionCenterId == activeHubCode ||
@@ -494,6 +571,7 @@ class DCConsoleState {
 class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   final LocalStorageService _storageService;
   final DCConsoleRepository _repository;
+  final Ref? _ref;
 
   static bool get isTestEnvironment {
     try {
@@ -518,13 +596,14 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }
   }
 
-  DCConsoleNotifier([LocalStorageService? storageService, DCConsoleRepository? repository])
+  DCConsoleNotifier([LocalStorageService? storageService, DCConsoleRepository? repository, Ref? ref])
       : _storageService = storageService ?? LocalStorageServiceImpl(),
         _repository = repository ??
             DCConsoleRepositoryImpl(
               remoteDataSource: DCConsoleRemoteDataSourceImpl(),
               storageService: storageService ?? LocalStorageServiceImpl(),
             ),
+        _ref = ref,
         super(DCConsoleState(
           distributionCenters: defaultDistributionCenters,
           drivers: defaultFleetDrivers,
@@ -667,10 +746,26 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         ),
       );
 
+  DistributionCenter get activeHub => distributionCenters.firstWhere(
+    (d) => d.id == state.activeHubId || d.code == state.activeHubCode,
+    orElse: () => DistributionCenter(
+      id: state.activeHubId,
+      code: state.activeHubCode,
+      name: state.activeHubName,
+      isGrandDc: isCurrentHubGrandDc,
+      isHub: isCurrentHubGrandDc,
+      state: '',
+      city: '',
+      address: '',
+    ),
+  );
+
   bool get isCurrentHubGrandDc =>
       state.activeHubId == grandDc?.id ||
       state.activeHubCode == grandDc?.code ||
+      state.activeHubCode == 'DC-CMD-01' ||
       state.activeHubCode == 'DC-ABJ-01' ||
+      state.activeHubName.toLowerCase().contains('central command') ||
       state.activeHubName.toLowerCase().contains('wuse central') ||
       state.activeHubName.toLowerCase().contains('grand dc');
 
@@ -710,14 +805,55 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(selectedDriverId: driverId);
   }
 
+  Future<void> toggleDriverAvailability(String driverId, bool isAvailable) async {
+    final newStatus = isAvailable ? 'active' : 'offline';
+    final updatedList = state.drivers.map((d) {
+      if (d.id == driverId || d.driverCode == driverId) {
+        return d.copyWith(status: newStatus);
+      }
+      return d;
+    }).toList();
+
+    state = state.copyWith(drivers: updatedList);
+    await _storageService.cacheFleetDrivers(updatedList);
+
+    try {
+      final driver = updatedList.firstWhere((d) => d.id == driverId || d.driverCode == driverId);
+      await _repository.updateDriverCompensationTerms(driver);
+    } catch (e) {
+      debugPrint('[DC_CONSOLE] ⚠️ toggleDriverAvailability notice: ');
+    }
+  }
+
   void selectDistributionCenter(String? dcId) {
+    final authUser = _ref?.read(authProvider).user;
+    final isSuperAdmin = authUser != null && (authUser.isSuperAdmin || authUser.role == 'super_admin' || authUser.role == 'admin');
+    final isGrandDcAdmin = state.isCurrentHubGrandDc || state.activeHub.isGrandDc;
+    final canManageOtherDcs = isSuperAdmin || isGrandDcAdmin;
+
+    // Strict boundary: Non-Grand-DC managers cannot switch DCs or access cumulative network
+    if (!canManageOtherDcs && dcId != null && dcId != state.activeHubId && dcId != state.activeHubCode) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⛔ Non-Grand-DC Admin cannot switch distribution centers.');
+      return;
+    }
+    if (!canManageOtherDcs && dcId == null) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⛔ Non-Grand-DC Admin cannot access cumulative network view.');
+      return;
+    }
+
     if (dcId == null) {
       state = state.copyWith(clearSelectedDcId: true);
     } else {
-      state = state.copyWith(selectedDcId: dcId);
-      final match = state.distributionCenters.where((d) => d.id == dcId).firstOrNull;
+      final match = state.distributionCenters.where((d) => d.id == dcId || d.code.toLowerCase() == dcId.toLowerCase()).firstOrNull;
       if (match != null) {
-        switchActiveHub(match);
+        state = state.copyWith(
+          selectedDcId: match.id,
+          activeHubId: match.id,
+          activeHubName: match.name,
+          activeHubCode: match.code,
+        );
+      } else {
+        state = state.copyWith(selectedDcId: dcId);
       }
     }
   }
@@ -1179,27 +1315,61 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   }
 
   void switchActiveHub(DistributionCenter dc) {
+    final existing = state.distributionCenters.any((d) => d.id == dc.id || d.code == dc.code);
+    final updatedDcs = existing ? state.distributionCenters : [dc, ...state.distributionCenters];
     state = state.copyWith(
+      distributionCenters: updatedDcs,
       activeHubId: dc.id,
       activeHubName: dc.name,
       activeHubCode: dc.code,
+      selectedDcId: dc.id,
     );
   }
 
   void syncWithUser(dynamic user) {
     if (user == null) return;
     final String? dcId = user.distributionCenterId;
+    final bool isSuperAdmin = (user.isSuperAdmin == true) || (user.role == 'super_admin');
+
+    if (isSuperAdmin && (dcId == null || dcId.isEmpty)) {
+      final grand = grandDc;
+      if (grand != null && state.selectedDcId == null) {
+        state = state.copyWith(
+          selectedDcId: grand.id,
+          activeHubId: grand.id,
+          activeHubName: grand.name,
+          activeHubCode: grand.code,
+        );
+      }
+      return;
+    }
+
     if (dcId == null || dcId.isEmpty) return;
 
-    if (state.activeHubId == dcId) return;
+    final grand = grandDc;
+    final bool isUserGrandDc = grand != null &&
+        (dcId == grand.id ||
+            dcId == grand.code ||
+            dcId == '22222222-2222-4222-8222-222222222222' ||
+            dcId.toLowerCase().contains('cmd'));
 
     final match = state.distributionCenters.where(
-      (d) => d.id == dcId || d.code.toLowerCase() == dcId.toLowerCase() || (user.deliveryAgentCode != null && user.deliveryAgentCode.toString().isNotEmpty && d.code.toLowerCase() == user.deliveryAgentCode.toString().toLowerCase()),
+      (d) =>
+          d.id == dcId ||
+          d.code.toLowerCase() == dcId.toLowerCase() ||
+          (user.deliveryAgentCode != null &&
+              user.deliveryAgentCode.toString().isNotEmpty &&
+              d.code.toLowerCase() == user.deliveryAgentCode.toString().toLowerCase()),
     ).firstOrNull;
 
     if (match != null) {
-      switchActiveHub(match);
-      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Switched active hub to user DC: ${match.name} (${match.code})');
+      state = state.copyWith(
+        activeHubId: match.id,
+        activeHubName: match.name,
+        activeHubCode: match.code,
+        selectedDcId: match.id,
+      );
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Switched active hub & selectedDcId to user DC: ${match.name} (${match.code})');
     } else {
       final fallbackDc = DistributionCenter(
         id: dcId,
@@ -1219,11 +1389,20 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         managerName: (user.fullName != null && user.fullName.toString().isNotEmpty)
             ? user.fullName.toString()
             : 'DC Supervisor',
-        isGrandDc: false,
+        isGrandDc: isUserGrandDc,
         isHub: false,
       );
-      switchActiveHub(fallbackDc);
-      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Set fallback active hub to user DC: ${fallbackDc.name} (${fallbackDc.code})');
+      final updatedDcs = state.distributionCenters.any((d) => d.id == fallbackDc.id || d.code == fallbackDc.code)
+          ? state.distributionCenters
+          : [fallbackDc, ...state.distributionCenters];
+      state = state.copyWith(
+        distributionCenters: updatedDcs,
+        activeHubId: fallbackDc.id,
+        activeHubName: fallbackDc.name,
+        activeHubCode: fallbackDc.code,
+        selectedDcId: fallbackDc.id,
+      );
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Set fallback active hub & selectedDcId to user DC: ${fallbackDc.name} (${fallbackDc.code})');
     }
   }
 
@@ -1473,18 +1652,28 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   }
 
   void addDriver(DCFleetDriver driver) {
+    final authUser = _ref?.read(authProvider).user;
+    final isSuperAdmin = authUser != null && (authUser.isSuperAdmin || authUser.role == 'super_admin' || authUser.role == 'admin');
+    final isGrandDcAdmin = state.isCurrentHubGrandDc || state.activeHub.isGrandDc;
+    final canManageOtherDcs = isSuperAdmin || isGrandDcAdmin;
+
+    final enforcedDcId = canManageOtherDcs
+        ? ((driver.distributionCenterId != null && driver.distributionCenterId!.isNotEmpty) ? driver.distributionCenterId! : state.activeHubId)
+        : state.activeHubId;
+    final effectiveDriver = driver.copyWith(distributionCenterId: enforcedDcId);
+
     final updated = [
-      driver,
-      ...state.drivers.where((d) => d.id != driver.id && d.driverCode != driver.driverCode && (driver.email.isEmpty || d.email != driver.email)),
+      effectiveDriver,
+      ...state.drivers.where((d) => d.id != effectiveDriver.id && d.driverCode != effectiveDriver.driverCode && (effectiveDriver.email.isEmpty || d.email != effectiveDriver.email)),
     ];
     state = state.copyWith(drivers: updated);
     _storageService.cacheFleetDrivers(updated);
-    _storageService.cacheDriverCompensationTerms(driver.driverCode, driver.toJson());
-    if (driver.email.isNotEmpty) {
-      _storageService.cacheDriverCompensationTerms(driver.email, driver.toJson());
+    _storageService.cacheDriverCompensationTerms(effectiveDriver.driverCode, effectiveDriver.toJson());
+    if (effectiveDriver.email.isNotEmpty) {
+      _storageService.cacheDriverCompensationTerms(effectiveDriver.email, effectiveDriver.toJson());
     }
-    if (driver.id.isNotEmpty) {
-      _storageService.cacheDriverCompensationTerms(driver.id, driver.toJson());
+    if (effectiveDriver.id.isNotEmpty) {
+      _storageService.cacheDriverCompensationTerms(effectiveDriver.id, effectiveDriver.toJson());
     }
   }
 
@@ -1772,8 +1961,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     final cleanName = name.trim();
     final cleanPhone = phone.trim();
     final cleanPass = password.trim();
-    final targetDcId = (distributionCenterId != null && distributionCenterId.isNotEmpty)
-        ? distributionCenterId
+    final authUser = _ref?.read(authProvider).user;
+    final isSuperAdmin = authUser != null && (authUser.isSuperAdmin || authUser.role == 'super_admin' || authUser.role == 'admin');
+    final isGrandDcAdmin = state.isCurrentHubGrandDc || state.activeHub.isGrandDc;
+    final canManageOtherDcs = isSuperAdmin || isGrandDcAdmin;
+
+    final targetDcId = canManageOtherDcs
+        ? ((distributionCenterId != null && distributionCenterId.isNotEmpty) ? distributionCenterId : state.activeHubId)
         : state.activeHubId;
 
     final existingLocal = state.operationsOfficers.where(
@@ -1919,6 +2113,23 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         proofOfPaymentUrl: proofOfPaymentUrl,
       );
       debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId approved via repository (Ref: $ref).');
+
+      AuditLoggingService.instance.logAction(
+        actorName: 'Distribution Center Supervisor',
+        actorEmail: 'dc.manager@novaxpress.ng',
+        actorRole: 'dc_manager',
+        action: 'APPROVE_PAYOUT_CLAIM',
+        resource: 'PAYOUTS',
+        details: 'Approved payout claim $claimId for rider ${claim.riderName} (Ref: $ref).',
+        distributionCenterId: state.activeHubId,
+        distributionCenterName: state.activeHubName,
+        metadata: {
+          'claim_id': claimId,
+          'rider_id': claim.riderId,
+          'amount': claim.requestedAmount,
+          'disbursement_ref': ref,
+        },
+      );
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Payout approval notice ($e).');
     }
@@ -1940,11 +2151,29 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     if (isTestEnvironment) return;
 
     try {
+      final claim = state.payoutClaims.firstWhere((c) => c.id == claimId, orElse: () => updated.first);
       await _repository.rejectPayoutClaim(
         claimId: claimId,
         reason: note,
       );
       debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId marked rejected via repository.');
+
+      AuditLoggingService.instance.logAction(
+        actorName: 'Distribution Center Supervisor',
+        actorEmail: 'dc.manager@novaxpress.ng',
+        actorRole: 'dc_manager',
+        action: 'REJECT_PAYOUT_CLAIM',
+        resource: 'PAYOUTS',
+        details: 'Rejected payout claim $claimId for rider ${claim.riderName}. Reason: $note',
+        distributionCenterId: state.activeHubId,
+        distributionCenterName: state.activeHubName,
+        metadata: {
+          'claim_id': claimId,
+          'rider_id': claim.riderId,
+          'amount': claim.requestedAmount,
+          'reason': note,
+        },
+      );
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Payout rejection notice ($e).');
     }
@@ -2036,6 +2265,25 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       supervisorId: supervisorId,
     );
     await _initDrivers();
+
+    try {
+      await AuditLoggingService.instance.logAction(
+        actorId: supervisorId,
+        actorName: 'DC Finance Supervisor',
+        actorEmail: 'dc.finance@novaxpress.ng',
+        actorRole: 'dc_finance_admin',
+        action: 'APPROVE_CASH_REMITTANCE',
+        resource: 'FINANCE_LEDGER',
+        details: 'Approved COD cash remittance "$remittanceId" at ${state.activeHubName}.',
+        distributionCenterId: state.activeHubId,
+        distributionCenterName: state.activeHubName,
+        metadata: {
+          'remittance_id': remittanceId,
+          'supervisor_id': supervisorId,
+        },
+      );
+    } catch (_) {}
+
     return result;
   }
 
@@ -2063,11 +2311,30 @@ final dcConsoleRepositoryProvider = Provider<DCConsoleRepository>((ref) {
 final dcConsoleProvider = StateNotifierProvider<DCConsoleNotifier, DCConsoleState>((ref) {
   final storage = ref.watch(localStorageServiceProvider);
   final repository = ref.watch(dcConsoleRepositoryProvider);
-  return DCConsoleNotifier(storage, repository);
+  final notifier = DCConsoleNotifier(storage, repository, ref);
+
+  final authUser = ref.read(authProvider).user;
+  if (authUser != null) {
+    notifier.syncWithUser(authUser);
+  }
+
+  ref.listen<AuthState>(authProvider, (previous, next) {
+    final prevUser = previous?.user;
+    final nextUser = next.user;
+    if (nextUser != null && (prevUser == null || prevUser.id != nextUser.id || prevUser.distributionCenterId != nextUser.distributionCenterId)) {
+      notifier.syncWithUser(nextUser);
+    }
+  });
+
+  return notifier;
 });
 
 final dcClientSettlementsProvider = FutureProvider.autoDispose.family<List<ClientSettlement>, String>((ref, dcId) async {
-  final repo = ref.watch(dcConsoleRepositoryProvider);
-  return await repo.fetchDcClientSettlements(dcId: dcId);
+  try {
+    final repo = ref.watch(dcConsoleRepositoryProvider);
+    return await repo.fetchDcClientSettlements(dcId: dcId);
+  } catch (e) {
+    return const [];
+  }
 });
 

@@ -56,7 +56,8 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
     final selectedFilter = ref.watch(dcPayoutFilterProvider);
     final searchQuery = ref.watch(dcPayoutSearchProvider);
     final dcState = ref.watch(dcConsoleProvider);
-    final allClaims = dcState.payoutClaims;
+    final isGrandDcCumulative = dcState.isCurrentHubGrandDc && dcState.selectedDcId == null;
+    final allClaims = isGrandDcCumulative ? dcState.payoutClaims : dcState.dcPayoutClaims;
 
     // Filter claims
     final filteredClaims = allClaims.where((claim) {

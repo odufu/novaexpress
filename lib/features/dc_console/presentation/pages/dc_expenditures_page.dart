@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -107,9 +108,11 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> with Si
     if (dc == null) return false;
     final name = dc.name.toLowerCase();
     final code = dc.code.toLowerCase();
-    return name.contains('wuse') ||
+    return name.contains('command') ||
+        name.contains('wuse') ||
         name.contains('abuja') ||
-        code.contains('wuse') ||
+        code.contains('cmd') ||
+        code == 'dc-cmd-01' ||
         code == 'dc-wuse-01' ||
         dc.isPrimaryHub;
   }
@@ -270,10 +273,10 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> with Si
                   labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
                   unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
                   tabs: const [
-                    Tab(icon: Icon(Icons.analytics_rounded, size: 18), text: 'P&L Statement & KPIs'),
-                    Tab(icon: Icon(Icons.receipt_long_rounded, size: 18), text: 'Expenditures & Invoices'),
-                    Tab(icon: Icon(Icons.local_shipping_rounded, size: 18), text: 'Delivery Operations & Root Cause'),
-                    Tab(icon: Icon(Icons.trending_up_rounded, size: 18), text: 'MoM Growth & Comparison'),
+                    Tab(icon: Icon(Icons.analytics_rounded, size: 18), child: NovaTooltip(message: 'P&L Statement, Gross & Operating Margins', child: Text('P&L KPIs'))),
+                    Tab(icon: Icon(Icons.receipt_long_rounded, size: 18), child: NovaTooltip(message: 'Operational Expenditures and Station Invoices', child: Text('Invoices'))),
+                    Tab(icon: Icon(Icons.local_shipping_rounded, size: 18), child: NovaTooltip(message: 'Delivery Operations and Root Cause Analysis', child: Text('Operations'))),
+                    Tab(icon: Icon(Icons.trending_up_rounded, size: 18), child: NovaTooltip(message: 'Month over Month Growth and Multi-Station Comparison', child: Text('Growth'))),
                   ],
                 ),
               ),
@@ -399,84 +402,79 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> with Si
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Financial Command & Operations Reporting',
-                            style: GoogleFonts.inter(
-                              fontSize: isDesktop ? 20 : 16,
-                              fontWeight: FontWeight.w900,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              letterSpacing: -0.3,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                    Flexible(
+                      child: Text(
+                        'Finance P&L',
+                        style: GoogleFonts.inter(
+                          fontSize: isDesktop ? 20 : 16,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          letterSpacing: -0.3,
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                          ),
-                          child: Text(
-                            'AUDITED REPORT',
-                            style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'P&L statement, cost of services, direct expenses, and delivery unit economics',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(width: 8),
+                    const NovaInfoIcon(
+                      message: 'P&L statement, cost of services, direct expenses, and delivery unit economics',
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        'AUDITED',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
+                      ),
                     ),
                   ],
                 ),
               ),
               if (isDesktop) ...[
                 // Excel Export Button
-                ElevatedButton.icon(
-                  onPressed: _isExporting ? null : () => _exportToExcel(state, dcs),
-                  icon: _isExporting
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.table_view_rounded, size: 16, color: Colors.white),
-                  label: Text(
-                    _isExporting ? 'Generating Excel...' : 'Export Excel (.xlsx)',
-                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
+                NovaTooltip(
+                  message: 'Generate and download station P&L and expenditure ledger in Excel (.xlsx) format',
+                  child: ElevatedButton.icon(
+                    onPressed: _isExporting ? null : () => _exportToExcel(state, dcs),
+                    icon: _isExporting
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.table_view_rounded, size: 16, color: Colors.white),
+                    label: Text(
+                      _isExporting ? 'Exporting...' : 'Export Excel',
+                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 // Record Expense Button
-                ElevatedButton.icon(
-                  onPressed: () => DCCreateExpenditureModal.show(context),
-                  icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
-                  label: Text(
-                    'Record Expense',
-                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF37021),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
+                NovaTooltip(
+                  message: 'Record a new station expense, operational cost, or invoice receipt',
+                  child: ElevatedButton.icon(
+                    onPressed: () => DCCreateExpenditureModal.show(context),
+                    icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                    label: Text(
+                      'New Expense',
+                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF37021),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
                   ),
                 ),
               ],

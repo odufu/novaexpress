@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/location_lookup_service.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
@@ -40,6 +41,9 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final isSuperAdmin = user != null && (user.role == 'super_admin' || user.role == 'admin');
+    final canCreateDc = isSuperAdmin ||
+        (user != null && (user.isDcManager || user.role == 'dc_admin' || user.role == 'dc_manager')) ||
+        dcState.isCurrentHubGrandDc;
 
     final currentHubId = dcState.activeHubId;
     final List<DistributionCenter> allDcs;
@@ -51,12 +55,12 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
           : defaultDistributionCenters;
       filteredDcs = dcState.filteredDistributionCenters;
     } else {
-      // Primary Regional Hub manages satellite / sub-DCs created under this primary DC
+      // Regional DC can see its own DC and any child satellite sub-DCs under it
       allDcs = dcState.distributionCenters
-          .where((d) => d.id != currentHubId && (d.parentDcId == currentHubId || d.parentDcId == dcState.activeHubCode))
+          .where((d) => d.id == currentHubId || d.parentDcId == currentHubId || d.parentDcId == dcState.activeHubCode)
           .toList();
       filteredDcs = dcState.filteredDistributionCenters
-          .where((d) => d.id != currentHubId && (d.parentDcId == currentHubId || d.parentDcId == dcState.activeHubCode))
+          .where((d) => d.id == currentHubId || d.parentDcId == currentHubId || d.parentDcId == dcState.activeHubCode)
           .toList();
     }
 
@@ -94,11 +98,10 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
                       Text(
-                        'Distribution Centers Network',
+                        'DC & Hubs',
                         style: GoogleFonts.inter(
                           fontSize: isCompact ? 18 : 22,
                           fontWeight: FontWeight.w800,
@@ -106,36 +109,36 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Provision, monitor, and manage regional fulfillment hubs, transit depots, and coverage zones.',
-                        style: GoogleFonts.inter(
-                          fontSize: isCompact ? 11.5 : 13,
-                          color: const Color(0xFF64748B),
-                        ),
+                      const SizedBox(width: 8),
+                      const NovaInfoIcon(
+                        message: 'Provision, monitor, and manage regional fulfillment hubs, transit depots, and coverage zones.',
                       ),
                     ],
                   ),
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => _showCreateOrEditDCDialog(context, isDark),
-                  icon: const Icon(Icons.add_location_alt_rounded, size: 17, color: Colors.white),
-                  label: Text(
-                    isCompact ? 'New DC' : '+ Register Distribution Center',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                if (canCreateDc)
+                  NovaTooltip(
+                    message: 'Provision and register a new distribution center or regional fulfillment hub',
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showCreateOrEditDCDialog(context, isDark),
+                      icon: const Icon(Icons.add_location_alt_rounded, size: 17, color: Colors.white),
+                      label: Text(
+                        'Create DC',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 18, vertical: isCompact ? 10 : 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 1,
+                      ),
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 18, vertical: isCompact ? 10 : 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 1,
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -152,7 +155,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                   children: [
                     _buildKpiCard(
                       width: cardWidth,
-                      title: 'Total Network DCs',
+                      title: 'Total Hubs',
                       value: '$totalDcs Hubs',
                       subtext: '$totalActive active operations',
                       icon: Icons.apartment_rounded,
@@ -161,7 +164,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                     ),
                     _buildKpiCard(
                       width: cardWidth,
-                      title: 'Primary Regional Hubs',
+                      title: 'Primary Hubs',
                       value: '$totalHubs Hubs',
                       subtext: '${allDcs.where((d) => d.isGeneralDc).length} general distribution centers',
                       icon: Icons.star_rounded,
@@ -170,7 +173,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                     ),
                     _buildKpiCard(
                       width: cardWidth,
-                      title: 'Fleet Attachment Capacity',
+                      title: 'Fleet Capacity',
                       value: '$totalRiders Riders',
                       subtext: 'Across all active facilities',
                       icon: Icons.two_wheeler_rounded,
@@ -179,7 +182,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                     ),
                     _buildKpiCard(
                       width: cardWidth,
-                      title: 'Network Storage Volume',
+                      title: 'Storage Capacity',
                       value: '${totalCapacity.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} Units',
                       subtext: 'Cumulative warehouse space',
                       icon: Icons.inventory_2_rounded,
@@ -319,15 +322,15 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildFilterChip('all', 'All DCs (${allDcs.length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
+                        _buildFilterChip('all', 'All (${allDcs.length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                         const SizedBox(width: 8),
-                        _buildFilterChip('grand', '👑 Grand DC (${allDcs.where((d) => d.isGrand).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
+                        _buildFilterChip('grand', '👑 Central (${allDcs.where((d) => d.isGrand).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                         const SizedBox(width: 8),
-                        _buildFilterChip('hubs', '⭐ Regional Hubs (${allDcs.where((d) => d.isHubDc).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
+                        _buildFilterChip('hubs', '⭐ Hubs (${allDcs.where((d) => d.isHubDc).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                         const SizedBox(width: 8),
-                        _buildFilterChip('general', '🏬 General DCs (${allDcs.where((d) => d.isGeneralDc).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
+                        _buildFilterChip('general', '🏬 Stations (${allDcs.where((d) => d.isGeneralDc).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                         const SizedBox(width: 8),
-                        _buildFilterChip('active', '✅ Active Operations (${allDcs.where((d) => d.isActive).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
+                        _buildFilterChip('active', '✅ Active (${allDcs.where((d) => d.isActive).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                         const SizedBox(width: 8),
                         _buildFilterChip('inactive', '⏸️ Inactive (${allDcs.where((d) => !d.isActive).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                       ],

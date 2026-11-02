@@ -1,0 +1,81 @@
+# ==============================================================================
+# NovaXpress Logistics Platform - Apache / cPanel / LiteSpeed Configuration
+# Optimized for Flutter WebAssembly (WASM) & SPA Navigation on Namecheap Stellar
+# ==============================================================================
+
+# 1. Correct MIME Types (Mandatory for WebAssembly Streaming Instantiation)
+<IfModule mod_mime.c>
+    AddType application/wasm .wasm
+    AddType application/javascript .js .mjs
+    AddType application/json .json
+    AddType image/svg+xml .svg
+    AddType font/woff2 .woff2
+    AddType font/woff .woff
+    AddType font/ttf .ttf
+    AddType font/otf .otf
+</IfModule>
+
+# 2. Cross-Origin Isolation Headers (Required for WebAssembly Multithreading)
+<IfModule mod_headers.c>
+    # Allows WebAssembly to use high-resolution timers and SharedArrayBuffer
+    Header set Cross-Origin-Opener-Policy "same-origin"
+    # "credentialless" allows loading third-party CDNs (Paystack, Google Fonts, Supabase)
+    Header set Cross-Origin-Embedder-Policy "credentialless"
+    
+    # Security Headers
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# 3. HTML5 History Mode URL Rewriting (GoRouter SPA Support)
+# Prevents 404 errors when refreshing routes like /admin, /client, /dc, /closer
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    
+    # If the requested file or directory physically exists, serve it directly
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+    
+    # Otherwise route everything through index.html
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+# 4. Gzip / Deflate Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE application/wasm
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml
+    AddOutputFilterByType DEFLATE font/ttf font/otf font/woff font/woff2
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# 5. Cache Control Policies
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # WebAssembly and JS bundles (Cache for 1 month)
+    ExpiresByType application/wasm "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    
+    # Fonts and Media
+    ExpiresByType font/ttf "access plus 1 year"
+    ExpiresByType font/otf "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+</IfModule>
+
+# Never cache index.html so users always get fresh updates and bootstrap code
+<Files "index.html">
+    <IfModule mod_headers.c>
+        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Header set Pragma "no-cache"
+        Header set Expires 0
+    </IfModule>
+</Files>
+

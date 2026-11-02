@@ -8,6 +8,7 @@ class DCOperationsOfficer {
   final String staffCode;
   final String distributionCenterId;
   final String distributionCenterName;
+  final String role;
   final bool isActive;
   final int totalDispatchedOrders;
   final String? avatarUrl;
@@ -25,6 +26,7 @@ class DCOperationsOfficer {
     required this.staffCode,
     required this.distributionCenterId,
     required this.distributionCenterName,
+    this.role = 'dc_operations',
     this.isActive = true,
     this.totalDispatchedOrders = 0,
     this.avatarUrl,
@@ -46,6 +48,7 @@ class DCOperationsOfficer {
     String? staffCode,
     String? distributionCenterId,
     String? distributionCenterName,
+    String? role,
     bool? isActive,
     int? totalDispatchedOrders,
     String? avatarUrl,
@@ -63,6 +66,7 @@ class DCOperationsOfficer {
       staffCode: staffCode ?? this.staffCode,
       distributionCenterId: distributionCenterId ?? this.distributionCenterId,
       distributionCenterName: distributionCenterName ?? this.distributionCenterName,
+      role: role ?? this.role,
       isActive: isActive ?? this.isActive,
       totalDispatchedOrders: totalDispatchedOrders ?? this.totalDispatchedOrders,
       avatarUrl: avatarUrl ?? this.avatarUrl,
@@ -83,6 +87,7 @@ class DCOperationsOfficer {
       staffCode: json['delivery_agent_code']?.toString() ?? json['staff_code']?.toString() ?? 'OPS-001',
       distributionCenterId: json['distribution_center_id']?.toString() ?? '',
       distributionCenterName: json['distribution_center_name']?.toString() ?? '',
+      role: json['role']?.toString() ?? 'dc_operations',
       isActive: json['is_active'] == true || json['is_active'] == null,
       totalDispatchedOrders: (json['dispatched_orders_count'] as num?)?.toInt() ?? 0,
       avatarUrl: json['avatar_url']?.toString(),
@@ -106,7 +111,7 @@ class DCOperationsOfficer {
       'distribution_center_id': distributionCenterId,
       'distribution_center_name': distributionCenterName,
       'is_active': isActive,
-      'role': 'dc_operations',
+      'role': role,
       'avatar_url': avatarUrl,
       'raw_password': rawPassword,
       'assigned_zone': assignedZone,

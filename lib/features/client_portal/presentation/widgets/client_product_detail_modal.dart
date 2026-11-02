@@ -174,7 +174,7 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
 
     final seenDcKeys = <String>{};
     final coveringDcs = allDcs.where((dc) {
-      if (dc.isGrand) return true; // Grand DC (Wuse Central) is always the apex national DC
+      if (dc.isGrand) return true; // Grand DC (Central Command) is always the apex national DC
       return liveProduct.coveringStates.any((st) => _stateMatches(dc.state, st));
     }).where((dc) {
       final codeKey = dc.code.trim().toLowerCase();
@@ -1324,7 +1324,7 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Audit reconciliation: Distribution Centers hold $dcSum units across Grand DC ($grandDcSum in Wuse Central apex hub), Regional Hubs ($hubDcSum in Hub DCs), and General DCs ($generalDcSum in Local Branch DCs). The remaining $pdaSum units are in active delivery transit with assigned dispatch personnel ($pdaSum units in motorcycle delivery bags/vans). Total network custody: $effectiveTotal units (100% reconciled).',
+                                'Audit reconciliation: Distribution Centers hold $dcSum units across Grand DC ($grandDcSum in Central Command apex hub), Regional Hubs ($hubDcSum in Hub DCs), and General DCs ($generalDcSum in Local Branch DCs). The remaining $pdaSum units are in active delivery transit with assigned dispatch personnel ($pdaSum units in motorcycle delivery bags/vans). Total network custody: $effectiveTotal units (100% reconciled).',
                                 style: GoogleFonts.inter(
                                   fontSize: 11.5,
                                   color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF),

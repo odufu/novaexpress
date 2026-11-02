@@ -4,26 +4,23 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
 import '../providers/dc_console_provider.dart';
+import '../../domain/entities/distribution_center.dart';
 import 'dc_clients_page.dart';
 import 'dc_dashboard_page.dart';
 import 'dc_distribution_centers_page.dart';
 import 'dc_finance_page.dart';
 import 'dc_operations_page.dart';
-import 'dc_order_payment_matching_page.dart';
 import 'dc_orders_page.dart';
-import 'dc_payouts_page.dart';
-import 'dc_returns_page.dart';
 import 'dc_riders_page.dart';
 import 'dc_settings_page.dart';
 import 'dc_stock_page.dart';
-import 'dc_transactions_page.dart';
-import 'dc_expenditures_page.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
 
@@ -37,13 +34,18 @@ class DCConsoleLayout extends ConsumerStatefulWidget {
 class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _searchController = TextEditingController();
-  bool _hasSyncedUser = false;
+  String? _lastSyncedUserId;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(stockProvider.notifier).fetchStockItems();
+      final user = ref.read(authProvider).user;
+      if (user != null) {
+        ref.read(dcConsoleProvider.notifier).syncWithUser(user);
+      }
+      final activeHub = ref.read(dcConsoleProvider).activeHubId;
+      ref.read(stockProvider.notifier).fetchStockItems(null, activeHub);
       ref.read(dcConsoleProvider.notifier).loadDistributionCentersFromDatabase();
       ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
       ref.read(dcConsoleProvider.notifier).loadOperationsOfficersFromDatabase();
@@ -86,9 +88,9 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     final authState = ref.watch(authProvider);
     final user = authState.user;
 
-    // Automatically synchronize active hub with logged-in supervisor's DC on initial load
-    if (!_hasSyncedUser && user != null && user.distributionCenterId != null && user.distributionCenterId!.isNotEmpty) {
-      _hasSyncedUser = true;
+    // Automatically synchronize active hub with logged-in supervisor's DC
+    if (user != null && (_lastSyncedUserId != user.id || (user.distributionCenterId != null && dcState.selectedDcId == null && !user.isSuperAdmin && !dcState.isCurrentHubGrandDc))) {
+      _lastSyncedUserId = user.id;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(dcConsoleProvider.notifier).syncWithUser(user);
       });
@@ -135,17 +137,17 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       case 1:
         return const DCOrdersPage();
       case 2:
-        return const DCOrderPaymentMatchingPage();
+        return const DCFinancePage(initialSubtab: 1, initialIncomeView: 'remittances');
       case 3:
         return const DCStockPage();
       case 4:
-        return const DCFinancePage();
+        return const DCFinancePage(initialSubtab: 0);
       case 5:
-        return const DCTransactionsPage();
+        return const DCFinancePage(initialSubtab: 0);
       case 6:
-        return const DCReturnsPage();
+        return const DCStockPage();
       case 7:
-        return const DCPayoutsPage();
+        return const DCFinancePage(initialSubtab: 1);
       case 8:
         return const DCRidersPage();
       case 9:
@@ -157,7 +159,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       case 12:
         return const DCOperationsPage();
       case 13:
-        return const DCExpendituresPage();
+        return const DCFinancePage(initialSubtab: 2);
       default:
         return const DCDashboardPage();
     }
@@ -177,9 +179,9 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     final activeDc = state.distributionCenters.where(
       (d) => d.id == state.activeHubId || d.code == state.activeHubCode,
     ).firstOrNull;
-    final isPrimaryDc = (activeDc != null && activeDc.isPrimaryHub) ||
-        state.isCurrentHubGrandDc ||
-        (user != null && (user.role == 'super_admin' || user.role == 'admin'));
+    final isPrimaryDc = state.isCurrentHubGrandDc ||
+        (activeDc != null && activeDc.isGrandDc) ||
+        (user != null && (user.role == 'super_admin' || user.role == 'admin' || user.isSuperAdmin == true));
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -260,21 +262,16 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
-                _buildNavItem(0, 'Dashboard', Icons.dashboard_rounded, state.activeTabIndex == 0, isCollapsed, isDrawer),
-                _buildNavItem(1, 'Deliveries & Orders', Icons.local_shipping_rounded, state.activeTabIndex == 1, isCollapsed, isDrawer),
-                _buildNavItem(2, 'Rider Remittances', Icons.receipt_long_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
-                _buildNavItem(3, 'Inventory & Stock', Icons.inventory_2_rounded, state.activeTabIndex == 3, isCollapsed, isDrawer),
-                _buildNavItem(4, 'Vault Cash & Settlements', Icons.account_balance_wallet_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
-                _buildNavItem(13, 'Business Finance & P&L', Icons.insights_rounded, state.activeTabIndex == 13, isCollapsed, isDrawer),
-                _buildNavItem(5, 'Audit Ledger', Icons.history_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
-                _buildNavItem(6, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
-                _buildNavItem(7, 'Rider Payout Claims', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
-                _buildNavItem(8, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer),
-                _buildNavItem(12, 'Operations Team', Icons.support_agent_rounded, state.activeTabIndex == 12, isCollapsed, isDrawer),
+                _buildNavItem(0, 'Dashboard', Icons.dashboard_rounded, state.activeTabIndex == 0, isCollapsed, isDrawer, tooltip: 'Operations overview & performance metrics'),
+                _buildNavItem(1, 'Orders', Icons.local_shipping_rounded, state.activeTabIndex == 1, isCollapsed, isDrawer, tooltip: 'Live order routing & dispatch monitoring'),
+                _buildNavItem(3, 'Inventory', Icons.inventory_2_rounded, state.activeTabIndex == 3, isCollapsed, isDrawer, tooltip: 'Hub product inventory & warehouse batches'),
+                _buildNavItem(4, 'Finance', Icons.account_balance_wallet_rounded, (state.activeTabIndex == 4 || state.activeTabIndex == 2 || state.activeTabIndex == 13), isCollapsed, isDrawer, tooltip: 'Financial hub combining revenue, settlements, remittances & expenses'),
+                _buildNavItem(8, 'Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer, tooltip: 'Courier manifest, shift status & rider roster'),
+                _buildNavItem(12, 'Operations', Icons.support_agent_rounded, state.activeTabIndex == 12, isCollapsed, isDrawer, tooltip: 'Station supervisors, dispatchers & officers'),
                 if (isPrimaryDc)
-                  _buildNavItem(9, 'Distribution Centers', Icons.apartment_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer),
-                _buildNavItem(11, 'Clients & Merchants', Icons.storefront_rounded, state.activeTabIndex == 11, isCollapsed, isDrawer),
-                _buildNavItem(10, 'Policy & Settings', Icons.settings_outlined, state.activeTabIndex == 10, isCollapsed, isDrawer),
+                  _buildNavItem(9, 'DC & Hubs', Icons.apartment_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer, tooltip: 'Regional distribution centers & satellites'),
+                _buildNavItem(11, 'Merchants', Icons.storefront_rounded, state.activeTabIndex == 11, isCollapsed, isDrawer, tooltip: 'Merchant accounts, inventory & invoices'),
+                _buildNavItem(10, 'Settings', Icons.settings_outlined, state.activeTabIndex == 10, isCollapsed, isDrawer, tooltip: 'Station operating zones, SLAs & policies'),
               ],
             ),
           ),
@@ -341,6 +338,13 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                             ],
                           ),
                         ),
+                        if (user?.isSuperAdmin == true || user?.role == 'super_admin') ...[
+                          IconButton(
+                            icon: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFF37021), size: 19),
+                            tooltip: 'Switch to Admin Console',
+                            onPressed: () => context.go('/admin'),
+                          ),
+                        ],
                         IconButton(
                           icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
                           tooltip: 'Logout of DC Console',
@@ -362,11 +366,12 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     bool isSelected,
     bool isCollapsed,
     bool isDrawer, {
+    String? tooltip,
     bool hasDot = false,
   }) {
     final notifier = ref.read(dcConsoleProvider.notifier);
 
-    return Container(
+    final itemWidget = Container(
       margin: const EdgeInsets.only(bottom: 4),
       child: Material(
         color: isSelected ? const Color(0xFF1E254E) : Colors.transparent,
@@ -455,40 +460,46 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
         ),
       ),
     );
+
+    if (tooltip != null && tooltip.isNotEmpty) {
+      return NovaTooltip(
+        message: tooltip,
+        preferDirection: isCollapsed ? AxisDirection.right : AxisDirection.down,
+        child: itemWidget,
+      );
+    }
+    return itemWidget;
   }
 
   String _getActiveTabTitle(int index) {
     switch (index) {
       case 0:
-        return 'Distribution Dashboard';
+        return 'Dashboard';
       case 1:
-        return 'Deliveries & Master Orders';
+        return 'Orders';
       case 2:
-        return 'Rider Remittances & Reconciliation';
-      case 3:
-        return 'Inventory & Stock';
       case 4:
-        return 'Vault Cash & Settlements';
-      case 5:
-        return 'Audit Ledger';
-      case 6:
-        return 'Returns & QC Desk';
-      case 7:
-        return 'Rider Payout Claims';
-      case 8:
-        return 'Riders & Fleet';
-      case 9:
-        return 'Distribution Centers';
-      case 10:
-        return 'Policy & Settings';
-      case 11:
-        return 'Clients & Merchants';
-      case 12:
-        return 'Operations Team';
       case 13:
-        return 'Expenditures & Invoices';
+        return 'Finance';
+      case 3:
+        return 'Inventory';
+      case 5:
+      case 7:
+        return 'Finance';
+      case 6:
+        return 'Inventory';
+      case 8:
+        return 'Fleet';
+      case 9:
+        return 'DC & Hubs';
+      case 10:
+        return 'Settings';
+      case 11:
+        return 'Merchants';
+      case 12:
+        return 'Operations';
       default:
-        return 'Distribution Center';
+        return 'Console';
     }
   }
 
@@ -527,76 +538,154 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
 
-          // Interactive Distribution Center Selector Dropdown
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isVeryCompact ? 6 : (isCompact ? 8 : 10),
-              vertical: isCompact ? 2 : 4,
-            ),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-              ),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String?>(
-                value: dcState.selectedDcId,
-                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                icon: const Icon(Icons.arrow_drop_down_rounded, size: 20, color: Color(0xFF10B981)),
-                isDense: true,
-                items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
+          // Distribution Center Selector or Locked Station Indicator
+          Builder(
+            builder: (context) {
+              final isSuperAdmin = user != null && (user.role == 'super_admin' || user.role == 'admin' || user.isSuperAdmin == true);
+              final isGrandDc = dcState.isCurrentHubGrandDc;
+              final canManageOtherDcs = isSuperAdmin || isGrandDc;
+
+              final activeDc = dcState.distributionCenters.where(
+                (d) => d.id == dcState.activeHubId || d.code == dcState.activeHubCode,
+              ).firstOrNull ?? dcState.activeHub;
+
+              // Non-Grand DC managers: strictly station-scoped pill (no dropdown)
+              if (!canManageOtherDcs) {
+                return Tooltip(
+                  message: 'Station Scoped (${activeDc.name}) • Zero cross-DC access',
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isVeryCompact ? 6 : (isCompact ? 8 : 10),
+                      vertical: isCompact ? 4 : 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                      ),
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.public_rounded, size: 15, color: Color(0xFF38BDF8)),
+                        const Icon(
+                          Icons.warehouse_rounded,
+                          size: 15,
+                          color: Color(0xFF10B981),
+                        ),
                         const SizedBox(width: 6),
                         Text(
-                          isVeryCompact ? 'All' : (isCompact ? 'All DCs' : '🌐 Cumulative Network (All DCs)'),
+                          isVeryCompact ? activeDc.code : (isCompact ? activeDc.code : '${activeDc.name} (${activeDc.code})'),
                           style: GoogleFonts.inter(
                             fontSize: isVeryCompact ? 10.5 : (isCompact ? 11 : 12),
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                             color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.lock_outline_rounded, size: 10, color: Color(0xFF10B981)),
+                              const SizedBox(width: 2),
+                              Text(
+                                'LOCKED',
+                                style: GoogleFonts.inter(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF10B981),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  ...dcState.distributionCenters.map((dc) {
-                    return DropdownMenuItem<String?>(
-                      value: dc.id,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            dc.isGrandDc ? Icons.stars_rounded : Icons.warehouse_rounded,
-                            size: 15,
-                            color: dc.isGrandDc ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isVeryCompact ? dc.code : (isCompact ? dc.code : '${dc.name} (${dc.code})'),
-                            style: GoogleFonts.inter(
-                              fontSize: isVeryCompact ? 10.5 : (isCompact ? 11 : 12),
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-                onChanged: (newDcId) {
-                  dcNotifier.selectDistributionCenter(newDcId);
-                },
-              ),
-            ),
-          ),
+                );
+              }
 
+              // Filter allowed DCs for dropdown (Grand DC / Super Admin only):
+              final List<DistributionCenter> allowedDcs = dcState.distributionCenters;
+              final effectiveSelectedValue = dcState.selectedDcId;
+
+              return Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isVeryCompact ? 6 : (isCompact ? 8 : 10),
+                  vertical: isCompact ? 2 : 4,
+                ),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                  ),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: effectiveSelectedValue,
+                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    icon: const Icon(Icons.arrow_drop_down_rounded, size: 20, color: Color(0xFF10B981)),
+                    isDense: true,
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.public_rounded, size: 15, color: Color(0xFF38BDF8)),
+                            const SizedBox(width: 6),
+                            Text(
+                              isVeryCompact ? 'All' : (isCompact ? 'All DCs' : '🌐 Cumulative Network (All DCs)'),
+                              style: GoogleFonts.inter(
+                                fontSize: isVeryCompact ? 10.5 : (isCompact ? 11 : 12),
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ...allowedDcs.map((dc) {
+                        return DropdownMenuItem<String?>(
+                          value: dc.id,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                dc.isGrandDc ? Icons.stars_rounded : Icons.warehouse_rounded,
+                                size: 15,
+                                color: dc.isGrandDc ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isVeryCompact ? dc.code : (isCompact ? dc.code : '${dc.name} (${dc.code})'),
+                                style: GoogleFonts.inter(
+                                  fontSize: isVeryCompact ? 10.5 : (isCompact ? 11 : 12),
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (newDcId) {
+                      dcNotifier.selectDistributionCenter(newDcId);
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
           const SizedBox(width: 6),
 
           // Screen Title Centered on AppBar
@@ -700,6 +789,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 ),
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   UserAvatarWidget(
                     avatarUrl: user?.avatarUrl,
@@ -837,8 +927,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     final navItems = [
       (index: 0, label: 'Dashboard', icon: Icons.dashboard_rounded),
       (index: 1, label: 'Deliveries', icon: Icons.local_shipping_rounded),
-      (index: 2, label: 'Remittances', icon: Icons.price_check_rounded),
-      (index: 13, label: 'Expenses', icon: Icons.receipt_long_rounded),
+      (index: 4, label: 'Finance', icon: Icons.account_balance_wallet_rounded),
       (index: 3, label: 'Stock', icon: Icons.inventory_2_rounded),
       (index: -1, label: 'More', icon: Icons.menu_open_rounded),
     ];

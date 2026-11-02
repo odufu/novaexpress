@@ -321,6 +321,8 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.onSurface,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                   const SizedBox(height: 8),
                   Text(

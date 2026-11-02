@@ -1,83 +1,402 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+
 import '../../../../core/helpers/formatters.dart';
-import '../../../../core/widgets/app_skeleton_loader.dart';
+import '../../../../core/services/audit_logging_service.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../client_portal/domain/entities/business_expenditure.dart';
+import '../../../client_portal/domain/entities/client_profile.dart';
+import '../../../client_portal/domain/entities/client_settlement.dart';
+import '../../../client_portal/presentation/widgets/client_settlement_detail_modal.dart';
+import '../../../client_portal/presentation/widgets/pangea_date_range_picker_modal.dart';
 import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/domain/entities/order.dart';
+import '../../../orders/domain/services/order_routing_service.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
-import '../../../client_portal/domain/entities/client_settlement.dart';
-import '../../../client_portal/presentation/widgets/client_settlement_detail_modal.dart';
 import '../providers/dc_console_provider.dart';
+import '../providers/dc_expenditures_provider.dart';
+import '../services/dc_finance_excel_exporter.dart';
+import '../../domain/entities/dc_transaction_record.dart';
+import '../widgets/dc_transaction_audit_modal.dart';
+import '../widgets/dc_create_expenditure_modal.dart';
 import '../widgets/dc_daily_merchant_settlement_modal.dart';
-import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
+import '../widgets/dc_receipt_preview_modal.dart';
+import 'dc_order_payment_matching_page.dart';
 
-final dcFinanceFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
-final dcFinanceSearchProvider = StateProvider.autoDispose<String>((ref) => '');
-final dcFinanceDenominationTotalProvider = StateProvider.autoDispose<double>((ref) => 0.0);
-
+/// Unified DC Finance Hub Page
+/// Modularized into 3 sub-tabs: Dashboard, Income, and Expenses.
+/// Re-implements Rider Remittance verification inside Income for clean ergonomics.
 class DCFinancePage extends ConsumerStatefulWidget {
-  const DCFinancePage({super.key});
+  final int initialSubtab;
+  final String initialIncomeView;
+
+  const DCFinancePage({
+    super.key,
+    this.initialSubtab = 0,
+    this.initialIncomeView = 'breakdown',
+  });
 
   @override
   ConsumerState<DCFinancePage> createState() => _DCFinancePageState();
 }
 
 class _DCFinancePageState extends ConsumerState<DCFinancePage> {
-  final TextEditingController _searchController = TextEditingController();
+  late int _activeSubtab;
+  late String _incomeView; // 'breakdown' or 'remittances'
 
-  final Map<int, TextEditingController> _denominationControllers = {
-    1000: TextEditingController(text: '0'),
-    500: TextEditingController(text: '0'),
-    200: TextEditingController(text: '0'),
-    100: TextEditingController(text: '0'),
-  };
+  // Global Financial Filters
+  String _datePreset = '30D';
+  DateTime? _startDate;
+  DateTime? _endDate;
+  String? _selectedMerchantId;
+  String? _selectedProductName;
+
+  // Search & Tab-Specific Filters
+  final TextEditingController _searchController = TextEditingController();
+  String _incomeStatusFilter = 'all'; // 'all', 'unsettled', 'awaiting_validation', 'settled'
+  String _expenseCategoryFilter = 'all';
+
+  bool _isExporting = false;
+  String _auditCategoryFilter = 'all';
 
   @override
   void initState() {
     super.initState();
+    _activeSubtab = widget.initialSubtab.clamp(0, 2);
+    _incomeView = widget.initialIncomeView;
+    _applyPreset('30D');
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final activeHubId = ref.read(dcConsoleProvider).activeHubId;
-      ref.read(financeProvider.notifier).loadRemittances(activeHubId);
+      try {
+        final activeHubId = ref.read(dcConsoleProvider).activeHubId;
+        ref.read(ordersProvider.notifier).loadDcOrders(activeHubId);
+        ref.read(financeProvider.notifier).loadRemittances(activeHubId);
+        ref.read(dcExpendituresProvider.notifier).loadExpenditures();
+        ref.read(dcConsoleProvider.notifier).fetchDcClientSettlements();
+        ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
+        ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
+      } catch (_) {}
     });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _denominationControllers.forEach((_, c) => c.dispose());
     super.dispose();
   }
 
-  void _updateDenominations() {
-    double total = 0;
-    _denominationControllers.forEach((denom, controller) {
-      final count = int.tryParse(controller.text) ?? 0;
-      total += denom * count;
+  void _applyPreset(String preset) {
+    final now = DateTime.now();
+    DateTime? start;
+    DateTime? end = now;
+
+    switch (preset) {
+      case 'Today':
+        start = DateTime(now.year, now.month, now.day);
+        end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+        break;
+      case '7D':
+        start = now.subtract(const Duration(days: 7));
+        break;
+      case '30D':
+        start = now.subtract(const Duration(days: 30));
+        break;
+      case 'This Month':
+        start = DateTime(now.year, now.month, 1);
+        break;
+      case 'All Time':
+        start = null;
+        end = null;
+        break;
+      case 'Custom':
+        // Keep existing custom dates
+        return;
+    }
+
+    setState(() {
+      _datePreset = preset;
+      _startDate = start;
+      _endDate = end;
     });
-    ref.read(dcFinanceDenominationTotalProvider.notifier).state = total;
   }
 
-  List<RemittanceEntity> _getFilteredRemittances(List<RemittanceEntity> list, String selectedFilter, String searchQuery) {
-    final query = searchQuery.trim().toLowerCase();
-    return list.where((rem) {
-      if (selectedFilter == 'paystack' && !rem.paymentMethod.toLowerCase().contains('paystack')) {
+  Color _getCategoryColor(ExpenditureCategory category) {
+    switch (category) {
+      case ExpenditureCategory.dieselFuel:
+        return const Color(0xFFF59E0B);
+      case ExpenditureCategory.riderAllowance:
+        return const Color(0xFF0D9488);
+      case ExpenditureCategory.logistics:
+        return const Color(0xFF3B82F6);
+      case ExpenditureCategory.rentUtilities:
+        return const Color(0xFF8B5CF6);
+      case ExpenditureCategory.equipmentMaintenance:
+        return const Color(0xFFEC4899);
+      case ExpenditureCategory.packaging:
+      case ExpenditureCategory.stationery:
+        return const Color(0xFF10B981);
+      case ExpenditureCategory.facilitySupplies:
+        return const Color(0xFF06B6D4);
+      case ExpenditureCategory.security:
+        return const Color(0xFF6366F1);
+      case ExpenditureCategory.salaries:
+        return const Color(0xFFF97316);
+      case ExpenditureCategory.other:
+      default:
+        return const Color(0xFF64748B);
+    }
+  }
+
+  IconData _getCategoryIcon(ExpenditureCategory category) {
+    switch (category) {
+      case ExpenditureCategory.dieselFuel:
+        return Icons.local_gas_station_rounded;
+      case ExpenditureCategory.riderAllowance:
+        return Icons.two_wheeler_rounded;
+      case ExpenditureCategory.logistics:
+        return Icons.local_shipping_rounded;
+      case ExpenditureCategory.rentUtilities:
+        return Icons.power_rounded;
+      case ExpenditureCategory.equipmentMaintenance:
+        return Icons.build_circle_rounded;
+      case ExpenditureCategory.packaging:
+      case ExpenditureCategory.stationery:
+        return Icons.inventory_2_rounded;
+      case ExpenditureCategory.facilitySupplies:
+        return Icons.cleaning_services_rounded;
+      case ExpenditureCategory.security:
+        return Icons.security_rounded;
+      case ExpenditureCategory.salaries:
+        return Icons.badge_rounded;
+      case ExpenditureCategory.other:
+      default:
+        return Icons.receipt_rounded;
+    }
+  }
+
+  Future<void> _exportExcel(
+    DCConsoleState dcState,
+    DCExpendituresState expState,
+    List<OrderEntity> orders,
+  ) async {
+    setState(() => _isExporting = true);
+    try {
+      final activeOrders = _filterOrders(orders, dcState);
+      final deliveredOrders = activeOrders.where((o) => o.status.toLowerCase() == 'delivered').toList();
+      final totalRevenue = deliveredOrders.fold(0.0, (s, o) => s + o.clientDeliveryFee);
+      final riderWages = deliveredOrders.length * dcState.financeSettings.defaultCommissionRate;
+      final fuelCost = deliveredOrders.length * (dcState.financeSettings.defaultTransportAllowance / 10.0).clamp(100.0, 800.0);
+      final filteredExp = _filterExpenditures(expState.expenditures, dcState);
+      final totalOpex = filteredExp.fold(0.0, (s, e) => s + e.amount);
+
+      final ok = await DcFinanceExcelExporter.exportFinancialReport(
+        periodName: _datePreset,
+        stationName: dcState.activeHubName,
+        totalRevenue: totalRevenue,
+        riderWages: riderWages,
+        fuelAndMaintenance: fuelCost,
+        airtimeAndData: 0.0,
+        totalDirectCosts: riderWages + fuelCost,
+        grossProfit: totalRevenue - (riderWages + fuelCost),
+        grossProfitMargin: totalRevenue > 0 ? ((totalRevenue - (riderWages + fuelCost)) / totalRevenue) * 100 : 0.0,
+        adminSalaries: 0.0,
+        officeExpenses: totalOpex,
+        otherExpenses: 0.0,
+        totalOpex: totalOpex,
+        netProfit: totalRevenue - (riderWages + fuelCost + totalOpex),
+        netProfitMargin: totalRevenue > 0 ? ((totalRevenue - (riderWages + fuelCost + totalOpex)) / totalRevenue) * 100 : 0.0,
+        adjustedNetProfit: totalRevenue - (riderWages + fuelCost + totalOpex),
+        totalOrdersAssigned: activeOrders.length,
+        totalOrdersDelivered: deliveredOrders.length,
+        deliverySuccessRate: activeOrders.isNotEmpty ? (deliveredOrders.length / activeOrders.length) * 100 : 0.0,
+        expenditures: filteredExp,
+        dcs: dcState.distributionCenters,
+        failureBreakdown: {},
+        riderScorecards: [],
+        momTrends: [],
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ok ? 'Excel report generated successfully' : 'Could not export Excel report'),
+            backgroundColor: ok ? const Color(0xFF10B981) : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  List<OrderEntity> _filterOrders(List<OrderEntity> allOrders, DCConsoleState dcState) {
+    final isGrandDcCumulative = dcState.isCurrentHubGrandDc && dcState.selectedDcId == null;
+    final activeDc = dcState.distributionCenters.where(
+      (d) => d.id == dcState.activeHubId || d.code == dcState.activeHubCode,
+    ).firstOrNull;
+
+    return allOrders.where((order) {
+      if (!isGrandDcCumulative && activeDc != null) {
+        if (!OrderRoutingService.doesOrderBelongToDc(
+          order: order,
+          currentDc: activeDc,
+          allDcs: dcState.distributionCenters,
+        )) {
+          return false;
+        }
+      }
+
+      if (_selectedMerchantId != null && _selectedMerchantId!.isNotEmpty) {
+        if (order.merchantId != _selectedMerchantId && order.clientId != _selectedMerchantId) {
+          return false;
+        }
+      }
+
+      if (_selectedProductName != null && _selectedProductName!.isNotEmpty) {
+        final prod = order.productName.toLowerCase();
+        if (!prod.contains(_selectedProductName!.toLowerCase())) {
+          return false;
+        }
+      }
+
+      if (_startDate != null && order.createdAt.isBefore(_startDate!)) {
         return false;
       }
-      if (selectedFilter == 'today') {
-        final now = DateTime.now();
-        final isToday = rem.createdAt.year == now.year && rem.createdAt.month == now.month && rem.createdAt.day == now.day;
-        if (!isToday) return false;
+      if (_endDate != null && order.createdAt.isAfter(_endDate!)) {
+        return false;
       }
+
+      return true;
+    }).toList();
+  }
+
+  List<BusinessExpenditureEntity> _filterExpenditures(
+    List<BusinessExpenditureEntity> allExp,
+    DCConsoleState dcState,
+  ) {
+    final isGrandDcCumulative = dcState.isCurrentHubGrandDc && dcState.selectedDcId == null;
+    final activeDcId = dcState.activeDcId;
+
+    return allExp.where((exp) {
+      if (!isGrandDcCumulative) {
+        if (exp.distributionCenterId != null && exp.distributionCenterId!.isNotEmpty) {
+          if (exp.distributionCenterId != activeDcId) return false;
+        }
+      }
+
+      if (_startDate != null && exp.expenditureDate.isBefore(_startDate!)) {
+        return false;
+      }
+      if (_endDate != null && exp.expenditureDate.isAfter(_endDate!)) {
+        return false;
+      }
+
+      if (_expenseCategoryFilter != 'all') {
+        if (exp.category.name.toLowerCase() != _expenseCategoryFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      final query = _searchController.text.trim().toLowerCase();
       if (query.isNotEmpty) {
-        final matchRef = rem.referenceNumber.toLowerCase().contains(query);
-        final matchAgent = rem.deliveryAgentId.toLowerCase().contains(query);
-        final matchNotes = (rem.notes ?? '').toLowerCase().contains(query);
-        if (!matchRef && !matchAgent && !matchNotes) return false;
+        final matchVendor = (exp.vendorName ?? '').toLowerCase().contains(query);
+        final matchVoucher = (exp.invoiceNumber ?? '').toLowerCase().contains(query);
+        final matchDesc = (exp.description ?? '').toLowerCase().contains(query);
+        if (!matchVendor && !matchVoucher && !matchDesc) return false;
       }
+
+      return true;
+    }).toList();
+  }
+
+  List<DCTransactionRecord> _filterTransactions(
+    List<DCTransactionRecord> allTxns,
+    DCConsoleState dcState,
+  ) {
+    final isGrandDcCumulative = dcState.isCurrentHubGrandDc && dcState.selectedDcId == null;
+    final dcRiderIds = isGrandDcCumulative
+        ? dcState.drivers.map((d) => d.id).toSet()
+        : dcState.dcDrivers.map((d) => d.id).toSet();
+    final dcRiderCodes = isGrandDcCumulative
+        ? dcState.drivers.map((d) => d.driverCode.toLowerCase()).toSet()
+        : dcState.dcDrivers.map((d) => d.driverCode.toLowerCase()).toSet();
+
+    return allTxns.where((txn) {
+      if (!isGrandDcCumulative) {
+        final matchesRider = dcRiderIds.contains(txn.riderId) || dcRiderCodes.contains(txn.riderCode.toLowerCase());
+        if (!matchesRider) return false;
+      }
+
+      if (_selectedProductName != null && _selectedProductName!.isNotEmpty) {
+        final prod = (txn.productName ?? '').toLowerCase();
+        if (!prod.contains(_selectedProductName!.toLowerCase())) {
+          return false;
+        }
+      }
+
+      if (_startDate != null && txn.createdAt.isBefore(_startDate!)) {
+        return false;
+      }
+      if (_endDate != null && txn.createdAt.isAfter(_endDate!)) {
+        return false;
+      }
+
+      if (_auditCategoryFilter != 'all') {
+        if (_auditCategoryFilter == 'cash' && !txn.isCashPod) return false;
+        if (_auditCategoryFilter == 'gateway' && !txn.isPaystack) return false;
+        if (_auditCategoryFilter == 'remittance' && !txn.isRemittance) return false;
+      }
+
+      final query = _searchController.text.trim().toLowerCase();
+      if (query.isNotEmpty) {
+        final matchRef = txn.transactionCode.toLowerCase().contains(query);
+        final matchOrder = (txn.orderNumber ?? '').toLowerCase().contains(query);
+        final matchRider = txn.riderName.toLowerCase().contains(query);
+        final matchCust = (txn.customerName ?? '').toLowerCase().contains(query);
+        if (!matchRef && !matchOrder && !matchRider && !matchCust) return false;
+      }
+
+      return true;
+    }).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  List<RemittanceEntity> _filterRemittances(
+    List<RemittanceEntity> allRem,
+    DCConsoleState dcState,
+  ) {
+    final isGrandDcCumulative = dcState.isCurrentHubGrandDc && dcState.selectedDcId == null;
+    final activeDcId = dcState.activeDcId;
+    final dcRiderIds = isGrandDcCumulative
+        ? dcState.drivers.map((d) => d.id).toSet()
+        : dcState.dcDrivers.map((d) => d.id).toSet();
+
+    return allRem.where((rem) {
+      if (!isGrandDcCumulative) {
+        if (rem.distributionCenterId != null && rem.distributionCenterId!.isNotEmpty) {
+          if (rem.distributionCenterId != activeDcId) return false;
+        } else if (!dcRiderIds.contains(rem.deliveryAgentId)) {
+          return false;
+        }
+      }
+
+      if (_startDate != null && rem.createdAt.isBefore(_startDate!)) {
+        return false;
+      }
+      if (_endDate != null && rem.createdAt.isAfter(_endDate!)) {
+        return false;
+      }
+
       return true;
     }).toList();
   }
@@ -86,110 +405,206 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final financeState = ref.watch(financeProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 850;
+
     final dcState = ref.watch(dcConsoleProvider);
     final ordersState = ref.watch(ordersProvider);
-    final selectedFilter = ref.watch(dcFinanceFilterProvider);
-    final searchQuery = ref.watch(dcFinanceSearchProvider);
-    final denomTotal = ref.watch(dcFinanceDenominationTotalProvider);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isCompact = screenWidth < 800;
+    final financeState = ref.watch(financeProvider);
+    final expState = ref.watch(dcExpendituresProvider);
+    final settlementsAsync = ref.watch(dcClientSettlementsProvider(dcState.activeDcId));
+    final settlements = settlementsAsync.valueOrNull ?? const [];
 
-    ref.listen<DCConsoleState>(dcConsoleProvider, (previous, next) {
-      if (previous?.activeHubId != next.activeHubId && next.activeHubId.isNotEmpty) {
-        ref.read(financeProvider.notifier).loadRemittances(next.activeHubId);
+    final scopedOrders = _filterOrders(ordersState.orders, dcState);
+    final scopedExpenditures = _filterExpenditures(expState.expenditures, dcState);
+    final scopedRemittances = _filterRemittances(financeState.remittances, dcState);
+    final scopedTransactions = _filterTransactions(dcState.transactions, dcState);
+
+    // Collect Unique Products for filter dropdown
+    final productNames = <String>{};
+    for (final o in ordersState.orders) {
+      if (o.productName.isNotEmpty) {
+        productNames.add(o.productName);
       }
-    });
-
-    final currentHubId = dcState.activeHubId;
-    final dcRiderIds = dcState.drivers.map((d) => d.id).toSet();
-    final allRemittances = financeState.remittances.where((r) {
-      if (r.distributionCenterId != null && r.distributionCenterId!.isNotEmpty) {
-        return r.distributionCenterId == currentHubId;
+    }
+    for (final b in dcState.warehouseBatches) {
+      if (b.productName.isNotEmpty) {
+        productNames.add(b.productName);
       }
-      return dcRiderIds.contains(r.deliveryAgentId);
-    }).toList();
-    final filteredList = _getFilteredRemittances(allRemittances, selectedFilter, searchQuery);
+    }
 
-    final totalReconciled = allRemittances.fold(0.0, (sum, r) => sum + r.amount);
-    final totalSubmissions = allRemittances.length;
-    final paystackCount = allRemittances.where((r) => r.paymentMethod.toLowerCase().contains('paystack') || r.isVerified).length;
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF031632) : const Color(0xFFF8FAFC),
+      body: Column(
+        children: [
+          // 1. Sleek Unified Top Header & Global Filter Bar
+          _buildMasterHeader(
+            isDark: isDark,
+            isCompact: isCompact,
+            dcState: dcState,
+            expState: expState,
+            orders: ordersState.orders,
+            productNames: productNames.toList(),
+          ),
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(isCompact ? 14 : 22),
+          // 2. Active Sub-Tab View (Dashboard, Income, Expenses)
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: _buildSubtabBody(
+                isDark: isDark,
+                isCompact: isCompact,
+                dcState: dcState,
+                expState: expState,
+                orders: scopedOrders,
+                expenditures: scopedExpenditures,
+                remittances: scopedRemittances,
+                settlements: settlements,
+                transactions: scopedTransactions,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // MASTER HEADER & GLOBAL CONTROLS
+  // ==========================================
+  Widget _buildMasterHeader({
+    required bool isDark,
+    required bool isCompact,
+    required DCConsoleState dcState,
+    required DCExpendituresState expState,
+    required List<OrderEntity> orders,
+    required List<String> productNames,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 22, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF071B39) : Colors.white,
+        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0))),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Header
+          // Row 1: Title, Subtabs Selector, and Quick Actions
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Finance & Remittance Audit Desk',
-                          style: GoogleFonts.inter(fontSize: isCompact ? 18 : 22, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'PAYSTACK SETTLEMENT POOL ⚡',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF00A2D3),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Live audit ledger of auto-verified rider remittances for ${dcState.activeHubName} • Zero manual reconciliation backlog',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              // Title + Sub-Tabs Pill Ribbon
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _showDcSettlementHistoryModal(context, ref, dcState.activeDcId),
-                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                    label: Text(
-                      'Settlement History',
-                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFF37021), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Finance',
+                    style: GoogleFonts.inter(
+                      fontSize: isCompact ? 18 : 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.3,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _openMerchantSettlementPicker(context, ref, dcState, ordersState.orders),
-                    icon: const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Colors.white),
-                    label: Text(
-                      'Client Settlement',
-                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                  const SizedBox(width: 6),
+                  const NovaInfoIcon(
+                    tooltip: 'Financial hub combining revenue, merchant settlements, rider remittances and station OpEx',
+                    size: 15,
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Subtabs Switcher: [ Dashboard | Income | Expenses ]
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF031632) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0284C7),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildSubtabPill(0, 'Dashboard', Icons.insights_rounded, isDark),
+                        _buildSubtabPill(1, 'Income', Icons.trending_up_rounded, isDark),
+                        _buildSubtabPill(2, 'Expenses', Icons.trending_down_rounded, isDark),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              // Action Buttons
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_activeSubtab == 2)
+                    NovaTooltip(
+                      message: 'Record a new operational expense voucher or station receipt',
+                      child: ElevatedButton.icon(
+                        onPressed: () => DCCreateExpenditureModal.show(context, initialDcId: dcState.activeDcId),
+                        icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                        label: Text(
+                          'Record OpEx',
+                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF37021),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                      ),
+                    )
+                  else if (_activeSubtab == 1 && _incomeView == 'breakdown')
+                    NovaTooltip(
+                      message: 'Initiate merchant settlement payout and upload transfer receipt',
+                      child: ElevatedButton.icon(
+                        onPressed: () => _openMerchantSettlementPicker(context, dcState, orders),
+                        icon: const Icon(Icons.payments_rounded, size: 16, color: Colors.white),
+                        label: Text(
+                          'Settle Client',
+                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  NovaTooltip(
+                    message: 'Export financial statement and audit ledger to Excel',
+                    child: OutlinedButton.icon(
+                      onPressed: _isExporting ? null : () => _exportExcel(dcState, expState, orders),
+                      icon: _isExporting
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.table_view_rounded, size: 15),
+                      label: Text(
+                        'Export Excel',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ),
                 ],
@@ -197,16 +612,348 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // Real-Time Finance Metric Tiles
+          // Row 2: Date Range Capsule Ribbon, Merchant Filter, and Product Filter
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              // Date Range Capsule Ribbon
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF031632) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildDatePill('Today', isDark),
+                    _buildDatePill('7D', isDark),
+                    _buildDatePill('30D', isDark),
+                    _buildDatePill('This Month', isDark),
+                    _buildDatePill('All Time', isDark),
+                    IconButton(
+                      tooltip: 'Pick custom date range',
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      icon: Icon(
+                        Icons.calendar_month_rounded,
+                        size: 15,
+                        color: _datePreset == 'Custom' ? const Color(0xFFF37021) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                      ),
+                      onPressed: () async {
+                        final result = await PangeaDateRangePickerModal.show(
+                          context,
+                          initialStartDate: _startDate ?? DateTime.now().subtract(const Duration(days: 30)),
+                          initialEndDate: _endDate ?? DateTime.now(),
+                          initialPreset: DateRangePreset.custom,
+                        );
+                        if (result != null) {
+                          setState(() {
+                            _datePreset = 'Custom';
+                            _startDate = result.startDate;
+                            _endDate = result.endDate;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // Merchant Filter Dropdown
+              Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF031632) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedMerchantId,
+                    hint: Text('All Merchants', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    isDense: true,
+                    icon: const Icon(Icons.arrow_drop_down_rounded, size: 18),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All Merchants', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                      ),
+                      ...dcState.clients.map((c) {
+                        return DropdownMenuItem<String?>(
+                          value: c.id,
+                          child: Text(
+                            c.companyName,
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) => setState(() => _selectedMerchantId = val),
+                  ),
+                ),
+              ),
+
+              // Product Filter Dropdown
+              Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF031632) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedProductName,
+                    hint: Text('All Products', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    isDense: true,
+                    icon: const Icon(Icons.arrow_drop_down_rounded, size: 18),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All Products', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                      ),
+                      ...productNames.map((p) {
+                        return DropdownMenuItem<String?>(
+                          value: p,
+                          child: Text(
+                            p,
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) => setState(() => _selectedProductName = val),
+                  ),
+                ),
+              ),
+
+              // Reset Filters if applied
+              if (_selectedMerchantId != null || _selectedProductName != null || _datePreset != '30D')
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedMerchantId = null;
+                      _selectedProductName = null;
+                      _applyPreset('30D');
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.close_rounded, size: 13, color: Color(0xFFEF4444)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Reset',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFEF4444)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubtabPill(int index, String label, IconData icon, bool isDark) {
+    final isSelected = _activeSubtab == index;
+    return InkWell(
+      onTap: () => setState(() => _activeSubtab = index),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? const Color(0xFF1E2D4A) : Colors.white)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected
+                  ? const Color(0xFFF37021)
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected
+                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDatePill(String label, bool isDark) {
+    final isSelected = _datePreset == label;
+    return InkWell(
+      onTap: () => _applyPreset(label),
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? const Color(0xFFF37021) : Colors.white)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected
+                ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // BODY SWITCHER
+  // ==========================================
+  Widget _buildSubtabBody({
+    required bool isDark,
+    required bool isCompact,
+    required DCConsoleState dcState,
+    required DCExpendituresState expState,
+    required List<OrderEntity> orders,
+    required List<BusinessExpenditureEntity> expenditures,
+    required List<RemittanceEntity> remittances,
+    required List<ClientSettlement> settlements,
+    required List<DCTransactionRecord> transactions,
+  }) {
+    switch (_activeSubtab) {
+      case 0:
+        return _buildDashboardSubtab(
+          isDark: isDark,
+          isCompact: isCompact,
+          dcState: dcState,
+          orders: orders,
+          expenditures: expenditures,
+          remittances: remittances,
+          settlements: settlements,
+          transactions: transactions,
+        );
+      case 1:
+        return _buildIncomeSubtab(
+          isDark: isDark,
+          isCompact: isCompact,
+          dcState: dcState,
+          orders: orders,
+          remittances: remittances,
+          settlements: settlements,
+        );
+      case 2:
+        return _buildExpensesSubtab(
+          isDark: isDark,
+          isCompact: isCompact,
+          dcState: dcState,
+          expState: expState,
+          expenditures: expenditures,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // ==========================================
+  // SUB-TAB 1: FINANCE DASHBOARD
+  // ==========================================
+  Widget _buildDashboardSubtab({
+    required bool isDark,
+    required bool isCompact,
+    required DCConsoleState dcState,
+    required List<OrderEntity> orders,
+    required List<BusinessExpenditureEntity> expenditures,
+    required List<RemittanceEntity> remittances,
+    required List<ClientSettlement> settlements,
+    required List<DCTransactionRecord> transactions,
+  }) {
+    final deliveredOrders = orders.where((o) => o.status.toLowerCase() == 'delivered').toList();
+    final grossInflow = deliveredOrders.fold(0.0, (s, o) => s + o.totalAmount);
+    final deliveryFeesCollected = deliveredOrders.fold(0.0, (s, o) => s + o.clientDeliveryFee);
+    final riderWages = deliveredOrders.length * dcState.financeSettings.defaultCommissionRate;
+    final fuelCost = deliveredOrders.length * (dcState.financeSettings.defaultTransportAllowance / 10.0).clamp(100.0, 800.0);
+    final totalOpex = expenditures.fold(0.0, (s, e) => s + e.amount);
+
+    final netMargin = deliveryFeesCollected - (riderWages + fuelCost + totalOpex);
+    final marginPct = deliveryFeesCollected > 0 ? (netMargin / deliveryFeesCollected) * 100 : 0.0;
+    final vaultCash = remittances.where((r) => r.isVerified).fold(0.0, (s, r) => s + r.amount);
+    final unsettledSettlements = settlements.where((s) => !s.isCompleted).fold(0.0, (s, st) => s + st.netPayoutAmount);
+
+    // Audit / Fund Movement Telemetry (Fused from Audit)
+    final totalTxnVolume = transactions.fold(0.0, (s, t) => s + t.amount);
+    final grossVolume = totalTxnVolume > 0 ? totalTxnVolume : grossInflow;
+    final cashHandled = transactions.where((t) => t.isCashPod).fold(0.0, (s, t) => s + t.amount);
+    final totalRiderEntitlements = transactions.fold(0.0, (s, t) => s + t.totalRiderEntitlement);
+    final effectiveRiderEarnings = totalRiderEntitlements > 0 ? totalRiderEntitlements : (riderWages + fuelCost);
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isCompact ? 14 : 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Key Telemetry Row
           LayoutBuilder(
             builder: (context, constraints) {
-              final cardWidth = constraints.maxWidth < 650
+              final cardWidth = constraints.maxWidth < 600
                   ? constraints.maxWidth
-                  : (constraints.maxWidth < 950
+                  : (constraints.maxWidth < 1100
                       ? (constraints.maxWidth - 12) / 2
-                      : (constraints.maxWidth - 24) / 3);
+                      : (constraints.maxWidth - 36) / 4);
 
               return Wrap(
                 spacing: 12,
@@ -215,34 +962,117 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                   SizedBox(
                     width: cardWidth,
                     child: _buildMetricTile(
-                      'Total Reconciled Volume',
-                      CurrencyFormatter.formatNaira(totalReconciled),
-                      '100% Verified Fleet Settlements',
-                      Icons.account_balance_wallet_rounded,
-                      const Color(0xFF10B981),
+                      'Net Margin',
+                      CurrencyFormatter.formatNaira(netMargin),
+                      '${marginPct.toStringAsFixed(1)}% Margin',
+                      Icons.insights_rounded,
+                      netMargin >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                       isDark,
+                      tooltip: 'Delivery billing fees minus driver commissions, fuel allowance, and station OpEx',
                     ),
                   ),
                   SizedBox(
                     width: cardWidth,
                     child: _buildMetricTile(
-                      'Fleet Remittance Records',
-                      '$totalSubmissions Settlements',
-                      'Across All Active DC Riders',
+                      'Gross Inflow',
+                      CurrencyFormatter.formatNaira(grossInflow),
+                      '${deliveredOrders.length} Delivered',
+                      Icons.payments_rounded,
+                      const Color(0xFF0284C7),
+                      isDark,
+                      tooltip: 'Total delivery value and collections from completed orders',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Total OpEx',
+                      CurrencyFormatter.formatNaira(totalOpex),
+                      '${expenditures.length} Vouchers',
                       Icons.receipt_long_rounded,
-                      const Color(0xFF00A2D3),
+                      const Color(0xFFF97316),
                       isDark,
+                      tooltip: 'Total operating expenses recorded across this distribution facility',
                     ),
                   ),
                   SizedBox(
                     width: cardWidth,
                     child: _buildMetricTile(
-                      'Auto-Reconciliation Rate',
-                      '100% ⚡',
-                      '$paystackCount Automated via Paystack',
-                      Icons.bolt_rounded,
+                      'Vault Cash',
+                      CurrencyFormatter.formatNaira(vaultCash),
+                      '${remittances.length} Settlements',
+                      Icons.account_balance_rounded,
                       const Color(0xFF8B5CF6),
                       isDark,
+                      tooltip: 'Total verified cash collections deposited into station vault',
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          // Secondary Fused Audit Telemetry Row (Fund Movement & Rider Entitlements)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cardWidth = constraints.maxWidth < 600
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth < 1100
+                      ? (constraints.maxWidth - 12) / 2
+                      : (constraints.maxWidth - 36) / 4);
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Gross Fund Volume',
+                      CurrencyFormatter.formatNaira(grossVolume),
+                      '${transactions.isNotEmpty ? transactions.length : deliveredOrders.length} Transactions',
+                      Icons.account_balance_wallet_rounded,
+                      const Color(0xFF2563EB),
+                      isDark,
+                      tooltip: 'Cumulative monetary volume across all customer orders and collection events',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Cash Handled (POD)',
+                      CurrencyFormatter.formatNaira(cashHandled > 0 ? cashHandled : (grossInflow - deliveryFeesCollected)),
+                      'Courier Handover Cash 💵',
+                      Icons.payments_rounded,
+                      const Color(0xFF10B981),
+                      isDark,
+                      tooltip: 'Physical cash collected from customers by dispatch riders at delivery',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Rider Earnings',
+                      CurrencyFormatter.formatNaira(effectiveRiderEarnings),
+                      'Commissions & Wages 🛵',
+                      Icons.two_wheeler_rounded,
+                      const Color(0xFFF37021),
+                      isDark,
+                      tooltip: 'Total courier commission entitlements and transport allowances',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Pending Settlements',
+                      CurrencyFormatter.formatNaira(unsettledSettlements),
+                      '${settlements.where((s) => !s.isCompleted).length} Awaiting Sign-off ⏳',
+                      Icons.hourglass_top_rounded,
+                      const Color(0xFFF59E0B),
+                      isDark,
+                      tooltip: 'Merchant remittances currently pending sign-off or accountant clearance',
                     ),
                   ),
                 ],
@@ -252,120 +1082,13 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
 
           const SizedBox(height: 20),
 
-          // Main Remittance Table Container
+          // Inflow vs Outflow Visual Telemetry Card
           Container(
-            padding: EdgeInsets.all(isCompact ? 14 : 20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Table Controls: Title & Search
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Rider Remittance Audit Ledger', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
-                        Text('Tap any row to view complete forensic breakdown & Paystack receipt', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildFilterChip('all', 'All Settlements', selectedFilter == 'all', isDark, () => ref.read(dcFinanceFilterProvider.notifier).state = 'all'),
-                        const SizedBox(width: 6),
-                        _buildFilterChip('paystack', 'Paystack ⚡', selectedFilter == 'paystack', isDark, () => ref.read(dcFinanceFilterProvider.notifier).state = 'paystack'),
-                        const SizedBox(width: 6),
-                        _buildFilterChip('today', 'Today', selectedFilter == 'today', isDark, () => ref.read(dcFinanceFilterProvider.notifier).state = 'today'),
-                      ],
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 14),
-
-                // Search Bar
-                TextField(
-                  controller: _searchController,
-                  onChanged: (val) => ref.read(dcFinanceSearchProvider.notifier).state = val,
-                  decoration: InputDecoration(
-                    hintText: 'Search by reference (e.g. PSTK-RMT...), rider name, or agent code...',
-                    hintStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF94A3B8)),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
-                    suffixIcon: searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 16),
-                            onPressed: () {
-                              _searchController.clear();
-                              ref.read(dcFinanceSearchProvider.notifier).state = '';
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Remittances Table
-                if (financeState.isLoading)
-                  Column(
-                    children: List.generate(3, (index) => const RemittanceCardSkeleton()),
-                  )
-                else if (filteredList.isEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 40),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.receipt_long_outlined, size: 44, color: Color(0xFF64748B)),
-                        const SizedBox(height: 12),
-                        Text('No Remittance Records Found', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text('All fleet payments are recorded automatically via Paystack.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      ],
-                    ),
-                  )
-                else
-                  _buildRemittancesTable(context, filteredList, isDark, dcState.drivers),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Physical Banknote Counting Desk (for exceptional edge cases)
-          Container(
-            padding: EdgeInsets.all(isCompact ? 14 : 20),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              color: isDark ? const Color(0xFF071B39) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -373,53 +1096,477 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
                       children: [
-                        Text('Physical Cash Desk Denomination Calculator', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold)),
-                        Text('Banknote inventory counter with instant thermal receipt generation', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                        const Icon(Icons.analytics_rounded, color: Color(0xFFF37021), size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Financial Pulse',
+                          style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(width: 6),
+                        const NovaInfoIcon(tooltip: 'Proportional comparison of revenue inflow vs operating outflows'),
                       ],
                     ),
-                    const Icon(Icons.calculate_outlined, color: Color(0xFF64748B), size: 20),
+                    Text(
+                      'Audited Cashflow',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF10B981)),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 14,
-                  runSpacing: 10,
-                  children: _denominationControllers.entries.map((e) {
-                    return SizedBox(
-                      width: 135,
-                      child: TextField(
-                        controller: e.value,
-                        keyboardType: TextInputType.number,
-                        onChanged: (_) => _updateDenominations(),
-                        decoration: InputDecoration(
-                          labelText: '₦${e.key} Notes',
-                          labelStyle: const TextStyle(fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                const SizedBox(height: 16),
+
+                // Visual Proportion Bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    height: 18,
+                    child: Row(
+                      children: [
+                        // Net Margin Bar (Green)
+                        Expanded(
+                          flex: (netMargin > 0 ? netMargin : 0).toInt().clamp(1, 1000000),
+                          child: Container(color: const Color(0xFF10B981)),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                        // OpEx Bar (Orange)
+                        Expanded(
+                          flex: totalOpex.toInt().clamp(1, 1000000),
+                          child: Container(color: const Color(0xFFF97316)),
+                        ),
+                        // Fleet Commission Bar (Sky)
+                        Expanded(
+                          flex: riderWages.toInt().clamp(1, 1000000),
+                          child: Container(color: const Color(0xFF0284C7)),
+                        ),
+                        // Fuel Bar (Amber)
+                        Expanded(
+                          flex: fuelCost.toInt().clamp(1, 1000000),
+                          child: Container(color: const Color(0xFFF59E0B)),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Counted Physical Cash Sum:', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
-                      Text(CurrencyFormatter.formatNaira(denomTotal), style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF059669))),
-                    ],
-                  ),
+                const SizedBox(height: 12),
+
+                // Legend
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 8,
+                  children: [
+                    _buildLegendItem('Net Margin', CurrencyFormatter.formatNaira(netMargin), const Color(0xFF10B981)),
+                    _buildLegendItem('Station OpEx', CurrencyFormatter.formatNaira(totalOpex), const Color(0xFFF97316)),
+                    _buildLegendItem('Fleet Wages', CurrencyFormatter.formatNaira(riderWages), const Color(0xFF0284C7)),
+                    _buildLegendItem('Fleet Fuel', CurrencyFormatter.formatNaira(fuelCost), const Color(0xFFF59E0B)),
+                  ],
                 ),
               ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Two-Column Grid: Revenue Stream Breakdown & OpEx Distribution
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isTwoCol = constraints.maxWidth >= 900;
+              final colWidth = isTwoCol ? (constraints.maxWidth - 16) / 2 : constraints.maxWidth;
+
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  // Revenue Streams Card
+                  SizedBox(
+                    width: colWidth,
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF071B39) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.monetization_on_rounded, color: Color(0xFF10B981), size: 18),
+                              const SizedBox(width: 8),
+                              Text('Revenue Streams', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800)),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          _buildStreamRow('Delivery Billings', deliveryFeesCollected, grossInflow, const Color(0xFF10B981)),
+                          _buildStreamRow('COD Collections', grossInflow - deliveryFeesCollected, grossInflow, const Color(0xFF0284C7)),
+                          _buildStreamRow('Vault Remittances', vaultCash, grossInflow, const Color(0xFF8B5CF6)),
+                          _buildStreamRow('Pending Settlement', unsettledSettlements, grossInflow, const Color(0xFFF59E0B)),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // OpEx Category Allocation Card
+                  SizedBox(
+                    width: colWidth,
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF071B39) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.pie_chart_rounded, color: Color(0xFFF97316), size: 18),
+                              const SizedBox(width: 8),
+                              Text('OpEx Allocation', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800)),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          if (expenditures.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              child: Center(
+                                child: Text('No expenditures recorded', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey)),
+                              ),
+                            )
+                          else
+                            ...ExpenditureCategory.values.take(4).map((cat) {
+                              final catTotal = expenditures.where((e) => e.category == cat).fold(0.0, (s, e) => s + e.amount);
+                              return _buildStreamRow(cat.name.toUpperCase(), catTotal, totalOpex, _getCategoryColor(cat));
+                            }),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+
+          const SizedBox(height: 22),
+
+          // 4. Fused Audit & Fund Movement Ledger
+          _buildFundMovementAuditSection(
+            isDark: isDark,
+            isCompact: isCompact,
+            transactions: transactions,
+            dcState: dcState,
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  // ==========================================
+  // FUSED AUDIT & FUND MOVEMENT LEDGER
+  // ==========================================
+  Widget _buildFundMovementAuditSection({
+    required bool isDark,
+    required bool isCompact,
+    required List<DCTransactionRecord> transactions,
+    required DCConsoleState dcState,
+  }) {
+    final cashCount = transactions.where((t) => t.isCashPod).length;
+    final gatewayCount = transactions.where((t) => t.isPaystack).length;
+    final remittanceCount = transactions.where((t) => t.isRemittance).length;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF071B39) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row: Title, Subtitle, and Sync Action
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF0284C7), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Fund Movement & Audit Trail',
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        'Live audited movement of customer collections, remittances, and merchant settlements',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Transactions audit ledger refreshed from database.'),
+                      duration: Duration(seconds: 2),
+                      backgroundColor: Color(0xFF0284C7),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.sync_rounded, size: 14, color: Colors.white),
+                label: Text(
+                  'Sync Live',
+                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Filter Pills Row (Reactively switches categories)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                _buildAuditFilterChip('all', 'All Movements (${transactions.length})', _auditCategoryFilter == 'all', isDark),
+                const SizedBox(width: 8),
+                _buildAuditFilterChip('cash', 'Cash POD ($cashCount)', _auditCategoryFilter == 'cash', isDark),
+                const SizedBox(width: 8),
+                _buildAuditFilterChip('gateway', 'Gateway / Bank ($gatewayCount)', _auditCategoryFilter == 'gateway', isDark),
+                const SizedBox(width: 8),
+                _buildAuditFilterChip('remittance', 'Rider Remittances ($remittanceCount)', _auditCategoryFilter == 'remittance', isDark),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Audit Ledger Items
+          if (transactions.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.receipt_long_outlined, size: 40, color: Color(0xFF94A3B8)),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No Audit Transactions Found',
+                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'No financial movement recorded for the selected date range or criteria.',
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: transactions.take(15).length,
+              separatorBuilder: (_, __) => Divider(
+                height: 1,
+                color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFF1F5F9),
+              ),
+              itemBuilder: (context, index) {
+                final txn = transactions[index];
+                return _buildAuditTransactionRow(context, txn, isDark);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAuditFilterChip(String key, String label, bool isSelected, bool isDark) {
+    return InkWell(
+      onTap: () => setState(() => _auditCategoryFilter = key),
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF0284C7)
+              : (isDark ? const Color(0xFF031632) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF0284C7)
+                : (isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected
+                ? Colors.white
+                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuditTransactionRow(BuildContext context, DCTransactionRecord txn, bool isDark) {
+    final isCash = txn.isCashPod;
+    final isRemittance = txn.isRemittance;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          // Icon Avatar
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isCash
+                  ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                  : (isRemittance
+                      ? const Color(0xFF8B5CF6).withValues(alpha: 0.12)
+                      : const Color(0xFF0284C7).withValues(alpha: 0.12)),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isCash
+                  ? Icons.payments_rounded
+                  : (isRemittance ? Icons.account_balance_rounded : Icons.bolt_rounded),
+              size: 18,
+              color: isCash
+                  ? const Color(0xFF10B981)
+                  : (isRemittance ? const Color(0xFF8B5CF6) : const Color(0xFF0284C7)),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Reference & Customer Info
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      txn.transactionCode,
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF031632) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        txn.category.replaceAll('_', ' ').toUpperCase(),
+                        style: GoogleFonts.inter(fontSize: 8.5, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  txn.orderNumber != null
+                      ? 'Order #${txn.orderNumber} • ${txn.customerName ?? "General Consignment"}'
+                      : (txn.customerName ?? 'Direct Settlement Entry'),
+                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+
+          // Courier & Channel
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  txn.riderName,
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${txn.channel} • ${DateFormat("MMM dd, hh:mm a").format(txn.createdAt)}',
+                  style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+
+          // Amount
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                CurrencyFormatter.formatNaira(txn.amount),
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              Text(
+                'Rider: ${CurrencyFormatter.formatNaira(txn.totalRiderEntitlement)}',
+                style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF10B981), fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+
+          // Action Button
+          OutlinedButton(
+            onPressed: () => DCTransactionAuditModal.show(context, txn, isDark: isDark),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              side: BorderSide(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFCBD5E1)),
+            ),
+            child: Text(
+              'Audit',
+              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -427,13 +1574,921 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
     );
   }
 
-  void _openMerchantSettlementPicker(BuildContext context, WidgetRef ref, DCConsoleState dcState, List<OrderEntity> allOrders) {
+  Widget _buildStreamRow(String label, double amount, double total, Color color) {
+    final pct = total > 0 ? (amount / total) * 100 : 0.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+              Text(CurrencyFormatter.formatNaira(amount), style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: (pct / 100).clamp(0.0, 1.0),
+              minHeight: 5,
+              backgroundColor: color.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, String value, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 6),
+        Text('$label: ', style: GoogleFonts.inter(fontSize: 11, color: Colors.grey)),
+        Text(value, style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.w800)),
+      ],
+    );
+  }
+
+  // ==========================================
+  // SUB-TAB 2: INCOME (BREAKDOWN + REMITTANCES)
+  // ==========================================
+  Widget _buildIncomeSubtab({
+    required bool isDark,
+    required bool isCompact,
+    required DCConsoleState dcState,
+    required List<OrderEntity> orders,
+    required List<RemittanceEntity> remittances,
+    required List<ClientSettlement> settlements,
+  }) {
+    // If user toggled into the integrated Remittances flow, render the full DCOrderPaymentMatchingPage!
+    if (_incomeView == 'remittances') {
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: isDark ? const Color(0xFF071B39) : const Color(0xFFF1F5F9),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.receipt_long_rounded, color: Color(0xFFF37021), size: 18),
+                    const SizedBox(width: 8),
+                    Text('Rider Remittances', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(() => _incomeView = 'breakdown'),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 14),
+                  label: Text('Back Breakdown', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          ),
+          const Expanded(child: DCOrderPaymentMatchingPage()),
+        ],
+      );
+    }
+
+    // Otherwise render the 8-Column Income Breakdown Matrix
+    final deliveredOrders = orders.where((o) => o.status.toLowerCase() == 'delivered').toList();
+    final failedOrders = orders.where((o) =>
+        o.status.toLowerCase() == 'failed' ||
+        o.status.toLowerCase() == 'returned' ||
+        o.status.toLowerCase() == 'cancelled'
+    ).toList();
+
+    final deliveredVal = deliveredOrders.fold(0.0, (s, o) => s + o.totalAmount);
+    final failedVal = failedOrders.fold(0.0, (s, o) => s + o.totalAmount);
+    final totalSettlementAmount = settlements.fold(0.0, (s, st) => s + st.netPayoutAmount);
+
+    // Group orders by Merchant / Client
+    final Map<String, List<OrderEntity>> ordersByClient = {};
+    for (final o in orders) {
+      final key = (o.merchantId != null && o.merchantId!.isNotEmpty)
+          ? o.merchantId!
+          : (o.clientId != null && o.clientId!.isNotEmpty ? o.clientId! : 'other');
+      ordersByClient.putIfAbsent(key, () => []).add(o);
+    }
+
+    // Build client rows
+    final clientRows = dcState.clients.map((client) {
+      final clientOrders = ordersByClient[client.id] ?? [];
+      final del = clientOrders.where((o) => o.status.toLowerCase() == 'delivered').toList();
+      final fail = clientOrders.where((o) =>
+          o.status.toLowerCase() == 'failed' ||
+          o.status.toLowerCase() == 'returned' ||
+          o.status.toLowerCase() == 'cancelled'
+      ).toList();
+
+      final delCount = del.length;
+      final delValue = del.fold(0.0, (s, o) => s + o.totalAmount);
+      final failCount = fail.length;
+      final failValue = fail.fold(0.0, (s, o) => s + o.totalAmount);
+
+      // Delivery fee deduction
+      final feePerOrder = client.customDeliveryFee ?? dcState.financeSettings.defaultClientDeliveryFee;
+      final totalDeductions = delCount * feePerOrder;
+      final settlementAmount = (delValue - totalDeductions).clamp(0.0, delValue);
+
+      // Fuel money: ₦0 for PDA riders, accounted for in-house
+      double fuelMoney = 0.0;
+      for (final o in del) {
+        final driver = dcState.drivers.where((d) => d.id == o.deliveryAgentId || d.driverCode.toLowerCase() == o.deliveryAgentCode?.toLowerCase()).firstOrNull;
+        final isPda = driver?.isPda == true;
+        if (!isPda) {
+          fuelMoney += (dcState.financeSettings.defaultTransportAllowance / 10.0).clamp(100.0, 800.0);
+        }
+      }
+
+      // Rider commission
+      final riderCommission = del.fold(0.0, (s, o) => s + (o.agentEntitlement > 0 ? o.agentEntitlement : dcState.financeSettings.defaultCommissionRate));
+
+      // Settlement status check
+      final clientSettlements = settlements.where((s) => s.clientId == client.id).toList();
+      String status = 'Unsettled';
+      ClientSettlement? activeSettlement;
+
+      if (clientSettlements.isNotEmpty) {
+        final latest = clientSettlements.first;
+        activeSettlement = latest;
+        if (latest.isCompleted) {
+          status = 'Settled';
+        } else if (latest.isRemitted || latest.isPending) {
+          status = 'Awaiting Validation';
+        }
+      } else if (del.isEmpty) {
+        status = 'No Dues';
+      }
+
+      return {
+        'client': client,
+        'delCount': delCount,
+        'delValue': delValue,
+        'failCount': failCount,
+        'failValue': failValue,
+        'settlement': settlementAmount,
+        'fuel': fuelMoney,
+        'commission': riderCommission,
+        'status': status,
+        'eligibleOrders': del.where((o) => !o.isClientSettled && o.financialSettlementStatus != 'client_settled').toList(),
+        'settlementRecord': activeSettlement,
+      };
+    }).where((row) {
+      if (_incomeStatusFilter == 'all') return true;
+      final st = row['status'].toString().toLowerCase().replaceAll(' ', '_');
+      return st == _incomeStatusFilter.toLowerCase();
+    }).toList();
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isCompact ? 14 : 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top KPI Summary Cards Row
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cardWidth = constraints.maxWidth < 650
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth < 1100
+                      ? (constraints.maxWidth - 12) / 2
+                      : (constraints.maxWidth - 36) / 4);
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Delivered Value',
+                      CurrencyFormatter.formatNaira(deliveredVal),
+                      '${deliveredOrders.length} Completed',
+                      Icons.check_circle_rounded,
+                      const Color(0xFF10B981),
+                      isDark,
+                      tooltip: 'Total delivery value of successfully delivered parcels',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Failed Value',
+                      CurrencyFormatter.formatNaira(failedVal),
+                      '${failedOrders.length} Attempts',
+                      Icons.cancel_rounded,
+                      const Color(0xFFEF4444),
+                      isDark,
+                      tooltip: 'Value of undelivered or failed delivery attempt consignments',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Settlement',
+                      CurrencyFormatter.formatNaira(totalSettlementAmount),
+                      '${settlements.length} Batches',
+                      Icons.account_balance_wallet_rounded,
+                      const Color(0xFF0284C7),
+                      isDark,
+                      tooltip: 'Total merchant settlements disbursed or queued for verification',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Fleet Fuel',
+                      CurrencyFormatter.formatNaira(deliveredOrders.length * 400.0),
+                      'In-House Only',
+                      Icons.local_gas_station_rounded,
+                      const Color(0xFFF59E0B),
+                      isDark,
+                      tooltip: 'Fuel allowances allocated for in-house riders (₦0 for external PDA)',
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+
+          const SizedBox(height: 20),
+
+          // View Selector & Table Header Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Segmented Sub-View Toggle: [ Breakdown | Remittances ]
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF071B39) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildIncomeTogglePill('breakdown', 'Breakdown', Icons.table_chart_rounded, isDark),
+                    _buildIncomeTogglePill('remittances', 'Remittances', Icons.two_wheeler_rounded, isDark),
+                  ],
+                ),
+              ),
+
+              // Status Filter Chips: [ All | Unsettled | Awaiting Validation | Settled ]
+              Wrap(
+                spacing: 6,
+                children: [
+                  _buildStatusChip('all', 'All', isDark),
+                  _buildStatusChip('unsettled', 'Unsettled', isDark),
+                  _buildStatusChip('awaiting_validation', 'Awaiting', isDark),
+                  _buildStatusChip('settled', 'Settled', isDark),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // The 8-Column Data Table Container
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF071B39) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columnSpacing: 22,
+                  headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF031632) : const Color(0xFFF8FAFC)),
+                  columns: const [
+                    DataColumn(label: Text('Merchant', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Delivered', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Delivered Value', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Failed', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Failed Value', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Settlement', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Fuel', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Commission', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                  ],
+                  rows: clientRows.map((row) {
+                    final client = row['client'] as ClientProfile;
+                    final delCount = row['delCount'] as int;
+                    final delVal = row['delValue'] as double;
+                    final failCount = row['failCount'] as int;
+                    final failVal = row['failValue'] as double;
+                    final settlement = row['settlement'] as double;
+                    final fuel = row['fuel'] as double;
+                    final commission = row['commission'] as double;
+                    final status = row['status'] as String;
+                    final eligible = row['eligibleOrders'] as List<OrderEntity>;
+                    final activeSettlement = row['settlementRecord'] as ClientSettlement?;
+
+                    return DataRow(
+                      cells: [
+                        // 1. Merchant Identity
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundColor: const Color(0xFFF37021).withValues(alpha: 0.15),
+                                child: Text(
+                                  client.companyName.isNotEmpty ? client.companyName[0].toUpperCase() : 'M',
+                                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 11, color: const Color(0xFFF37021)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(client.companyName, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                                  Text(client.bankName.isNotEmpty ? client.bankName : 'Direct Transfer', style: GoogleFonts.inter(fontSize: 10, color: Colors.grey)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        // 2. Delivered Count
+                        DataCell(Text('$delCount', style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.w700, fontSize: 12))),
+                        // 3. Delivered Value
+                        DataCell(Text(CurrencyFormatter.formatNaira(delVal), style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.w700, fontSize: 12, color: const Color(0xFF10B981)))),
+                        // 4. Failed Attempt Count
+                        DataCell(Text('$failCount', style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.w700, fontSize: 12))),
+                        // 5. Failed Attempt Value
+                        DataCell(Text(CurrencyFormatter.formatNaira(failVal), style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.w700, fontSize: 12, color: const Color(0xFFEF4444)))),
+                        // 6. Merchant Settlement
+                        DataCell(Text(CurrencyFormatter.formatNaira(settlement), style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.w800, fontSize: 12, color: const Color(0xFF0284C7)))),
+                        // 7. Fuel Money (₦0 for PDA, accounted for in-house)
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(CurrencyFormatter.formatNaira(fuel), style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.w700, fontSize: 12)),
+                              if (fuel == 0.0)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: NovaTooltip(
+                                    message: 'External PDA courier: ₦0 fuel allowance allocated',
+                                    child: Icon(Icons.info_outline_rounded, size: 12, color: Colors.grey.shade400),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        // 8. Rider Commission
+                        DataCell(Text(CurrencyFormatter.formatNaira(commission), style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.w700, fontSize: 12))),
+                        // 9. Settlement Status
+                        DataCell(_buildStatusBadge(status)),
+                        // 10. Action Button
+                        DataCell(
+                          _buildSettlementActionButton(
+                            context: context,
+                            client: client,
+                            status: status,
+                            eligibleOrders: eligible,
+                            settlement: activeSettlement,
+                            dcState: dcState,
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIncomeTogglePill(String viewKey, String label, IconData icon, bool isDark) {
+    final isSelected = _incomeView == viewKey;
+    return InkWell(
+      onTap: () => setState(() => _incomeView = viewKey),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? (isDark ? const Color(0xFF1E2D4A) : Colors.white) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05), blurRadius: 4, offset: const Offset(0, 1))] : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: isSelected ? const Color(0xFFF37021) : Colors.grey),
+            const SizedBox(width: 6),
+            Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String key, String label, bool isDark) {
+    final isSelected = _incomeStatusFilter == key;
+    return ChoiceChip(
+      label: Text(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700)),
+      selected: isSelected,
+      onSelected: (val) => setState(() => _incomeStatusFilter = key),
+      selectedColor: const Color(0xFFF37021),
+      labelStyle: TextStyle(color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87)),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    Color bg;
+    Color fg;
+    switch (status.toLowerCase()) {
+      case 'settled':
+        bg = const Color(0xFF10B981).withValues(alpha: 0.15);
+        fg = const Color(0xFF10B981);
+        break;
+      case 'awaiting validation':
+      case 'awaiting_validation':
+        bg = const Color(0xFF0284C7).withValues(alpha: 0.15);
+        fg = const Color(0xFF0284C7);
+        break;
+      case 'unsettled':
+        bg = const Color(0xFFF97316).withValues(alpha: 0.15);
+        fg = const Color(0xFFF97316);
+        break;
+      default:
+        bg = Colors.grey.withValues(alpha: 0.15);
+        fg = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+      child: Text(
+        status.toUpperCase(),
+        style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: fg),
+      ),
+    );
+  }
+
+  Widget _buildSettlementActionButton({
+    required BuildContext context,
+    required ClientProfile client,
+    required String status,
+    required List<OrderEntity> eligibleOrders,
+    required ClientSettlement? settlement,
+    required DCConsoleState dcState,
+  }) {
+    if (status == 'Unsettled' && eligibleOrders.isNotEmpty) {
+      return ElevatedButton.icon(
+        onPressed: () {
+          DCDailyMerchantSettlementModal.show(
+            context: context,
+            client: client,
+            eligibleOrders: eligibleOrders,
+          );
+        },
+        icon: const Icon(Icons.send_rounded, size: 13, color: Colors.white),
+        label: Text('Settle', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF0284C7),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          elevation: 0,
+        ),
+      );
+    } else if (settlement != null) {
+      return OutlinedButton.icon(
+        onPressed: () {
+          ClientSettlementDetailModal.show(
+            context: context,
+            settlement: settlement,
+            isDcView: true,
+            clientName: client.companyName,
+          );
+        },
+        icon: const Icon(Icons.receipt_long_rounded, size: 13),
+        label: Text(status == 'Settled' ? 'Receipt' : 'Inspect', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700)),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+      );
+    }
+
+    return Text('-', style: GoogleFonts.inter(color: Colors.grey));
+  }
+
+  // ==========================================
+  // SUB-TAB 3: EXPENSES (EXPENDITURES LEDGER)
+  // ==========================================
+  Widget _buildExpensesSubtab({
+    required bool isDark,
+    required bool isCompact,
+    required DCConsoleState dcState,
+    required DCExpendituresState expState,
+    required List<BusinessExpenditureEntity> expenditures,
+  }) {
+    final totalOpex = expenditures.fold(0.0, (s, e) => s + e.amount);
+    final daysInPreset = _startDate != null && _endDate != null
+        ? _endDate!.difference(_startDate!).inDays.clamp(1, 365)
+        : 30;
+    final dailyBurn = totalOpex / daysInPreset;
+
+    // Determine Top Category
+    final Map<ExpenditureCategory, double> spendByCategory = {};
+    for (final e in expenditures) {
+      spendByCategory[e.category] = (spendByCategory[e.category] ?? 0.0) + e.amount;
+    }
+    ExpenditureCategory topCategory = ExpenditureCategory.dieselFuel;
+    double topCategorySpend = 0.0;
+    spendByCategory.forEach((cat, spend) {
+      if (spend > topCategorySpend) {
+        topCategorySpend = spend;
+        topCategory = cat;
+      }
+    });
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isCompact ? 14 : 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top OpEx KPI Row
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cardWidth = constraints.maxWidth < 650
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth < 1100
+                      ? (constraints.maxWidth - 12) / 2
+                      : (constraints.maxWidth - 36) / 4);
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Total OpEx',
+                      CurrencyFormatter.formatNaira(totalOpex),
+                      '${expenditures.length} Vouchers',
+                      Icons.trending_down_rounded,
+                      const Color(0xFFF97316),
+                      isDark,
+                      tooltip: 'Cumulative operational expenditures logged across this station',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Daily Burn',
+                      CurrencyFormatter.formatNaira(dailyBurn),
+                      'Average Burn',
+                      Icons.local_fire_department_rounded,
+                      const Color(0xFFEF4444),
+                      isDark,
+                      tooltip: 'Average daily operating expenditure burn across current period',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Top Category',
+                      topCategory.name.toUpperCase(),
+                      CurrencyFormatter.formatNaira(topCategorySpend),
+                      _getCategoryIcon(topCategory),
+                      _getCategoryColor(topCategory),
+                      isDark,
+                      tooltip: 'Largest operational expense allocation category',
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildMetricTile(
+                      'Vouchers',
+                      '${expenditures.length} Logged',
+                      'Audited Ledger',
+                      Icons.receipt_rounded,
+                      const Color(0xFF10B981),
+                      isDark,
+                      tooltip: 'Total receipts and verified station expenditure records',
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+
+          const SizedBox(height: 20),
+
+          // Search, Category Filters, and Record Button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Search Input
+              SizedBox(
+                width: isCompact ? 200 : 280,
+                height: 38,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Search vouchers...',
+                    hintStyle: GoogleFonts.inter(fontSize: 12),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 16),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    isDense: true,
+                  ),
+                ),
+              ),
+
+              // Category Filter Dropdown
+              Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF071B39) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _expenseCategoryFilter,
+                    isDense: true,
+                    icon: const Icon(Icons.arrow_drop_down_rounded, size: 18),
+                    items: [
+                      const DropdownMenuItem(value: 'all', child: Text('All Categories')),
+                      ...ExpenditureCategory.values.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name.toUpperCase()))),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setState(() => _expenseCategoryFilter = val);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Expenditures Data Table
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF071B39) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: expenditures.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            const Icon(Icons.receipt_long_rounded, size: 36, color: Colors.grey),
+                            const SizedBox(height: 8),
+                            Text('No expenditure records found', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        columnSpacing: 24,
+                        headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF031632) : const Color(0xFFF8FAFC)),
+                        columns: const [
+                          DataColumn(label: Text('Voucher', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Vendor', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Receipt', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                        ],
+                        rows: expenditures.map((exp) {
+                          final categoryColor = _getCategoryColor(exp.category);
+                          return DataRow(
+                            cells: [
+                              DataCell(Text(exp.invoiceNumber ?? 'VOUCHER', style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.w800, fontSize: 12))),
+                              DataCell(Text(DateFormat('MMM dd, yyyy').format(exp.expenditureDate), style: GoogleFonts.inter(fontSize: 12))),
+                              DataCell(
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: categoryColor.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(_getCategoryIcon(exp.category), size: 12, color: categoryColor),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        exp.category.name.toUpperCase(),
+                                        style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: categoryColor),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              DataCell(Text(exp.vendorName ?? 'General Vendor', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12))),
+                              DataCell(Text(CurrencyFormatter.formatNaira(exp.amount), style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.w800, fontSize: 12, color: const Color(0xFFEF4444)))),
+                              DataCell(
+                                exp.hasReceipt
+                                    ? IconButton(
+                                        icon: const Icon(Icons.attach_file_rounded, size: 16, color: Color(0xFF0284C7)),
+                                        tooltip: 'View attached receipt voucher',
+                                        onPressed: () => DCReceiptPreviewModal.show(context, exp, dcName: dcState.activeHubName),
+                                      )
+                                    : Text('-', style: GoogleFonts.inter(color: Colors.grey)),
+                              ),
+                              DataCell(
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
+                                  tooltip: 'Delete expenditure voucher',
+                                  onPressed: () => _confirmDeleteExpenditure(context, exp, dcState),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteExpenditure(
+    BuildContext context,
+    BusinessExpenditureEntity exp,
+    DCConsoleState dcState,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Voucher?'),
+        content: Text('Permanently remove expense ${exp.invoiceNumber} (₦${exp.amount.toStringAsFixed(2)}) from station records?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final user = ref.read(authProvider).user;
+      final ok = await ref.read(dcExpendituresProvider.notifier).deleteExpenditure(exp.id);
+      if (ok && mounted) {
+        await AuditLoggingService.instance.logAction(
+          actorId: user?.id,
+          actorName: user?.fullName ?? 'DC Supervisor',
+          actorEmail: user?.email ?? 'dc.supervisor@novaxpress.ng',
+          actorRole: user?.role ?? 'dc_manager',
+          action: 'DELETE_EXPENDITURE_VOUCHER',
+          resource: 'EXPENDITURES_LEDGER',
+          details: 'Deleted expenditure voucher ${exp.invoiceNumber} (₦${exp.amount}) from ${dcState.activeHubName}',
+          distributionCenterId: dcState.activeDcId,
+          distributionCenterName: dcState.activeHubName,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Voucher deleted from station ledger'), backgroundColor: Color(0xFF10B981)),
+        );
+      }
+    }
+  }
+
+  // ==========================================
+  // REUSABLE METRIC TILE
+  // ==========================================
+  Widget _buildMetricTile(
+    String title,
+    String value,
+    String subtitle,
+    IconData icon,
+    Color color,
+    bool isDark, {
+    String? tooltip,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF071B39) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                    if (tooltip != null) ...[
+                      const SizedBox(width: 4),
+                      NovaInfoIcon(tooltip: tooltip, size: 13),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: GoogleFonts.inter(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openMerchantSettlementPicker(
+    BuildContext context,
+    DCConsoleState dcState,
+    List<OrderEntity> allOrders,
+  ) {
     if (dcState.clients.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFFF97316),
-          content: Text('No merchant clients registered in network yet.'),
-        ),
+        const SnackBar(content: Text('No merchant clients registered yet.')),
       );
       return;
     }
@@ -441,13 +2496,9 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
     if (dcState.clients.length == 1) {
       final client = dcState.clients.first;
       final eligible = allOrders.where((o) =>
-        (o.merchantId == client.id || o.clientId == client.id) &&
-        (o.paymentMethod.toLowerCase() == 'cash' ||
-            o.paymentMethod.toLowerCase() == 'cod' ||
-            o.paymentMethod.toLowerCase() == 'direct_transfer' ||
-            o.paymentType == 'direct_transfer') &&
-        o.status.toLowerCase() == 'delivered' &&
-        !o.isClientSettled
+          (o.merchantId == client.id || o.clientId == client.id) &&
+          o.status.toLowerCase() == 'delivered' &&
+          !o.isClientSettled
       ).toList();
       DCDailyMerchantSettlementModal.show(
         context: context,
@@ -462,1134 +2513,43 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          backgroundColor: isDark ? const Color(0xFF071B39) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF0284C7), size: 22),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Client Settlement',
-                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Select a merchant partner to generate itemized clearinghouse deductions and finalize bank payout disbursement:',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 16),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 320),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: dcState.clients.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (cCtx, i) {
-                      final c = dcState.clients[i];
-                      final eligibleOrders = allOrders.where((o) =>
-                        (o.merchantId == c.id || o.clientId == c.id) &&
-                        (o.paymentMethod.toLowerCase() == 'cash' ||
-                            o.paymentMethod.toLowerCase() == 'cod' ||
-                            o.paymentMethod.toLowerCase() == 'direct_transfer' ||
-                            o.paymentType == 'direct_transfer') &&
-                        o.status.toLowerCase() == 'delivered' &&
-                        !o.isClientSettled
-                      ).toList();
+          title: Text('Select Merchant', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: SizedBox(
+            width: 380,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: dcState.clients.length,
+              itemBuilder: (ctx, i) {
+                final client = dcState.clients[i];
+                final eligible = allOrders.where((o) =>
+                    (o.merchantId == client.id || o.clientId == client.id) &&
+                    o.status.toLowerCase() == 'delivered' &&
+                    !o.isClientSettled
+                ).toList();
 
-                      final unsettledSum = eligibleOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
-
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFF0284C7).withValues(alpha: 0.12),
-                          child: Text(
-                            c.companyName.isNotEmpty ? c.companyName[0].toUpperCase() : 'M',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF0284C7)),
-                          ),
-                        ),
-                        title: Text(c.companyName, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                        subtitle: Text(
-                          '${eligibleOrders.length} delivered orders pending settlement • ${CurrencyFormatter.formatNaira(unsettledSum)} gross',
-                          style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
-                        onTap: () {
-                          Navigator.pop(ctx);
-                          DCDailyMerchantSettlementModal.show(
-                            context: context,
-                            client: c,
-                            eligibleOrders: eligibleOrders,
-                          );
-                        },
-                      );
-                    },
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFFF37021).withValues(alpha: 0.15),
+                    child: Text(client.companyName.isNotEmpty ? client.companyName[0].toUpperCase() : 'M'),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _showDcSettlementHistoryModal(context, ref, dcState.activeDcId);
-              },
-              icon: const Icon(Icons.receipt_long_rounded, size: 16),
-              label: const Text('Settlement History & Receipts'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showDcSettlementHistoryModal(BuildContext context, WidgetRef ref, String dcId) {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0284C7).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.history_rounded, color: Color(0xFF0284C7), size: 22),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Client Settlement Ledger',
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800),
-                    ),
-                    Text(
-                      'All manual remittances, itemized deductions & attached receipts',
-                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620, maxHeight: 480),
-            child: SizedBox(
-              width: double.maxFinite,
-              child: FutureBuilder<List<ClientSettlement>>(
-                future: ref.read(dcConsoleProvider.notifier).fetchDcClientSettlements(),
-                builder: (fCtx, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final settlements = snapshot.data ?? [];
-                  if (settlements.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.receipt_long_outlined, size: 40, color: Color(0xFF94A3B8)),
-                          const SizedBox(height: 8),
-                          Text('No Client Settlements Found', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
-                          Text('Fulfill client settlements from the action button above.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                        ],
-                      ),
+                  title: Text(client.companyName, style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                  subtitle: Text('${eligible.length} unsettled orders'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    DCDailyMerchantSettlementModal.show(
+                      context: context,
+                      client: client,
+                      eligibleOrders: eligible,
                     );
-                  }
-
-                  return ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: settlements.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (lCtx, idx) {
-                      final s = settlements[idx];
-                      final isRemitted = s.isRemitted;
-                      final isCompleted = s.isCompleted;
-
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: (isCompleted
-                                  ? const Color(0xFF10B981)
-                                  : (isRemitted ? const Color(0xFFF59E0B) : const Color(0xFF0284C7)))
-                              .withValues(alpha: 0.12),
-                          child: Icon(
-                            isCompleted
-                                ? Icons.check_circle_rounded
-                                : (isRemitted ? Icons.pending_actions_rounded : Icons.receipt_rounded),
-                            color: isCompleted
-                                ? const Color(0xFF10B981)
-                                : (isRemitted ? const Color(0xFFF59E0B) : const Color(0xFF0284C7)),
-                            size: 20,
-                          ),
-                        ),
-                        title: Row(
-                          children: [
-                            Text(s.settlementNumber, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: (isCompleted
-                                        ? const Color(0xFF10B981)
-                                        : (isRemitted ? const Color(0xFFF59E0B) : const Color(0xFF64748B)))
-                                    .withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                isCompleted ? 'Completed' : (isRemitted ? 'Remitted' : s.status),
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: isCompleted
-                                      ? const Color(0xFF059669)
-                                      : (isRemitted ? const Color(0xFFD97706) : const Color(0xFF475569)),
-                                ),
-                              ),
-                            ),
-                            if (s.hasReceipt) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0D9488).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.attach_file_rounded, size: 10, color: Color(0xFF0D9488)),
-                                    SizedBox(width: 2),
-                                    Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0D9488))),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        subtitle: Text(
-                          '${s.destinationBankName} - ${s.destinationAccountNumber} • ${DateFormat('MMM dd, yyyy').format(s.settledAt)}',
-                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              CurrencyFormatter.formatNaira(s.netPayoutAmount),
-                              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13.5, color: const Color(0xFF0D9488)),
-                            ),
-                            const Text('View Details →', style: TextStyle(fontSize: 10, color: Color(0xFF0284C7))),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.pop(ctx);
-                          final clientObj = ref.read(dcConsoleProvider).clients.where((c) => c.id == s.clientId).firstOrNull;
-                          ClientSettlementDetailModal.show(
-                            context: context,
-                            settlement: s,
-                            isDcView: true,
-                            clientName: clientObj?.companyName,
-                            clientLogo: clientObj?.logoUrl,
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
+                  },
+                );
+              },
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
-            ),
-          ],
         );
       },
-    );
-  }
-
-  Widget _buildMetricTile(String title, String value, String subtitle, IconData icon, Color color, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: color, size: 16),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(value, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
-          ),
-          const SizedBox(height: 4),
-          Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)), overflow: TextOverflow.ellipsis),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String id, String label, bool isSelected, bool isDark, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? (isDark ? const Color(0xFF00A2D3).withValues(alpha: 0.25) : const Color(0xFFE0F2FE))
-              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF00A2D3) : Colors.transparent,
-          ),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 11.5,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? const Color(0xFF00A2D3) : const Color(0xFF64748B),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRemittancesTable(BuildContext context, List<RemittanceEntity> list, bool isDark, List<dynamic> drivers) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: PangeaExcelDataTable<RemittanceEntity>(
-        items: list,
-        enablePagination: true,
-        initialPageSize: 25,
-        rowHeight: 64.0,
-        brandPrimary: const Color(0xFF0D9488),
-        dateExtractor: (rem) => rem.createdAt,
-        onRowTap: (rem) {
-          final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
-          final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
-          final riderCode = driver != null ? driver.driverCode : 'N/A';
-          _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode);
-        },
-        columns: [
-          ExcelColumnDef<RemittanceEntity>(
-            key: 'ref_channel',
-            group: 'Payment Reference',
-            label: 'REFERENCE & CHANNEL',
-            defaultWidth: 190,
-            minWidth: 140,
-            searchString: (rem) {
-              final refCode = rem.referenceNumber.isNotEmpty
-                  ? rem.referenceNumber
-                  : 'REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
-              return '$refCode ${rem.paymentMethod}';
-            },
-            sortValue: (rem) => rem.createdAt,
-            dateValue: (rem) => rem.createdAt,
-            cellBuilder: (context, rem, row, isDark, brand) {
-              final refCode = rem.referenceNumber.isNotEmpty
-                  ? rem.referenceNumber
-                  : 'REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
-              final isPaystack = rem.paymentMethod.toLowerCase().contains('paystack') || refCode.startsWith('PSTK');
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isPaystack ? Icons.bolt_rounded : Icons.receipt_rounded,
-                        size: 14,
-                        color: isPaystack ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          refCode,
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF00A2D3),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isPaystack ? 'Titan Trust / Paystack' : rem.paymentMethod.toUpperCase(),
-                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              );
-            },
-          ),
-          ExcelColumnDef<RemittanceEntity>(
-            key: 'rider',
-            group: 'Logistics Field Agent',
-            label: 'RIDER & FLEET CODE',
-            defaultWidth: 180,
-            minWidth: 130,
-            searchString: (rem) {
-              final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
-              final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
-              final riderCode = driver != null ? driver.driverCode : 'N/A';
-              return '$riderName $riderCode';
-            },
-            sortValue: (rem) {
-              final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
-              return driver != null ? driver.name : (rem.payerName ?? '');
-            },
-            cellBuilder: (context, rem, row, isDark, brand) {
-              final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
-              final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
-              final riderCode = driver != null ? driver.driverCode : 'N/A';
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(riderName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF37021).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          riderCode,
-                          style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
-          ExcelColumnDef<RemittanceEntity>(
-            key: 'dc',
-            group: 'Hub Location',
-            label: 'DISTRIBUTION CENTER',
-            defaultWidth: 160,
-            minWidth: 120,
-            cellBuilder: (context, rem, row, isDark, brand) {
-              return Text(
-                'Wuse DC Hub',
-                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-                overflow: TextOverflow.ellipsis,
-              );
-            },
-          ),
-          ExcelColumnDef<RemittanceEntity>(
-            key: 'amount',
-            group: 'Financial Settlement',
-            label: 'AMOUNT REMITTED',
-            defaultWidth: 160,
-            minWidth: 120,
-            align: TextAlign.right,
-            searchString: (rem) => '${rem.amount} ${rem.grossCollections}',
-            sortValue: (rem) => rem.amount,
-            cellBuilder: (context, rem, row, isDark, brand) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    CurrencyFormatter.formatNaira(rem.amount),
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF10B981)),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (rem.grossCollections > 0)
-                    Text(
-                      'Gross: ${CurrencyFormatter.formatNaira(rem.grossCollections)}',
-                      style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8)),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              );
-            },
-          ),
-          ExcelColumnDef<RemittanceEntity>(
-            key: 'status',
-            group: 'Audit Status',
-            label: 'STATUS',
-            defaultWidth: 155,
-            minWidth: 120,
-            searchString: (rem) => rem.status,
-            sortValue: (rem) => rem.status,
-            cellBuilder: (context, rem, row, isDark, brand) {
-              if (rem.isPending) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7ED),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFFDBA74)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.hourglass_top_rounded, size: 10, color: Color(0xFFEA580C)),
-                      const SizedBox(width: 3.5),
-                      Text(
-                        'PENDING AUDIT ⏳',
-                        style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFFEA580C)),
-                      ),
-                    ],
-                  ),
-                );
-              } else if (rem.isPartialRemittance) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7ED),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFFDBA74)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.published_with_changes_rounded, size: 10, color: Color(0xFFEA580C)),
-                      const SizedBox(width: 3.5),
-                      Text(
-                        'PARTIAL ⚠️',
-                        style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFFEA580C)),
-                      ),
-                    ],
-                  ),
-                );
-              } else if (rem.isRejected) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFFCA5A5)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.cancel_rounded, size: 10, color: Color(0xFFDC2626)),
-                      const SizedBox(width: 3.5),
-                      Text(
-                        'REJECTED ❌',
-                        style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFFDC2626)),
-                      ),
-                    ],
-                  ),
-                );
-              } else {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFF86EFAC)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF16A34A)),
-                      const SizedBox(width: 3.5),
-                      Text(
-                        'COMPLETE ⚡',
-                        style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFF15803D)),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            },
-          ),
-          ExcelColumnDef<RemittanceEntity>(
-            key: 'date',
-            group: 'Audit Timestamp',
-            label: 'DATE & TIME',
-            defaultWidth: 160,
-            minWidth: 120,
-            searchString: (rem) => DateFormat('dd MMM yyyy • hh:mm a').format(rem.createdAt),
-            sortValue: (rem) => rem.createdAt,
-            cellBuilder: (context, rem, row, isDark, brand) {
-              return Text(
-                DateFormat('dd MMM yyyy • hh:mm a').format(rem.createdAt),
-                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                overflow: TextOverflow.ellipsis,
-              );
-            },
-          ),
-          ExcelColumnDef<RemittanceEntity>(
-            key: 'action',
-            group: 'Action',
-            label: 'ACTION',
-            defaultWidth: 80,
-            minWidth: 60,
-            cellBuilder: (context, rem, row, isDark, brand) {
-              return Center(
-                child: IconButton(
-                  icon: const Icon(Icons.remove_red_eye_outlined, size: 16, color: Color(0xFF00A2D3)),
-                  tooltip: 'View Settlement Details',
-                  onPressed: () {
-                    final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
-                    final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
-                    final riderCode = driver != null ? driver.driverCode : 'N/A';
-                    _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode);
-                  },
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openRemittanceDetailsModal(BuildContext context, bool isDark, RemittanceEntity rem, String riderName, String riderCode) {
-    final refCode = rem.referenceNumber.isNotEmpty
-        ? rem.referenceNumber
-        : 'PSTK-REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
-    final isPartial = rem.isPartialRemittance;
-    final double remainingShortage = rem.remainingShortage;
-    final timestampFormatted = DateFormat('dd MMMM yyyy • hh:mm:ss a').format(rem.createdAt);
-
-    final gross = rem.grossCollections > 0 ? rem.grossCollections : (rem.amount * 1.5);
-    final comm = rem.commissionDeducted > 0 ? rem.commissionDeducted : (gross * 0.25);
-    final transport = rem.transportAllowanceDeducted > 0 ? rem.transportAllowanceDeducted : (gross * 0.2);
-    final expectedHandover = rem.expectedAmount ?? (gross - comm - transport).clamp(0.0, double.infinity);
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final screenHeight = MediaQuery.of(ctx).size.height;
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          child: Container(
-            constraints: BoxConstraints(
-              maxWidth: 580,
-              maxHeight: screenHeight * 0.92,
-            ),
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 1. Top Header & Reference
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.bolt_rounded, color: Color(0xFF00A2D3), size: 22),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Remittance Settlement Receipt',
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'NovaXpress Distribution Center Financial Pool',
-                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 20),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-
-                const SizedBox(height: 16),
-
-                // 2. HERO AMOUNT & STATUS CARD
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: rem.isPending
-                              ? const Color(0xFFFFF7ED)
-                              : (isPartial ? const Color(0xFFFFF7ED) : const Color(0xFFDCFCE7)),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: rem.isPending
-                                ? const Color(0xFFFDBA74)
-                                : (isPartial ? const Color(0xFFFDBA74) : const Color(0xFF86EFAC)),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              rem.isPending
-                                  ? Icons.hourglass_top_rounded
-                                  : (isPartial ? Icons.published_with_changes_rounded : Icons.check_circle_rounded),
-                              size: 14,
-                              color: (rem.isPending || isPartial) ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              rem.isPending
-                                  ? 'PENDING DC CASH VERIFICATION'
-                                  : (isPartial ? 'PARTIAL SETTLEMENT' : 'SUCCESSFUL / SETTLED'),
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: (rem.isPending || isPartial) ? const Color(0xFFEA580C) : const Color(0xFF15803D),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'TOTAL REMITTANCE PAID',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        CurrencyFormatter.formatNaira(rem.amount),
-                        style: GoogleFonts.inter(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w900,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Transferred via ${rem.paystackChannel ?? "Paystack Virtual NUBAN"} • Credited to DC Treasury',
-                        style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // 3. SETTLEMENT CONFIRMATION BANNER
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: rem.isPending
-                        ? (isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.3) : const Color(0xFFFFF7ED))
-                        : (isPartial
-                            ? (isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.3) : const Color(0xFFFFF7ED))
-                            : (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4))),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: (rem.isPending || isPartial) ? const Color(0xFFF97316) : const Color(0xFF10B981)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        rem.isPending
-                            ? Icons.hourglass_top_rounded
-                            : (isPartial ? Icons.published_with_changes_rounded : Icons.verified_rounded),
-                        color: (rem.isPending || isPartial) ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
-                        size: 22,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              rem.isPending
-                                  ? 'Pending Cash Handover Audit'
-                                  : (isPartial ? 'Partial Settlement Reconciled' : 'Payment Verified & Settled'),
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: (rem.isPending || isPartial) ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
-                              ),
-                            ),
-                            Text(
-                              rem.isPending
-                                  ? 'Rider submitted physical cash handover of ${CurrencyFormatter.formatNaira(rem.amount)}. Awaiting DC cash desk physical confirmation.'
-                                  : (isPartial
-                                      ? 'Paid ${CurrencyFormatter.formatNaira(rem.amount)} of expected ${CurrencyFormatter.formatNaira(expectedHandover)}. Shortage balance recorded in hub audit.'
-                                      : 'This remittance was completed via Paystack and automatically credited to the DC treasury pool.'),
-                              style: GoogleFonts.inter(
-                                fontSize: 10.5,
-                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // 4. FINANCIAL RECONCILIATION MATRIX
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SETTLEMENT RECONCILIATION',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                          color: const Color(0xFF475569),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildModalRow('Customer Collections (POD)', CurrencyFormatter.formatNaira(gross)),
-                      const Divider(height: 12),
-                      _buildModalRow('Less: Delivery Commission', '-${CurrencyFormatter.formatNaira(comm)}', valueColor: const Color(0xFF16A34A)),
-                      const Divider(height: 12),
-                      _buildModalRow('Less: Transport Allowance', '-${CurrencyFormatter.formatNaira(transport)}', valueColor: const Color(0xFF2563EB)),
-                      const Divider(height: 12),
-                      _buildModalRow('Expected Remittance', CurrencyFormatter.formatNaira(expectedHandover), isBold: true, valueColor: const Color(0xFFEA580C)),
-                      const Divider(height: 12),
-                      _buildModalRow('Actual Amount Remitted', CurrencyFormatter.formatNaira(rem.amount), isBold: true, valueColor: const Color(0xFF16A34A)),
-                      if (isPartial) ...[
-                        const Divider(height: 12),
-                        _buildModalRow('Remaining Shortage Liability', '-${CurrencyFormatter.formatNaira(remainingShortage)}', isBold: true, valueColor: const Color(0xFFEA580C)),
-                        if (rem.discrepancyReason != null && rem.discrepancyReason!.isNotEmpty) ...[
-                          const Divider(height: 12),
-                          _buildModalRow('Variance Reason', rem.discrepancyReason!, valueColor: const Color(0xFFF97316)),
-                        ],
-                      ],
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // 5. AUDIT & TRANSACTION DETAILS (PAYSTACK METADATA)
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'AUDIT & TRANSACTION DETAILS',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                          color: const Color(0xFF475569),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildModalRow('Remitted To', '${rem.destinationAccountName} (${rem.destinationBankName})'),
-                      const Divider(height: 12),
-                      _buildModalRow('Assigned Rider', '$riderName ($riderCode)'),
-                      const Divider(height: 12),
-                      _buildModalRow('Distribution Hub', 'Wuse DC Hub (DC-WUSE-01)'),
-                      const Divider(height: 12),
-                      _buildModalRow('Payment Method', rem.paymentMethodDisplay),
-                      const Divider(height: 12),
-                      _buildCopyableRow(context, 'Transaction Reference', refCode),
-                      const Divider(height: 12),
-                      _buildModalRow('Paystack Channel', rem.paystackChannel ?? 'Dedicated Virtual Account (NUBAN)'),
-                      const Divider(height: 12),
-                      _buildModalRow('Bank / Processor', rem.paystackBank ?? 'Titan Trust Bank / Paystack'),
-                      const Divider(height: 12),
-                      _buildModalRow('Auth / Trace Code', rem.paystackAuthCode ?? 'AUTH_${refCode.replaceAll(RegExp(r'[^0-9A-Za-z]'), '')}'),
-                      const Divider(height: 12),
-                      _buildModalRow('Gateway Status', rem.gatewayResponse ?? 'APPROVED / SUCCESSFUL (200 OK)', isBold: true, valueColor: const Color(0xFF16A34A)),
-                      const Divider(height: 12),
-                      _buildModalRow('Settlement Timestamp', timestampFormatted),
-                      const Divider(height: 12),
-                      _buildModalRow('Reconciled By', rem.verifiedByName ?? 'Paystack Instant Settlement Engine'),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                // Pending Cash Verification Action
-                if (rem.isPending) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        try {
-                          final res = await ref.read(dcConsoleProvider.notifier).approveCashRemittance(rem.id);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: const Color(0xFF10B981),
-                                content: Text(res['message']?.toString() ?? 'Remittance ${rem.referenceNumber} verified and approved successfully!'),
-                              ),
-                            );
-                            ref.read(financeProvider.notifier).loadRemittances(ref.read(dcConsoleProvider).activeHubId);
-                          }
-                        } catch (err) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Error approving remittance: $err')),
-                            );
-                          }
-                        }
-                      },
-                      icon: const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
-                      label: Text(
-                        'Verify & Approve Cash Handover (${CurrencyFormatter.formatNaira(rem.amount)})',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // 6. ACTION BUTTONS (SHARE & DOWNLOAD & CLOSE)
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          final receiptText = '''
-========================================
-NOVAXPRESS REMITTANCE SETTLEMENT RECEIPT
-========================================
-Reference: $refCode
-Rider: $riderName ($riderCode)
-Amount Remitted: ${CurrencyFormatter.formatNaira(rem.amount)}
-Expected Amount: ${CurrencyFormatter.formatNaira(expectedHandover)}
-Status: SUCCESSFUL / SETTLED
-Settlement Channel: ${rem.paystackChannel ?? "Dedicated Virtual Account (NUBAN)"}
-Processor: ${rem.paystackBank ?? "Titan Trust Bank / Paystack"}
-Destination: ${rem.destinationAccountName} (${rem.destinationBankName})
-Timestamp: $timestampFormatted
-Verification: Approved by Paystack Settlement Engine
-========================================
-NovaXpress Distribution Center Audit
-''';
-                          Clipboard.setData(ClipboardData(text: receiptText));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: const Color(0xFF10B981),
-                              behavior: SnackBarBehavior.floating,
-                              content: const Row(
-                                children: [
-                                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                                  SizedBox(width: 8),
-                                  Expanded(child: Text('Remittance receipt summary copied! Ready to share.')),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        icon: const Icon(Icons.share_rounded, size: 16),
-                        label: Text('Share Receipt', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: const Color(0xFF2563EB),
-                              content: Text('Downloading statement for $refCode...'),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        icon: const Icon(Icons.download_rounded, size: 16),
-                        label: Text('Download PDF', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text('Close', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    },
-  );
-}
-
-  Widget _buildModalRow(String label, String value, {bool isBold = false, Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: GoogleFonts.inter(
-                fontSize: isBold ? 13 : 12,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-                color: valueColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCopyableRow(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-          const SizedBox(width: 8),
-          InkWell(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: value));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: const Color(0xFF00A2D3),
-                  content: Text('Copied reference "$value" to clipboard'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value,
-                  style: GoogleFonts.jetBrainsMono(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.copy_rounded, size: 13, color: Color(0xFF00A2D3)),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

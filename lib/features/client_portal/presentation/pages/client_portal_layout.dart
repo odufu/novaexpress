@@ -10,6 +10,7 @@ import '../providers/client_portal_provider.dart';
 import '../widgets/client_create_order_modal.dart';
 import 'client_closer_workspace_page.dart';
 import 'client_closers_page.dart';
+import 'client_accountants_page.dart';
 import 'client_dashboard_page.dart';
 import 'finance/client_expenses_view.dart';
 import 'finance/client_payouts_view.dart';
@@ -20,6 +21,8 @@ import 'client_orders_page.dart';
 import 'client_products_page.dart';
 import 'client_marketing_suite_page.dart';
 import 'closer_mobile_portal_page.dart';
+import 'merchant_bi_chat_page.dart';
+import 'merchant_settlements_mobile_page.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
@@ -70,8 +73,6 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
 
     return Scaffold(
       key: _scaffoldKey,
-      floatingActionButton: const PipelineChatFloatingActionButton(),
-      floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       drawer: isDesktop
           ? null
@@ -134,10 +135,15 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
 
   Widget _buildActivePage(WidgetRef ref, String activeTab, bool isCloser) {
     switch (activeTab) {
+      case 'ai_bi':
+        return const MerchantBiChatPage();
       case 'leads':
         return const ClientCloserWorkspacePage();
       case 'closers':
         return const ClientClosersPage();
+      case 'accountants':
+      case 'finance_accountants':
+        return const ClientAccountantsPage();
       case 'orders':
         return const ClientOrdersPage();
       case 'inventory':
@@ -153,6 +159,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         return const ClientPayoutsView();
       case 'products':
         return const ClientProductsPage();
+      case 'settlements':
+        return const MerchantSettlementsMobilePage();
       case 'marketing':
         return const ClientMarketingSuitePage();
       case 'dashboard':
@@ -307,6 +315,15 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                     title: 'Dashboard',
                     icon: Icons.dashboard_rounded,
                     isSelected: activeTab == 'dashboard',
+                    isCollapsed: isCollapsed,
+                    isDrawer: isDrawer,
+                  ),
+                  _buildNavItem(
+                    key: 'ai_bi',
+                    title: 'NovaBI Copilot',
+                    icon: Icons.auto_awesome_rounded,
+                    badge: 'AI',
+                    isSelected: activeTab == 'ai_bi',
                     isCollapsed: isCollapsed,
                     isDrawer: isDrawer,
                   ),
@@ -678,6 +695,22 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                     isSelected: activeTab == 'finance_payouts',
                     isDrawer: isDrawer,
                   ),
+                  _buildSubNavItem(
+                    key: 'settlements',
+                    title: 'Settlements App',
+                    tooltip: 'Multi-DC Live Remittance & Settlement Console',
+                    icon: Icons.account_balance_wallet_rounded,
+                    isSelected: activeTab == 'settlements',
+                    isDrawer: isDrawer,
+                  ),
+                  _buildSubNavItem(
+                    key: 'finance_accountants',
+                    title: 'Accountants',
+                    tooltip: 'Merchant Accountants & Finance Officers',
+                    icon: Icons.manage_accounts_rounded,
+                    isSelected: activeTab == 'finance_accountants' || activeTab == 'accountants',
+                    isDrawer: isDrawer,
+                  ),
                 ],
               ),
             ),
@@ -754,6 +787,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
 
   String _getActiveTabTitle(String activeTab, bool isCloser) {
     switch (activeTab) {
+      case 'ai_bi':
+        return 'NovaBI Copilot';
       case 'leads':
         return 'Leads';
       case 'closers':
@@ -769,6 +804,11 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         return 'Profits';
       case 'finance_payouts':
         return 'Payouts';
+      case 'settlements':
+        return 'Settlements';
+      case 'accountants':
+      case 'finance_accountants':
+        return 'Accountants';
       case 'inventory':
         return 'Inventory';
       case 'products':
@@ -863,6 +903,50 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                 color: isDark ? Colors.white : const Color(0xFF0F172A),
               ),
               overflow: TextOverflow.ellipsis,
+            ),
+          ),
+
+          // NovaBI Intelligence Copilot Launcher
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              onTap: () {
+                ref.read(clientActiveTabProvider.notifier).state = 'ai_bi';
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.auto_awesome, color: Colors.white, size: 14),
+                    if (!isCompact) ...[
+                      const SizedBox(width: 5),
+                      Text(
+                        'NovaBI',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
 
@@ -996,6 +1080,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
     final brandPrimary = state.clientProfile.brandPrimaryColor;
     final navItems = [
       (key: 'dashboard', label: 'Dashboard', icon: Icons.dashboard_rounded),
+      (key: 'ai_bi', label: 'NovaBI', icon: Icons.auto_awesome_rounded),
       (key: 'orders', label: 'Orders', icon: Icons.local_shipping_rounded),
       if (state.clientProfile.hasInventoryManagement)
         (key: 'inventory', label: 'Inventory', icon: Icons.warehouse_rounded),

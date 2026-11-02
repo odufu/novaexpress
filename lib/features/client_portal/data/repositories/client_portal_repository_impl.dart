@@ -10,6 +10,7 @@ import '../../domain/entities/stock_holder_custody.dart';
 import '../../domain/entities/client_marketer.dart';
 import '../../domain/entities/client_marketer_payout.dart';
 import '../../domain/entities/lead_form.dart';
+import '../../domain/entities/client_accountant.dart';
 import '../../domain/repositories/client_portal_repository.dart';
 import '../datasources/client_portal_remote_datasource.dart';
 
@@ -116,6 +117,70 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       accountName: accountName,
       assignedProductIds: assignedProductIds,
       assignedProductNames: assignedProductNames,
+    );
+  }
+
+  // ==========================================
+  // MERCHANT ACCOUNTANTS
+  // ==========================================
+
+  @override
+  Future<List<ClientAccountant>> getAccountants(String clientId) async {
+    try {
+      return await _remoteDataSource.fetchAccountants(clientId);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<ClientAccountant> createAccountant({
+    required String clientId,
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? accountantCode,
+    bool canApproveSettlements = true,
+    bool canManageExpenses = true,
+    bool canDisbursePayouts = true,
+    String? avatarUrl,
+  }) async {
+    return await _remoteDataSource.createAccountant(
+      clientId: clientId,
+      fullName: fullName,
+      email: email,
+      phone: phone,
+      password: password,
+      accountantCode: accountantCode,
+      canApproveSettlements: canApproveSettlements,
+      canManageExpenses: canManageExpenses,
+      canDisbursePayouts: canDisbursePayouts,
+      avatarUrl: avatarUrl,
+    );
+  }
+
+  @override
+  Future<void> toggleAccountantStatus({
+    required String accountantId,
+    required bool isActive,
+  }) async {
+    await _remoteDataSource.updateAccountantStatus(
+      accountantId: accountantId,
+      isActive: isActive,
+    );
+  }
+
+  @override
+  Future<void> resetAccountantPassword({
+    required String accountantId,
+    String? userId,
+    required String newPassword,
+  }) async {
+    await _remoteDataSource.resetAccountantPassword(
+      accountantId: accountantId,
+      userId: userId,
+      newPassword: newPassword,
     );
   }
 

@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/services/audit_logging_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/dc_operations_officer.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
@@ -39,11 +41,50 @@ class _DCOnboardOperationsOfficerModalState
   String _selectedRole = 'dc_operations';
   DCOperationsOfficer? _createdOfficer;
 
+  bool _canManageOtherDcs() {
+    final user = ref.read(authProvider).user;
+    if (user == null) return false;
+    final isSuperAdmin = user.isSuperAdmin || user.role == 'super_admin' || user.role == 'admin';
+    if (isSuperAdmin) return true;
+
+    final userDcId = user.distributionCenterId;
+    if (userDcId == null || userDcId.isEmpty) return false;
+
+    final dcState = ref.read(dcConsoleProvider);
+    final userDc = dcState.distributionCenters.firstWhere(
+      (d) => d.id == userDcId || d.code == userDcId,
+      orElse: () => defaultDistributionCenters.firstWhere(
+        (d) => d.id == userDcId || d.code == userDcId,
+        orElse: () => DistributionCenter(
+          id: userDcId,
+          code: '',
+          name: '',
+          state: '',
+          city: '',
+          address: '',
+          isGrandDc: userDcId == '22222222-2222-4222-8222-222222222222',
+        ),
+      ),
+    );
+
+    final isUserFromGrandDc = userDc.isGrandDc ||
+        userDcId == '22222222-2222-4222-8222-222222222222' ||
+        userDc.code == 'DC-CMD-01' ||
+        userDc.name.toLowerCase().contains('central command');
+
+    final isDcAdminOrManager = user.role == 'dc_admin' || user.role == 'dc_manager' || user.isDcManager == true;
+    return isDcAdminOrManager && isUserFromGrandDc;
+  }
+
   @override
   void initState() {
     super.initState();
     final dcState = ref.read(dcConsoleProvider);
-    _selectedDcId = widget.preselectedDc?.id ?? dcState.activeHubId;
+    final canManageOthers = _canManageOtherDcs();
+    final user = ref.read(authProvider).user;
+    _selectedDcId = canManageOthers
+        ? (widget.preselectedDc?.id ?? dcState.activeHubId)
+        : (user?.distributionCenterId ?? dcState.activeHubId);
 
     // Generate strong default password
     _generatePassword();
@@ -60,10 +101,65 @@ class _DCOnboardOperationsOfficerModalState
     setState(() {});
   }
 
+  String _getRoleTitle(String role) {
+    switch (role) {
+      case 'dc_manager':
+        return 'General Distribution Manager (DC Admin)';
+      case 'dc_stock_admin':
+        return 'Stock & Inventory Admin';
+      case 'dc_finance_admin':
+        return 'Station Finance Admin';
+      case 'general_accountant':
+        return 'General Accountant';
+      default:
+        return 'Distribution Center Operations Officer';
+    }
+  }
+
+  String _getPortalRoute(String role) {
+    switch (role) {
+      case 'dc_manager':
+        return '/dc';
+      case 'dc_stock_admin':
+        return '/stock-ops';
+      case 'dc_finance_admin':
+        return '/finance-ops';
+      case 'general_accountant':
+        return '/accountant';
+      default:
+        return '/ops (Strictly Mobile)';
+    }
+  }
+
+  String _getRoleScope(String role) {
+    switch (role) {
+      case 'dc_manager':
+        return 'Full DC Operations, Admin User Creation & Distribution Management';
+      case 'dc_stock_admin':
+        return 'Stock Reconciliation & Hub Inventory Management';
+      case 'dc_finance_admin':
+        return 'COD Remittances, Station Cashflow & Reconciliation';
+      case 'general_accountant':
+        return 'National Audits, Ledger Entries & Financial Reports';
+      default:
+        return 'Live Incoming Order Routing & Dispatch Only (Strictly Mobile)';
+    }
+  }
+
   void _generateStaffCode([String? hubCode]) {
-    final prefix = (hubCode != null && hubCode.isNotEmpty)
-        ? hubCode.replaceAll('DC-', 'OPS-')
-        : 'OPS';
+    final baseHub = (hubCode != null && hubCode.isNotEmpty) ? hubCode.replaceAll('DC-', '') : 'HUB';
+    String prefix;
+    if (_selectedRole == 'dc_manager') {
+      prefix = 'MGR-$baseHub';
+    } else if (_selectedRole == 'dc_stock_admin') {
+      prefix = 'STK-$baseHub';
+    } else if (_selectedRole == 'dc_finance_admin') {
+      prefix = 'FIN-$baseHub';
+    } else if (_selectedRole == 'general_accountant') {
+      prefix = 'ACC-$baseHub';
+    } else {
+      prefix = 'OPS-$baseHub';
+    }
     final rand = 100 + math.Random().nextInt(899);
     _staffCodeController.text = '$prefix-$rand';
     setState(() {});
@@ -83,10 +179,12 @@ class _DCOnboardOperationsOfficerModalState
 
   DistributionCenter? _getSelectedDc() {
     final dcState = ref.read(dcConsoleProvider);
-    final targetId = _selectedDcId ?? dcState.activeHubId;
-    return dcState.distributionCenters.where((d) => d.id == targetId).firstOrNull ??
-        dcState.distributionCenters.where((d) => d.isGrandDc).firstOrNull ??
-        dcState.distributionCenters.firstOrNull;
+    final canManageOthers = _canManageOtherDcs();
+    final targetId = canManageOthers
+        ? (_selectedDcId ?? dcState.activeHubId)
+        : dcState.activeHubId;
+    return dcState.distributionCenters.where((d) => d.id == targetId || d.code == targetId).firstOrNull ??
+        dcState.activeHub;
   }
 
   Future<void> _submitForm() async {
@@ -102,8 +200,11 @@ class _DCOnboardOperationsOfficerModalState
       final phone = _phoneController.text.trim();
       final password = _passwordController.text.trim();
       final staffCode = _staffCodeController.text.trim().toUpperCase();
+      final canManageOthers = _canManageOtherDcs();
       final selectedDc = _getSelectedDc();
-      final dcId = selectedDc?.id ?? ref.read(dcConsoleProvider).activeHubId;
+      final dcId = canManageOthers
+          ? (selectedDc?.id ?? ref.read(dcConsoleProvider).activeHubId)
+          : ref.read(dcConsoleProvider).activeHubId;
       final assignedZone = _assignedZoneController.text.trim().isNotEmpty
           ? _assignedZoneController.text.trim()
           : (selectedDc?.name ?? 'Main Terminal');
@@ -118,6 +219,35 @@ class _DCOnboardOperationsOfficerModalState
             assignedZone: assignedZone,
             role: _selectedRole,
           );
+
+      // Record immutable audit log attributing the actual logged-in DC Admin
+      final currentUser = ref.read(authProvider).user;
+      final roleTitle = _getRoleTitle(_selectedRole);
+      final isCoManager = _selectedRole == 'dc_manager';
+
+      await AuditLoggingService.instance.logAction(
+        actorId: currentUser?.id ?? currentUser?.authUserId,
+        actorName: (currentUser != null && (currentUser.firstName.isNotEmpty || currentUser.lastName.isNotEmpty))
+            ? '${currentUser.firstName} ${currentUser.lastName}'.trim()
+            : (currentUser?.email ?? 'Distribution Center Supervisor'),
+        actorEmail: currentUser?.email ?? 'dc.manager@novaxpress.ng',
+        actorRole: currentUser?.role ?? 'dc_manager',
+        action: isCoManager ? 'CREATE_DC_ADMIN' : 'CREATE_ADMIN_USER',
+        resource: 'USER_ROSTER',
+        details: 'Onboarded $roleTitle "$fullName" ($email, Staff Code: $staffCode) for ${selectedDc?.name ?? 'DC Hub'}.',
+        distributionCenterId: dcId,
+        distributionCenterName: selectedDc?.name ?? ref.read(dcConsoleProvider).activeHubName,
+        metadata: {
+          'officer_name': fullName,
+          'officer_email': email,
+          'officer_phone': phone,
+          'officer_code': staffCode,
+          'assigned_role': _selectedRole,
+          'assigned_zone': assignedZone,
+          'distribution_center_id': dcId,
+          'created_by': currentUser?.email ?? 'dc.admin@novaxpress.ng',
+        },
+      );
 
       if (mounted) {
         setState(() {
@@ -151,22 +281,24 @@ class _DCOnboardOperationsOfficerModalState
     }
 
     final targetDc = _getSelectedDc();
-    final message = '''*NovaXpress DC Operations Portal - Login Credentials*
+    final roleTitle = _getRoleTitle(officer.role);
+    final portalRoute = _getPortalRoute(officer.role);
+    final scope = _getRoleScope(officer.role);
+
+    final message = '''*NovaXpress Operations Portal - Login Credentials*
 ----------------------------------------
 Hello ${officer.name},
-You have been onboarded as a *Distribution Center Operations Officer* at *${targetDc?.name ?? 'NovaXpress DC'}*.
+You have been onboarded as *$roleTitle* at *${targetDc?.name ?? 'NovaXpress DC'}*.
 
 *Your Login Details:*
-📱 *Mobile Portal:* Access from your smartphone browser or mobile app
+📱 *Portal Route:* $portalRoute
 👤 *Staff Code:* ${officer.staffCode}
 📧 *Email:* ${officer.email}
 🔑 *Password:* ${officer.rawPassword ?? 'Provided by your DC Supervisor'}
 🏢 *Assigned DC:* ${targetDc?.name ?? 'Terminal Hub'}
 
 *Access Scope:*
-• Live incoming DC order monitoring
-• Direct rider order dispatching
-• DC-to-DC order rerouting
+• $scope
 
 _Please login immediately and change your password upon first entry._
 ----------------------------------------
@@ -194,15 +326,20 @@ _Please login immediately and change your password upon first entry._
 
   void _copyCredentials(DCOperationsOfficer officer) {
     final targetDc = _getSelectedDc();
-    final text = '''NovaXpress DC Operations Officer Credentials
+    final roleTitle = _getRoleTitle(officer.role);
+    final portalRoute = _getPortalRoute(officer.role);
+    final scope = _getRoleScope(officer.role);
+
+    final text = '''NovaXpress Staff Credentials
 ----------------------------------------
 Officer Name: ${officer.name}
+Role: $roleTitle
 Staff Code: ${officer.staffCode}
 Email: ${officer.email}
 Password: ${officer.rawPassword ?? ''}
 Assigned DC: ${targetDc?.name ?? 'Assigned Station'}
-Portal Route: /ops (Strictly Mobile)
-Scope: Incoming Order Routing & Dispatch Only
+Portal Route: $portalRoute
+Scope: $scope
 ----------------------------------------''';
 
     Clipboard.setData(ClipboardData(text: text));
@@ -437,55 +574,120 @@ Scope: Incoming Order Routing & Dispatch Only
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                                  ),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _selectedDcId,
-                                    isExpanded: true,
-                                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                    items: dcState.distributionCenters.map((dc) {
-                                      return DropdownMenuItem<String>(
-                                        value: dc.id,
+                              Builder(
+                                builder: (context) {
+                                  final canManageOthers = _canManageOtherDcs();
+                                  final currentDc = _getSelectedDc() ?? dcState.activeHub;
+
+                                  return canManageOthers
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                                        ),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<String>(
+                                          value: _selectedDcId,
+                                          isExpanded: true,
+                                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                          items: dcState.distributionCenters.map((dc) {
+                                            return DropdownMenuItem<String>(
+                                              value: dc.id,
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    dc.isGrand ? Icons.domain_rounded : Icons.warehouse_rounded,
+                                                    size: 16,
+                                                    color: dc.isGrand ? const Color(0xFFF37021) : const Color(0xFF0D9488),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      '${dc.name} (${dc.code})',
+                                                      style: GoogleFonts.inter(fontSize: 13),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }).toList(),
+                                          onChanged: (val) {
+                                            if (val != null) {
+                                              setState(() {
+                                                _selectedDcId = val;
+                                                final dc = dcState.distributionCenters.where((d) => d.id == val).firstOrNull;
+                                                if (dc != null) {
+                                                  _generateStaffCode(dc.code);
+                                                }
+                                              });
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    )
+                                  : Tooltip(
+                                      message: 'Staff creation is strictly scoped to this Distribution Center.',
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                                          ),
+                                        ),
                                         child: Row(
                                           children: [
-                                            Icon(
-                                              dc.isGrand ? Icons.domain_rounded : Icons.warehouse_rounded,
+                                            const Icon(
+                                              Icons.warehouse_rounded,
                                               size: 16,
-                                              color: dc.isGrand ? const Color(0xFFF37021) : const Color(0xFF0D9488),
+                                              color: Color(0xFF0D9488),
                                             ),
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
-                                                '${dc.name} (${dc.code})',
-                                                style: GoogleFonts.inter(fontSize: 13),
+                                                '${currentDc.name} (${currentDc.code})',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                ),
                                                 overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.lock_rounded, size: 10, color: Color(0xFF0D9488)),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    'LOCKED',
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: const Color(0xFF0D9488),
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ],
                                         ),
-                                      );
-                                    }).toList(),
-                                    onChanged: (val) {
-                                      if (val != null) {
-                                        setState(() {
-                                          _selectedDcId = val;
-                                          final dc = dcState.distributionCenters.where((d) => d.id == val).firstOrNull;
-                                          if (dc != null) {
-                                            _generateStaffCode(dc.code);
-                                          }
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ),
+                                      ),
+                                    );
+                                },
                               ),
                             ],
                           ),
@@ -529,6 +731,21 @@ Scope: Incoming Order Routing & Dispatch Only
                               isExpanded: true,
                               dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                               items: const [
+                                DropdownMenuItem(
+                                  value: 'dc_manager',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.apartment_rounded, size: 16, color: Color(0xFFF37021)),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'General Distribution Manager / DC Admin (/dc)',
+                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                                 DropdownMenuItem(
                                   value: 'dc_operations',
                                   child: Row(
@@ -592,7 +809,11 @@ Scope: Incoming Order Routing & Dispatch Only
                               ],
                               onChanged: (val) {
                                 if (val != null) {
-                                  setState(() => _selectedRole = val);
+                                  setState(() {
+                                    _selectedRole = val;
+                                    final selectedDc = _getSelectedDc();
+                                    _generateStaffCode(selectedDc?.code);
+                                  });
                                 }
                               },
                             ),
@@ -821,13 +1042,14 @@ Scope: Incoming Order Routing & Dispatch Only
                 child: Column(
                   children: [
                     _buildSlipRow('Officer Name:', officer.name, isBold: true),
+                    _buildSlipRow('Assigned Role:', _getRoleTitle(officer.role), isBold: true, isHighlight: officer.role == 'dc_manager'),
                     _buildSlipRow('Staff / Officer Code:', officer.staffCode, isCode: true),
                     _buildSlipRow('Distribution Center:', targetDc?.name ?? 'Assigned Station'),
-                    _buildSlipRow('Operational Scope:', 'Live Orders & Rider Routing (Strictly Mobile)'),
+                    _buildSlipRow('Operational Scope:', _getRoleScope(officer.role)),
                     const Divider(height: 20),
-                    _buildSlipRow('Mobile Login Email:', officer.email, isCode: true),
+                    _buildSlipRow('Login Email:', officer.email, isCode: true),
                     _buildSlipRow('Temporary Password:', officer.rawPassword ?? '********', isCode: true, isHighlight: true),
-                    _buildSlipRow('Direct Route:', '/ops', isCode: true),
+                    _buildSlipRow('Direct Route:', _getPortalRoute(officer.role), isCode: true),
                   ],
                 ),
               ),

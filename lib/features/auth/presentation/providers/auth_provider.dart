@@ -388,6 +388,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
             }
           }
 
+          // Update client_accountants table for accountant profiles
+          if (currentUser.isMerchantAccountant || currentUser.role == 'merchant_accountant' || currentUser.accountantCode != null) {
+            try {
+              final accountantUpdateData = <String, dynamic>{
+                'full_name': '$firstName $lastName'.trim(),
+                'phone': phone,
+                'updated_at': DateTime.now().toIso8601String(),
+                'avatar_url': cleanAvatar,
+              };
+              if (currentUser.accountantCode != null && currentUser.accountantCode!.isNotEmpty) {
+                await serviceDb
+                    .from('client_accountants')
+                    .update(accountantUpdateData)
+                    .eq('accountant_code', currentUser.accountantCode!);
+              } else if (currentUser.email.isNotEmpty) {
+                await serviceDb
+                    .from('client_accountants')
+                    .update(accountantUpdateData)
+                    .ilike('email', currentUser.email.trim());
+              }
+              debugPrint('[AUTH_PROVIDER] ✅ client_accountants table updated for accountant: ${currentUser.accountantCode}');
+            } catch (accErr) {
+              debugPrint('[AUTH_PROVIDER] ⚠️ client_accountants table update notice: $accErr');
+            }
+          }
+
           // Update clients table for merchant profiles
           if (currentUser.isClientAdmin || currentUser.clientId != null) {
             try {
@@ -490,6 +516,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           clientCompanyName: currentUser.clientCompanyName,
           closerId: currentUser.closerId,
           closerCode: currentUser.closerCode,
+          marketerId: currentUser.marketerId,
+          marketerCode: currentUser.marketerCode,
+          accountantId: currentUser.accountantId,
+          accountantCode: currentUser.accountantCode,
           avatarUrl: cleanAvatar,
         );
 
@@ -508,6 +538,87 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       debugPrint('[AUTH_PROVIDER] ❌ updateProfile error: $e');
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  /// Toggles or sets the rider availability / duty status
+  Future<bool> updateRiderAvailability(bool isAvailable) async {
+    try {
+      final currentUser = state.user;
+      if (currentUser == null) return false;
+
+      final newStatus = isAvailable ? 'available' : 'offline';
+      final updatedUser = currentUser.copyWith(agentStatus: newStatus);
+
+      // 1. Update state immediately for instant, fluid UI responsiveness
+      state = state.copyWith(user: updatedUser);
+
+      // 2. Cache in local storage
+      final userModel = UserModel(
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+        companyId: updatedUser.companyId,
+        deliveryAgentId: updatedUser.deliveryAgentId,
+        deliveryAgentCode: updatedUser.deliveryAgentCode,
+        distributionCenterId: updatedUser.distributionCenterId,
+        distributionCenterName: updatedUser.distributionCenterName,
+        lifetimeDeliveriesCount: updatedUser.lifetimeDeliveriesCount,
+        rating: updatedUser.rating,
+        personnelType: updatedUser.personnelType,
+        compensationType: updatedUser.compensationType,
+        commissionRate: updatedUser.commissionRate,
+        transportAllowance: updatedUser.transportAllowance,
+        fuelAllowance: updatedUser.fuelAllowance,
+        failedDeliveryAllowance: updatedUser.failedDeliveryAllowance,
+        baseSalary: updatedUser.baseSalary,
+        vehicleType: updatedUser.vehicleType,
+        vehiclePlateNumber: updatedUser.vehiclePlateNumber,
+        operatingState: updatedUser.operatingState,
+        operatingCity: updatedUser.operatingCity,
+        bankName: updatedUser.bankName,
+        bankAccountNumber: updatedUser.bankAccountNumber,
+        bankAccountName: updatedUser.bankAccountName,
+        agentStatus: newStatus,
+        clientId: updatedUser.clientId,
+        clientCompanyName: updatedUser.clientCompanyName,
+        closerId: updatedUser.closerId,
+        closerCode: updatedUser.closerCode,
+        marketerId: updatedUser.marketerId,
+        marketerCode: updatedUser.marketerCode,
+        accountantId: updatedUser.accountantId,
+        accountantCode: updatedUser.accountantCode,
+        avatarUrl: updatedUser.avatarUrl,
+        isSupervisor: updatedUser.isSupervisor,
+      );
+
+      await localStorageService?.cacheUserProfile(userModel.toJson());
+
+      // 3. Register in AuthRemoteDataSource memory store
+      AuthRemoteDataSourceImpl.registerUserInMemory(userModel);
+
+      // 4. Update Supabase remote DB asynchronously (non-blocking)
+      try {
+        final client = Supabase.instance.client;
+        final agentId = currentUser.deliveryAgentId ?? currentUser.id;
+        final dbStatus = isAvailable ? 'active' : 'offline';
+        if (agentId.isNotEmpty) {
+          await client.from('delivery_agents').update({'current_status': dbStatus}).or('id.eq.$agentId,agent_code.eq.${currentUser.deliveryAgentCode}');
+        }
+        if (currentUser.id.isNotEmpty) {
+          await client.from('users').update({'current_status': newStatus}).eq('id', currentUser.id);
+        }
+      } catch (dbErr) {
+        debugPrint('[AUTH_PROVIDER] ℹ️ Remote availability sync notice ($dbErr). Local state updated.');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('[AUTH_PROVIDER] ❌ updateRiderAvailability error: $e');
       return false;
     }
   }

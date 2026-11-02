@@ -85,9 +85,10 @@ class ChatUserProfileCardModal extends ConsumerWidget {
         onMention: onMention != null
             ? () {
                 Navigator.of(ctx).pop();
-                final insertTag = resolved.code != null && resolved.code!.isNotEmpty
-                    ? '@${resolved.code}'
-                    : '@${resolved.name.split(' ').first}';
+                final insertTag =
+                    resolved.code != null && resolved.code!.isNotEmpty
+                        ? '@${resolved.code}'
+                        : '@${resolved.name.split(' ').first}';
                 onMention(insertTag);
               }
             : null,
@@ -118,8 +119,13 @@ class ChatUserProfileCardModal extends ConsumerWidget {
       }
     }
 
-    if (matchedCloser != null || cleanTag.contains('closer') || (conv?.closerName != null && conv!.closerName!.isNotEmpty && cleanTag.contains(conv.closerName!.toLowerCase()))) {
-      final name = matchedCloser?.fullName ?? conv?.closerName ?? 'Telesales Closer';
+    if (matchedCloser != null ||
+        cleanTag.contains('closer') ||
+        (conv?.closerName != null &&
+            conv!.closerName!.isNotEmpty &&
+            cleanTag.contains(conv.closerName!.toLowerCase()))) {
+      final name =
+          matchedCloser?.fullName ?? conv?.closerName ?? 'Telesales Closer';
       final code = matchedCloser?.closerCode ?? 'CLS-NOVA';
       final phone = matchedCloser?.phone ?? '0800-NOVA-CLOSER';
       final email = matchedCloser?.email;
@@ -153,8 +159,13 @@ class ChatUserProfileCardModal extends ConsumerWidget {
       }
     }
 
-    if (matchedMarketer != null || cleanTag.contains('marketer') || (conv?.marketerName != null && conv!.marketerName!.isNotEmpty && cleanTag.contains(conv.marketerName!.toLowerCase()))) {
-      final name = matchedMarketer?.fullName ?? conv?.marketerName ?? 'Digital Marketer';
+    if (matchedMarketer != null ||
+        cleanTag.contains('marketer') ||
+        (conv?.marketerName != null &&
+            conv!.marketerName!.isNotEmpty &&
+            cleanTag.contains(conv.marketerName!.toLowerCase()))) {
+      final name =
+          matchedMarketer?.fullName ?? conv?.marketerName ?? 'Digital Marketer';
       final code = matchedMarketer?.marketerCode ?? 'MKT-GROWTH';
       final phone = matchedMarketer?.phone ?? '0800-MKT-ADS';
       final email = matchedMarketer?.email;
@@ -182,11 +193,13 @@ class ChatUserProfileCardModal extends ConsumerWidget {
         cleanTag.contains('abigail') ||
         cleanTag.contains('wuse') ||
         cleanTag.contains('garki')) {
-      final dcName = conv?.distributionCenterName ?? order?.distributionCenterName ?? 'Wuse Grand Central Distribution Center';
+      final dcName = conv?.distributionCenterName ??
+          order?.distributionCenterName ??
+          'Central Command Distribution Center';
       return ChatUserProfileData(
         id: conv?.distributionCenterId ?? 'dc-operations',
         name: 'DC Operations Control',
-        code: 'OPS-WUSE-01',
+        code: 'OPS-CMD-01',
         phone: '0812-400-3321',
         email: 'operations@novaxpress.net',
         avatarUrl: null,
@@ -195,7 +208,8 @@ class ChatUserProfileCardModal extends ConsumerWidget {
         roleColor: const Color(0xFF6366F1), // Indigo
         location: dcName,
         orderReference: conv?.orderNumber ?? order?.orderNumber,
-        notes: 'Manages physical warehouse intake, bin storage, and courier dispatch routing.',
+        notes:
+            'Manages physical warehouse intake, bin storage, and courier dispatch routing.',
       );
     }
 
@@ -205,8 +219,11 @@ class ChatUserProfileCardModal extends ConsumerWidget {
         cleanTag.contains('driver') ||
         cleanTag.contains('agent') ||
         cleanTag.contains('musa') ||
-        (conv?.deliveryAgentName != null && cleanTag.contains(conv!.deliveryAgentName!.toLowerCase()))) {
-      final riderName = conv?.deliveryAgentName ?? order?.deliveryAgentName ?? 'Assigned Dispatch Courier';
+        (conv?.deliveryAgentName != null &&
+            cleanTag.contains(conv!.deliveryAgentName!.toLowerCase()))) {
+      final riderName = conv?.deliveryAgentName ??
+          order?.deliveryAgentName ??
+          'Assigned Dispatch Courier';
       final riderPhone = order?.deliveryAgentPhone ?? '0809-555-RIDER';
       return ChatUserProfileData(
         id: conv?.deliveryAgentId ?? 'rider-agent-id',
@@ -218,29 +235,43 @@ class ChatUserProfileCardModal extends ConsumerWidget {
         role: ParticipantRole.rider,
         roleLabel: 'Dispatch Courier',
         roleColor: const Color(0xFFF59E0B), // Amber
-        location: (order?.deliveryState != null && order!.deliveryState.isNotEmpty)
-            ? '${order.deliveryCity}, ${order.deliveryState}'
-            : 'Abuja Metro PDA Routing',
+        location:
+            (order?.deliveryState != null && order!.deliveryState.isNotEmpty)
+                ? '${order.deliveryCity}, ${order.deliveryState}'
+                : 'Abuja Metro PDA Routing',
         orderReference: conv?.orderNumber ?? order?.orderNumber,
-        notes: 'Equipped with PDA mobile terminal for cash collection and proof-of-delivery.',
+        notes:
+            'Equipped with PDA mobile terminal for cash collection and proof-of-delivery.',
       );
     }
 
     // 5. Check Client / Merchant match
-    final clientName = conv?.clientName ?? portalState.clientProfile.companyName;
+    final clientName =
+        conv?.clientName ?? portalState.clientProfile.companyName;
     return ChatUserProfileData(
       id: conv?.clientId ?? portalState.clientProfile.id,
-      name: clientName.isNotEmpty ? clientName : (authUser?.clientCompanyName ?? 'Merchant Account'),
-      code: portalState.clientProfile.code.isNotEmpty ? portalState.clientProfile.code : 'MERCHANT',
-      phone: portalState.clientProfile.phone.isNotEmpty ? portalState.clientProfile.phone : (authUser?.phone ?? '0800-NOVACARE'),
-      email: portalState.clientProfile.email.isNotEmpty ? portalState.clientProfile.email : authUser?.email,
+      name: clientName.isNotEmpty
+          ? clientName
+          : (authUser?.clientCompanyName ?? 'Merchant Account'),
+      code: portalState.clientProfile.code.isNotEmpty
+          ? portalState.clientProfile.code
+          : 'MERCHANT',
+      phone: portalState.clientProfile.phone.isNotEmpty
+          ? portalState.clientProfile.phone
+          : (authUser?.phone ?? '0800-NOVACARE'),
+      email: portalState.clientProfile.email.isNotEmpty
+          ? portalState.clientProfile.email
+          : authUser?.email,
       avatarUrl: portalState.clientProfile.logoUrl,
       role: ParticipantRole.client,
       roleLabel: 'Merchant Executive',
       roleColor: const Color(0xFF0D9488), // Teal
-      location: portalState.clientProfile.address.isNotEmpty ? portalState.clientProfile.address : 'Corporate Head Office',
+      location: portalState.clientProfile.address.isNotEmpty
+          ? portalState.clientProfile.address
+          : 'Corporate Head Office',
       orderReference: conv?.orderNumber ?? order?.orderNumber,
-      notes: 'Merchant brand owner managing products, inventory batches, and settlements.',
+      notes:
+          'Merchant brand owner managing products, inventory batches, and settlements.',
     );
   }
 
@@ -366,7 +397,8 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                         avatarUrl: profile.avatarUrl,
                         fullName: profile.name,
                         radius: 28,
-                        backgroundColor: profile.roleColor.withValues(alpha: 0.2),
+                        backgroundColor:
+                            profile.roleColor.withValues(alpha: 0.2),
                         textColor: profile.roleColor,
                       ),
                       Container(
@@ -376,7 +408,8 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                           color: const Color(0xFF10B981),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            color:
+                                isDark ? const Color(0xFF0F172A) : Colors.white,
                             width: 2.5,
                           ),
                         ),
@@ -395,7 +428,8 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            color:
+                                isDark ? Colors.white : const Color(0xFF0F172A),
                             letterSpacing: -0.3,
                           ),
                           maxLines: 1,
@@ -405,7 +439,8 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2.5),
                               decoration: BoxDecoration(
                                 color: profile.roleColor,
                                 borderRadius: BorderRadius.circular(6),
@@ -420,14 +455,17 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                                 ),
                               ),
                             ),
-                            if (profile.code != null && profile.code!.isNotEmpty) ...[
+                            if (profile.code != null &&
+                                profile.code!.isNotEmpty) ...[
                               const SizedBox(width: 6),
                               Text(
                                 profile.code!,
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
                                 ),
                               ),
                             ],
@@ -441,7 +479,9 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close_rounded, size: 20),
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B),
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
@@ -464,9 +504,11 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                         icon: const Icon(Icons.copy_rounded, size: 16),
                         color: const Color(0xFF94A3B8),
                         onPressed: () {
-                          Clipboard.setData(ClipboardData(text: profile.phone!));
+                          Clipboard.setData(
+                              ClipboardData(text: profile.phone!));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Phone copied to clipboard!')),
+                            const SnackBar(
+                                content: Text('Phone copied to clipboard!')),
                           );
                         },
                       ),
@@ -486,7 +528,8 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                     const SizedBox(height: 8),
                   ],
 
-                  if (profile.location != null && profile.location!.isNotEmpty) ...[
+                  if (profile.location != null &&
+                      profile.location!.isNotEmpty) ...[
                     _buildInfoTile(
                       icon: Icons.storefront_outlined,
                       iconColor: const Color(0xFF8B5CF6),
@@ -502,10 +545,14 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
                         ),
                       ),
                       child: Row(
@@ -522,7 +569,9 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                               profile.notes!,
                               style: GoogleFonts.inter(
                                 fontSize: 11.5,
-                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : const Color(0xFF475569),
                                 height: 1.35,
                               ),
                             ),
@@ -558,7 +607,8 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                         icon: const Icon(Icons.call_rounded, size: 18),
                         label: Text(
                           'Call Direct',
-                          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                          style: GoogleFonts.inter(
+                              fontSize: 13, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -576,11 +626,13 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                           ),
                           elevation: 0,
                         ),
-                        onPressed: () => _launchWhatsApp(context, profile.phone!, profile.name),
+                        onPressed: () => _launchWhatsApp(
+                            context, profile.phone!, profile.name),
                         icon: const Icon(Icons.chat_bubble_rounded, size: 18),
                         label: Text(
                           'WhatsApp',
-                          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                          style: GoogleFonts.inter(
+                              fontSize: 13, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -593,17 +645,22 @@ class ChatUserProfileCardModal extends ConsumerWidget {
                       message: 'Tag in chat',
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: profile.roleColor.withValues(alpha: 0.15),
+                          backgroundColor:
+                              profile.roleColor.withValues(alpha: 0.15),
                           foregroundColor: profile.roleColor,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 13),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: profile.roleColor.withValues(alpha: 0.3)),
+                            side: BorderSide(
+                                color:
+                                    profile.roleColor.withValues(alpha: 0.3)),
                           ),
                           elevation: 0,
                         ),
                         onPressed: onMention,
-                        child: const Icon(Icons.alternate_email_rounded, size: 18),
+                        child:
+                            const Icon(Icons.alternate_email_rounded, size: 18),
                       ),
                     ),
                   ],

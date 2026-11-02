@@ -248,13 +248,38 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
       });
     }
 
-    // 2. DC Operations
+    // 2. DC Operations & Operational Staff
+    final dcTitle = conv?.distributionCenterName ?? 'Central Command DC';
     list.add({
-      'name': conv?.distributionCenterName ?? 'DC Operations Hub',
-      'role': 'Distribution Center',
+      'name': '$dcTitle Operations',
+      'role': 'DC Command & Dispatch Desk',
       'tag': '@Operations',
       'color': const Color(0xFF6366F1),
       'icon': Icons.corporate_fare_rounded,
+      'avatarUrl': null,
+    });
+    list.add({
+      'name': 'DC Fleet Dispatcher',
+      'role': 'Fleet Routing & Dispatch Officer',
+      'tag': '@Dispatch',
+      'color': const Color(0xFF6366F1),
+      'icon': Icons.alt_route_rounded,
+      'avatarUrl': null,
+    });
+    list.add({
+      'name': 'DC Warehouse / Stock Desk',
+      'role': 'DC Inventory & Stock Fulfillment',
+      'tag': '@Warehouse',
+      'color': const Color(0xFF6366F1),
+      'icon': Icons.inventory_2_rounded,
+      'avatarUrl': null,
+    });
+    list.add({
+      'name': 'DC Station Accountant',
+      'role': 'DC Finance & Remittance Desk',
+      'tag': '@Finance',
+      'color': const Color(0xFF6366F1),
+      'icon': Icons.account_balance_wallet_rounded,
       'avatarUrl': null,
     });
 
@@ -682,6 +707,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
           // Product & Dispatch Status Banner
           if (conv != null) _buildOrderInfoBanner(context, conv, isDark),
+          if (conv != null) _buildParticipantsBar(context, conv, isDark),
 
           // Chat Messages Body
           Expanded(
@@ -1140,6 +1166,158 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildParticipantsBar(BuildContext context, OrderConversationEntity conv, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.hub_rounded, size: 12, color: Color(0xFF6366F1)),
+                const SizedBox(width: 4),
+                Text(
+                  'ACTIVE PIPELINE:',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 8),
+
+            // 1. DC Operations Chip (Always Connected)
+            _buildParticipantChip(
+              icon: Icons.corporate_fare_rounded,
+              label: 'DC Operations',
+              color: const Color(0xFF6366F1),
+              isDark: isDark,
+              hasBeacon: true,
+              onTap: () => _appendMentionTag('@Operations'),
+              tooltip: 'DC Operations Hub is actively in this room. Tap to tag @Operations',
+            ),
+            const SizedBox(width: 6),
+
+            // 2. Rider Chip
+            if (conv.deliveryAgentName != null && conv.deliveryAgentName!.trim().isNotEmpty) ...[
+              _buildParticipantChip(
+                icon: Icons.two_wheeler_rounded,
+                label: 'Rider: ${conv.deliveryAgentName!.trim()}',
+                color: const Color(0xFFF59E0B),
+                isDark: isDark,
+                onTap: () => _appendMentionTag('@${conv.deliveryAgentName!.trim()}'),
+                tooltip: 'Tap to tag rider @${conv.deliveryAgentName!.trim()}',
+              ),
+              const SizedBox(width: 6),
+            ] else ...[
+              _buildParticipantChip(
+                icon: Icons.two_wheeler_rounded,
+                label: 'Field Courier',
+                color: const Color(0xFFF59E0B),
+                isDark: isDark,
+                onTap: () => _appendMentionTag('@Rider'),
+                tooltip: 'Tap to tag @Rider',
+              ),
+              const SizedBox(width: 6),
+            ],
+
+            // 3. Closer Chip
+            if (conv.closerName != null && conv.closerName!.trim().isNotEmpty) ...[
+              _buildParticipantChip(
+                icon: Icons.headset_mic_rounded,
+                label: 'Closer: ${conv.closerName!.trim()}',
+                color: const Color(0xFF8B5CF6),
+                isDark: isDark,
+                onTap: () => _appendMentionTag('@${conv.closerName!.trim()}'),
+                tooltip: 'Tap to tag closer @${conv.closerName!.trim()}',
+              ),
+              const SizedBox(width: 6),
+            ],
+
+            // 4. Merchant Brand Chip
+            _buildParticipantChip(
+              icon: Icons.storefront_rounded,
+              label: 'Merchant: ${conv.clientName.trim()}',
+              color: const Color(0xFF0D9488),
+              isDark: isDark,
+              onTap: () => _appendMentionTag('@Client'),
+              tooltip: 'Tap to tag @Client (${conv.clientName.trim()})',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildParticipantChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required bool isDark,
+    bool hasBeacon = false,
+    required VoidCallback onTap,
+    required String tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: isDark ? 0.16 : 0.09),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: color.withValues(alpha: isDark ? 0.35 : 0.25),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (hasBeacon) ...[
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF10B981),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+              ],
+              Icon(icon, size: 12, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

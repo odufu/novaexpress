@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_driver_manifest_table.dart';
 import '../widgets/dc_onboard_rider_modal.dart';
@@ -21,6 +22,7 @@ class DCRidersPage extends ConsumerWidget {
     final pdaCount = dcDrivers.where((d) => d.isPda).length;
     final inHouseCount = dcDrivers.where((d) => d.isInHouseRider).length;
     final activeCount = dcDrivers.where((d) => d.isActive).length;
+    final unavailableCount = dcDrivers.where((d) => d.isUnavailable).length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -31,36 +33,37 @@ class DCRidersPage extends ConsumerWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final isMobile = constraints.maxWidth < 650;
-              final headerContent = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              final headerContent = Row(
                 children: [
                   Text(
-                    'Riders & Delivery Fleet Control',
+                    'Fleet',
                     style: GoogleFonts.inter(
                       fontSize: isMobile ? 18 : 22,
                       fontWeight: FontWeight.bold,
                       color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Onboard and manage PDAs & in-house riders with custom commission and transport agreements (BR-010 to BR-015)',
-                    style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                  const SizedBox(width: 8),
+                  const NovaInfoIcon(
+                    message: 'Onboard and manage PDAs & in-house riders with custom commission and transport agreements.',
                   ),
                 ],
               );
 
-              final actionButton = ElevatedButton.icon(
-                onPressed: () => DCOnboardRiderModal.show(context),
-                icon: const Icon(Icons.person_add_alt_1_rounded, size: 18, color: Colors.white),
-                label: const Text(
-                  'Onboard Delivery Agent',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF031632),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              final actionButton = NovaTooltip(
+                message: 'Register a new PDA or in-house delivery rider',
+                child: ElevatedButton.icon(
+                  onPressed: () => DCOnboardRiderModal.show(context),
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 17, color: Colors.white),
+                  label: const Text(
+                    'Onboard',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF031632),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               );
 
@@ -107,9 +110,9 @@ class DCRidersPage extends ConsumerWidget {
                   SizedBox(
                     width: cardWidth,
                     child: _buildPersonnelTypeSummaryCard(
-                      title: 'PDA Agents (Personal Transport)',
-                      count: '$pdaCount Agents',
-                      subtext: 'Carries client inventory • ₦1,000 avg comm.',
+                      title: 'PDAs',
+                      count: '$pdaCount',
+                      tooltip: 'Contract PDA Agents • Personal transport • ₦1,000 average drop commission',
                       icon: Icons.two_wheeler_rounded,
                       color: const Color(0xFFF37021),
                       isDark: isDark,
@@ -118,9 +121,9 @@ class DCRidersPage extends ConsumerWidget {
                   SizedBox(
                     width: cardWidth,
                     child: _buildPersonnelTypeSummaryCard(
-                      title: 'In-House Fleet Riders',
-                      count: '$inHouseCount Riders',
-                      subtext: 'Company bikes • Base salary + fuel allowance',
+                      title: 'In-House',
+                      count: '$inHouseCount',
+                      tooltip: 'Company Fleet Riders • Company bikes • Base salary + fuel allowance',
                       icon: Icons.delivery_dining_rounded,
                       color: const Color(0xFF10B981),
                       isDark: isDark,
@@ -129,9 +132,9 @@ class DCRidersPage extends ConsumerWidget {
                   SizedBox(
                     width: cardWidth,
                     child: _buildPersonnelTypeSummaryCard(
-                      title: 'Active on Route Today',
-                      count: '$activeCount on Duty',
-                      subtext: '96.4% on-time delivery SLA',
+                      title: 'Active Duty',
+                      count: '$activeCount',
+                      tooltip: 'Currently dispatched on route • 96.4% on-time delivery SLA',
                       icon: Icons.badge_rounded,
                       color: const Color(0xFF2563EB),
                       isDark: isDark,
@@ -149,11 +152,13 @@ class DCRidersPage extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildFilterChip('All Agents ($allCount)', 'all', dcState.fleetFilter, dcNotifier),
+                _buildFilterChip('All ($allCount)', 'all', dcState.fleetFilter, dcNotifier),
                 const SizedBox(width: 8),
-                _buildFilterChip('Active on Route ($activeCount)', 'active', dcState.fleetFilter, dcNotifier, color: const Color(0xFF10B981)),
+                _buildFilterChip('Active ($activeCount)', 'active', dcState.fleetFilter, dcNotifier, color: const Color(0xFF10B981)),
                 const SizedBox(width: 8),
-                _buildFilterChip('At Rest / Standby', 'at_rest', dcState.fleetFilter, dcNotifier, color: const Color(0xFFF59E0B)),
+                _buildFilterChip('Unavailable ($unavailableCount)', 'unavailable', dcState.fleetFilter, dcNotifier, color: const Color(0xFFEF4444)),
+                const SizedBox(width: 8),
+                _buildFilterChip('Standby', 'at_rest', dcState.fleetFilter, dcNotifier, color: const Color(0xFFF59E0B)),
                 const SizedBox(width: 8),
                 _buildFilterChip('Delayed', 'delayed', dcState.fleetFilter, dcNotifier, color: const Color(0xFFEF4444)),
               ],
@@ -181,41 +186,63 @@ class DCRidersPage extends ConsumerWidget {
   Widget _buildPersonnelTypeSummaryCard({
     required String title,
     required String count,
-    required String subtext,
+    required String tooltip,
     required IconData icon,
     required Color color,
     required bool isDark,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
+    return NovaTooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 22, color: color),
             ),
-            child: Icon(icon, size: 22, color: color),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
-                const SizedBox(height: 2),
-                Text(count, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                Text(subtext, style: GoogleFonts.inter(fontSize: 11, color: color, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-              ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.info_outline_rounded, size: 12, color: const Color(0xFF94A3B8)),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    count,
+                    style: GoogleFonts.inter(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

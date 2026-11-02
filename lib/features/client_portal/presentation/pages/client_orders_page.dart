@@ -8,6 +8,7 @@ import '../widgets/client_order_tracking_modal.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../providers/client_portal_provider.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/ux_states/ux_states.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/pangea_excel_data_table.dart';
 import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
@@ -249,31 +250,22 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
 
           // Orders List: Responsive Table for Desktop vs Clean Cards for Mobile/Tablet
           if (orders.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(40),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF151D36) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-              ),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.inbox_rounded, size: 44, color: isDark ? const Color(0xFF64748B) : const Color(0xFFCBD5E1)),
-                    const SizedBox(height: 10),
-                    Text(
-                      'No matching orders found',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF64748B)),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Try modifying your search or filter terms',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-                    ),
-                  ],
-                ),
-              ),
-            )
+            (state.searchQuery.isNotEmpty || state.selectedStatusFilter != 'all' || (state.selectedStateFilter != null && state.selectedStateFilter != 'all'))
+                ? NovaNoSearchResultsState(
+                    searchQuery: state.searchQuery.isNotEmpty ? state.searchQuery : null,
+                    filterContext: state.selectedStatusFilter != 'all'
+                        ? 'Status: ${state.selectedStatusFilter}'
+                        : (state.selectedStateFilter != null && state.selectedStateFilter != 'all' ? 'State: ${state.selectedStateFilter}' : null),
+                    onClearFilters: () {
+                      _searchController.clear();
+                      ref.read(clientPortalProvider.notifier).setSearchQuery('');
+                      ref.read(clientPortalProvider.notifier).setStatusFilter('all');
+                      ref.read(clientPortalProvider.notifier).setStateFilter('all');
+                    },
+                  )
+                : NovaEmptyState.orders(
+                    onAction: () => ClientCreateOrderModal.show(context),
+                  )
           else if (isWide)
             // Desktop Wide Table View: Pangea Excel-Style Data Table with Resizable Columns & Filters
             SizedBox(
@@ -675,25 +667,12 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
         minWidth: 90,
         align: TextAlign.center,
         cellBuilder: (context, order, row, isDark, brand) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.forum_outlined, size: 16, color: Color(0xFF0D9488)),
-                tooltip: 'Order Pipeline Chat',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF0D9488)),
-                tooltip: 'Track & View Details',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                onPressed: () => ClientOrderTrackingModal.show(context, order),
-              ),
-            ],
+          return IconButton(
+            icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF0D9488)),
+            tooltip: 'Track & View Details',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            onPressed: () => ClientOrderTrackingModal.show(context, order),
           );
         },
       ),
@@ -1036,43 +1015,23 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
             ),
             const SizedBox(height: 18),
 
-            // Live Tracking & Pipeline Chat Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF0D9488),
-                      side: const BorderSide(color: Color(0xFF0D9488)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      OrderPipelineChatSheet.showForOrder(context, order);
-                    },
-                    icon: const Icon(Icons.forum_outlined, size: 16),
-                    label: Text('Pipeline Chat', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                  ),
+            // Live Tracking & Fulfillment Audit Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      ClientOrderTrackingModal.show(context, order);
-                    },
-                    icon: const Icon(Icons.track_changes_rounded, size: 16),
-                    label: Text('Track Progress', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ClientOrderTrackingModal.show(context, order);
+                },
+                icon: const Icon(Icons.track_changes_rounded, size: 16),
+                label: Text('Track Progress & Live Audit', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         ),

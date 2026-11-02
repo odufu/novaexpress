@@ -8,8 +8,12 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
+import '../../../../core/widgets/ux_states/ux_states.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../client_portal/presentation/widgets/pangea_date_range_picker_modal.dart';
+import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
 
@@ -57,6 +61,7 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
     final notifState = ref.watch(notificationsProvider);
     final user = authState.user;
     final agentName = user?.firstName ?? '';
+    final isAvailable = user?.isAvailable ?? true;
 
     final selectedTab = ref.watch(pdaOrdersSelectedTabProvider);
     final searchQuery = ref.watch(pdaOrdersSearchQueryProvider);
@@ -70,31 +75,18 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
 
     final allOrders = ordersState.orders;
 
-    // Helper to format active date filter label
+    // Helper to format active date filter label matching Pangea standard
     String getDateFilterLabel() {
-      switch (dateFilterType) {
-        case 'Today':
-          return 'Today';
-        case 'Yesterday':
-          return 'Yesterday';
-        case 'This Week':
-          return 'This Week';
-        case 'This Month':
-          return 'This Month';
-        case 'Specific Date':
-          if (customSingleDate != null) {
-            return DateFormat('d MMM yyyy').format(customSingleDate);
-          }
-          return 'Specific Date';
-        case 'Custom Range':
-          if (customDateRange != null) {
-            return '${DateFormat('d MMM').format(customDateRange.start)} - ${DateFormat('d MMM').format(customDateRange.end)}';
-          }
-          return 'Date Range';
-        case 'All Time':
-        default:
-          return 'All Dates';
+      if (dateFilterType == 'All Time' || dateFilterType == 'All Dates') {
+        return 'All Dates';
       }
+      if (customDateRange != null) {
+        if (dateFilterType != 'Custom' && dateFilterType.isNotEmpty) {
+          return dateFilterType;
+        }
+        return '${DateFormat('d MMM').format(customDateRange.start)} - ${DateFormat('d MMM').format(customDateRange.end)}';
+      }
+      return dateFilterType;
     }
 
     // Real-time metrics matching DOCUMENTATION/PDA/delivery and orders.md
@@ -133,29 +125,25 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
         }
       }
 
-      // 4. Date Range Filter
+      // 4. Date Range Filter (Pangea Date Range Standard)
       final orderDate = o.deliveredAt ?? o.createdAt;
       final now = DateTime.now();
       final todayStart = DateTime(now.year, now.month, now.day);
       final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-      if (dateFilterType == 'Today') {
+      if (dateFilterType == 'Today' || dateFilterType == 'today') {
         if (orderDate.isBefore(todayStart) || orderDate.isAfter(todayEnd)) return false;
-      } else if (dateFilterType == 'Yesterday') {
+      } else if (dateFilterType == 'Yesterday' || dateFilterType == 'yesterday') {
         final yesterdayStart = todayStart.subtract(const Duration(days: 1));
         final yesterdayEnd = DateTime(yesterdayStart.year, yesterdayStart.month, yesterdayStart.day, 23, 59, 59);
         if (orderDate.isBefore(yesterdayStart) || orderDate.isAfter(yesterdayEnd)) return false;
-      } else if (dateFilterType == 'This Week') {
+      } else if (dateFilterType.toLowerCase() == 'this week') {
         final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
         if (orderDate.isBefore(weekStart) || orderDate.isAfter(todayEnd)) return false;
-      } else if (dateFilterType == 'This Month') {
+      } else if (dateFilterType.toLowerCase() == 'this month') {
         final monthStart = DateTime(now.year, now.month, 1);
         if (orderDate.isBefore(monthStart) || orderDate.isAfter(todayEnd)) return false;
-      } else if (dateFilterType == 'Specific Date' && customSingleDate != null) {
-        final start = DateTime(customSingleDate.year, customSingleDate.month, customSingleDate.day);
-        final end = DateTime(customSingleDate.year, customSingleDate.month, customSingleDate.day, 23, 59, 59);
-        if (orderDate.isBefore(start) || orderDate.isAfter(end)) return false;
-      } else if (dateFilterType == 'Custom Range' && customDateRange != null) {
+      } else if (customDateRange != null) {
         final start = DateTime(customDateRange.start.year, customDateRange.start.month, customDateRange.start.day);
         final end = DateTime(customDateRange.end.year, customDateRange.end.month, customDateRange.end.day, 23, 59, 59);
         if (orderDate.isBefore(start) || orderDate.isAfter(end)) return false;
@@ -359,6 +347,46 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                       ),
                       const SizedBox(height: 10),
                     ],
+
+                    // 0. Rider Availability Duty Status Banner
+                    _RiderDutyStatusBanner(
+                      isAvailable: isAvailable,
+                      onToggle: (newVal) async {
+                        await ref.read(authProvider.notifier).updateRiderAvailability(newVal);
+                        final riderCode = user?.deliveryAgentCode ?? user?.deliveryAgentId;
+                        if (riderCode != null && riderCode.isNotEmpty) {
+                          ref.read(dcConsoleProvider.notifier).toggleDriverAvailability(riderCode, newVal);
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(
+                                    newVal ? Icons.check_circle_rounded : Icons.pause_circle_filled_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      newVal
+                                          ? '🟢 You are now ONLINE & available for delivery assignments.'
+                                          : '⚪ You are now OFF-DUTY. Dispatch officers cannot assign orders to you.',
+                                      style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: newVal ? const Color(0xFF10B981) : const Color(0xFF475569),
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
 
                     // Order Summary Card
                     Container(
@@ -614,48 +642,49 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                     ],
                     const SizedBox(height: 12),
 
-                    // Orders List View / Shimmer / Empty State
+                    // Orders List View / Shimmer / Empty State / Error State
                     if (ordersState.isLoading) ...[
                       const OrderCardSkeleton(),
                       const OrderCardSkeleton(),
                       const OrderCardSkeleton(),
-                    ] else if (filteredOrders.isEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.all(28),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.inventory_2_outlined,
-                                size: 40,
-                                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'No orders match your filter',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Try clearing your search query or selecting a different status/date filter.',
-                                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
+                    ] else if (ordersState.errorMessage != null && allOrders.isEmpty) ...[
+                      NovaErrorState.serverError(
+                        errorMessage: ordersState.errorMessage,
+                        onRetry: () {
+                          final user = ref.read(authProvider).user;
+                          if (user != null) {
+                            ref.read(ordersProvider.notifier).loadOrders(user.id);
+                          } else {
+                            ref.read(ordersProvider.notifier).loadOrders();
+                          }
+                        },
                       ),
+                    ] else if (filteredOrders.isEmpty) ...[
+                      if (selectedTab != 'All' || dateFilterType != 'All Time' || searchQuery.isNotEmpty) ...[
+                        NovaNoSearchResultsState(
+                          searchQuery: searchQuery.isNotEmpty ? searchQuery : null,
+                          filterContext: selectedTab != 'All'
+                              ? 'Tab: $selectedTab'
+                              : (dateFilterType != 'All Time' ? 'Date: $dateFilterType' : null),
+                          onClearFilters: () {
+                            ref.read(pdaOrdersSelectedTabProvider.notifier).state = 'All';
+                            ref.read(pdaOrdersDateFilterTypeProvider.notifier).state = 'All Time';
+                            ref.read(pdaOrdersCustomDateRangeProvider.notifier).state = null;
+                            ref.read(pdaOrdersCustomSingleDateProvider.notifier).state = null;
+                            _searchController.clear();
+                            ref.read(pdaOrdersSearchQueryProvider.notifier).state = '';
+                          },
+                        ),
+                      ] else ...[
+                        NovaEmptyState.orders(
+                          title: 'No Orders Assigned Yet',
+                          message: isAvailable
+                              ? 'You are online and ready! As soon as Central Dispatch assigns delivery runs to you, they will appear here automatically.'
+                              : 'You are currently off-duty. Turn ON your availability toggle at the top of the screen to receive new delivery runs.',
+                          onAction: null,
+                          actionLabel: null,
+                        ),
+                      ],
                     ] else ...[
                       ListView.separated(
                         shrinkWrap: true,
@@ -707,40 +736,49 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
     );
   }
 
-  // Dedicated Calendar Filter Modal for Specific Date or Date Range Selection
-  void _showCalendarModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalContext) {
-        return Consumer(
-          builder: (context, ref, _) {
-            final currentDateFilterType = ref.watch(pdaOrdersDateFilterTypeProvider);
-            final currentCustomRange = ref.watch(pdaOrdersCustomDateRangeProvider);
-            final currentSingleDate = ref.watch(pdaOrdersCustomSingleDateProvider);
+  // Dedicated Date Range Filter Modal (Standardized Pangea Design)
+  Future<void> _showCalendarModal(BuildContext context) async {
+    final currentDateFilterType = ref.read(pdaOrdersDateFilterTypeProvider);
+    final currentCustomRange = ref.read(pdaOrdersCustomDateRangeProvider);
+    final now = DateTime.now();
 
-            return _CalendarFilterModalContent(
-              initialType: currentDateFilterType,
-              initialRange: currentCustomRange,
-              initialSingleDate: currentSingleDate,
-              onApply: (type, singleDate, dateRange) {
-                ref.read(pdaOrdersDateFilterTypeProvider.notifier).state = type;
-                ref.read(pdaOrdersCustomSingleDateProvider.notifier).state = singleDate;
-                ref.read(pdaOrdersCustomDateRangeProvider.notifier).state = dateRange;
-                Navigator.pop(modalContext);
-              },
-              onReset: () {
-                ref.read(pdaOrdersDateFilterTypeProvider.notifier).state = 'All Time';
-                ref.read(pdaOrdersCustomSingleDateProvider.notifier).state = null;
-                ref.read(pdaOrdersCustomDateRangeProvider.notifier).state = null;
-                Navigator.pop(modalContext);
-              },
-            );
-          },
-        );
-      },
+    DateTime start = currentCustomRange?.start ?? now.subtract(const Duration(days: 6));
+    DateTime end = currentCustomRange?.end ?? now;
+    DateRangePreset initialPreset = DateRangePreset.last7Days;
+
+    if (currentDateFilterType == 'Today' || currentDateFilterType == 'today') {
+      start = DateTime(now.year, now.month, now.day);
+      end = start;
+      initialPreset = DateRangePreset.today;
+    } else if (currentDateFilterType == 'Yesterday' || currentDateFilterType == 'yesterday') {
+      start = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+      end = start;
+      initialPreset = DateRangePreset.yesterday;
+    } else if (currentDateFilterType.toLowerCase() == 'this month') {
+      start = DateTime(now.year, now.month, 1);
+      end = now;
+      initialPreset = DateRangePreset.thisMonth;
+    } else if (currentDateFilterType.toLowerCase() == 'this week') {
+      start = now.subtract(Duration(days: now.weekday % 7));
+      end = now;
+      initialPreset = DateRangePreset.thisWeek;
+    }
+
+    final result = await PangeaDateRangePickerModal.show(
+      context,
+      initialStartDate: start,
+      initialEndDate: end,
+      initialPreset: initialPreset,
     );
+
+    if (result != null) {
+      ref.read(pdaOrdersCustomDateRangeProvider.notifier).state = DateTimeRange(
+        start: result.startDate,
+        end: result.endDate,
+      );
+      ref.read(pdaOrdersCustomSingleDateProvider.notifier).state = null;
+      ref.read(pdaOrdersDateFilterTypeProvider.notifier).state = result.preset.label;
+    }
   }
 
   // Filter Modal Sheet for advanced filtering
@@ -877,472 +915,160 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
   }
 }
 
-class _CalendarFilterModalContent extends StatefulWidget {
-  final String initialType;
-  final DateTimeRange? initialRange;
-  final DateTime? initialSingleDate;
-  final Function(String type, DateTime? singleDate, DateTimeRange? dateRange) onApply;
-  final VoidCallback onReset;
+class _RiderDutyStatusBanner extends StatelessWidget {
+  final bool isAvailable;
+  final ValueChanged<bool> onToggle;
 
-  const _CalendarFilterModalContent({
-    required this.initialType,
-    required this.initialRange,
-    required this.initialSingleDate,
-    required this.onApply,
-    required this.onReset,
+  const _RiderDutyStatusBanner({
+    required this.isAvailable,
+    required this.onToggle,
   });
-
-  @override
-  State<_CalendarFilterModalContent> createState() => _CalendarFilterModalContentState();
-}
-
-class _CalendarFilterModalContentState extends State<_CalendarFilterModalContent> {
-  late String _selectedType;
-  late DateTime _selectedSingleDate;
-  DateTimeRange? _selectedRange;
-  int _calendarModeIndex = 0; // 0: Single Date, 1: Date Range
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedType = widget.initialType;
-    _selectedSingleDate = widget.initialSingleDate ?? DateTime.now();
-    _selectedRange = widget.initialRange ??
-        DateTimeRange(
-          start: DateTime.now().subtract(const Duration(days: 7)),
-          end: DateTime.now(),
-        );
-
-    if (widget.initialType == 'Custom Range') {
-      _calendarModeIndex = 1;
-    } else {
-      _calendarModeIndex = 0;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
+    final activeGreen = const Color(0xFF10B981);
+    final activeGreenDark = const Color(0xFF047857);
+    final inactiveSlate = const Color(0xFF64748B);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onToggle(!isAvailable),
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isAvailable
+                  ? [
+                      isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                      isDark ? const Color(0xFF022C22) : const Color(0xFFD1FAE5),
+                    ]
+                  : [
+                      isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                      isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isAvailable
+                  ? activeGreen.withValues(alpha: isDark ? 0.6 : 0.45)
+                  : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isAvailable
+                    ? activeGreen.withValues(alpha: isDark ? 0.25 : 0.12)
+                    : Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // 1. Glowing Pulse Indicator Icon
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
                 width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
+                height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_month_rounded, color: AppColors.orange, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Filter by Date',
-                      style: GoogleFonts.inter(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Quick Preset Chips
-            Text(
-              'QUICK PRESETS',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-                color: const Color(0xFF64748B),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildPresetChip('All Time', 'All Time'),
-                _buildPresetChip('Today', 'Today'),
-                _buildPresetChip('Yesterday', 'Yesterday'),
-                _buildPresetChip('This Week', 'This Week'),
-                _buildPresetChip('This Month', 'This Month'),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Mode Selector: Specific Date vs Date Range
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                ),
-              ),
-              padding: const EdgeInsets.all(3),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _calendarModeIndex = 0;
-                          _selectedType = 'Specific Date';
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _calendarModeIndex == 0
-                              ? (isDark ? const Color(0xFF1E293B) : Colors.white)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: _calendarModeIndex == 0
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.event_rounded,
-                              size: 15,
-                              color: _calendarModeIndex == 0 ? AppColors.orange : const Color(0xFF64748B),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Specific Date',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.5,
-                                fontWeight: _calendarModeIndex == 0 ? FontWeight.bold : FontWeight.w500,
-                                color: _calendarModeIndex == 0
-                                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                                    : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _calendarModeIndex = 1;
-                          _selectedType = 'Custom Range';
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _calendarModeIndex == 1
-                              ? (isDark ? const Color(0xFF1E293B) : Colors.white)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: _calendarModeIndex == 1
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.date_range_rounded,
-                              size: 15,
-                              color: _calendarModeIndex == 1 ? AppColors.orange : const Color(0xFF64748B),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Date Range',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.5,
-                                fontWeight: _calendarModeIndex == 1 ? FontWeight.bold : FontWeight.w500,
-                                color: _calendarModeIndex == 1
-                                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                                    : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Calendar View / Date Pickers
-            if (_calendarModeIndex == 0) ...[
-              // Single Date Calendar
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
+                  shape: BoxShape.circle,
+                  color: isAvailable
+                      ? activeGreen.withValues(alpha: 0.18)
+                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    color: isAvailable ? activeGreen : inactiveSlate.withValues(alpha: 0.4),
+                    width: 2,
                   ),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: CalendarDatePicker(
-                  initialDate: _selectedSingleDate,
-                  firstDate: DateTime(2023),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                  onDateChanged: (newDate) {
-                    setState(() {
-                      _selectedSingleDate = newDate;
-                      _selectedType = 'Specific Date';
-                    });
-                  },
+                child: Icon(
+                  isAvailable ? Icons.wifi_tethering_rounded : Icons.power_settings_new_rounded,
+                  color: isAvailable ? activeGreen : (isDark ? Colors.white70 : inactiveSlate),
+                  size: 20,
                 ),
               ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF0284C7)),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Selected Date: ${DateFormat('EEEE, d MMMM yyyy').format(_selectedSingleDate)}',
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF0284C7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              // Date Range Picker trigger
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                  ),
-                ),
+              const SizedBox(width: 12),
+
+              // 2. Status Text & Subtitle Guidance
+              Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'START DATE',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _selectedRange != null
-                                    ? DateFormat('d MMM yyyy').format(_selectedRange!.start)
-                                    : 'Select Start',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                              ),
-                            ],
+                        Text(
+                          isAvailable ? "YOU'RE ONLINE" : "YOU'RE OFF-DUTY",
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.3,
+                            color: isAvailable
+                                ? (isDark ? Colors.white : activeGreenDark)
+                                : (isDark ? Colors.white : const Color(0xFF334155)),
                           ),
                         ),
-                        const Icon(Icons.arrow_forward_rounded, size: 16, color: Color(0xFF64748B)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'END DATE',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _selectedRange != null
-                                    ? DateFormat('d MMM yyyy').format(_selectedRange!.end)
-                                    : 'Select End',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isAvailable
+                                ? activeGreen.withValues(alpha: 0.18)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            isAvailable ? "READY FOR RUNS" : "OFFLINE",
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: isAvailable ? activeGreen : inactiveSlate,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final picked = await showDateRangePicker(
-                          context: context,
-                          firstDate: DateTime(2023),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                          initialDateRange: _selectedRange ??
-                              DateTimeRange(
-                                start: DateTime.now().subtract(const Duration(days: 7)),
-                                end: DateTime.now(),
-                              ),
-                          builder: (context, child) {
-                            return Theme(
-                              data: Theme.of(context).copyWith(
-                                colorScheme: Theme.of(context).colorScheme.copyWith(
-                                      primary: AppColors.orange,
-                                      onPrimary: Colors.white,
-                                    ),
-                              ),
-                              child: child!,
-                            );
-                          },
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            _selectedRange = picked;
-                            _selectedType = 'Custom Range';
-                          });
-                        }
-                      },
-                      icon: const Icon(Icons.date_range_rounded, size: 16),
-                      label: const Text('Pick Range from Calendar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        foregroundColor: theme.colorScheme.onSurface,
-                        side: BorderSide(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                        ),
-                        minimumSize: const Size(double.infinity, 42),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    const SizedBox(height: 2),
+                    Text(
+                      isAvailable
+                          ? "Available to receive dispatch orders from Operations."
+                          : "Tap toggle to go online and receive new orders.",
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: isAvailable
+                            ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46))
+                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        fontWeight: FontWeight.w500,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 10),
+
+              // 3. Obvious, Tried-and-Tested Toggle Switch
+              Switch(
+                value: isAvailable,
+                activeColor: Colors.white,
+                activeTrackColor: activeGreen,
+                inactiveThumbColor: Colors.white,
+                inactiveTrackColor: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                onChanged: onToggle,
+              ),
             ],
-            const SizedBox(height: 20),
-
-            // Bottom Actions: Reset & Apply
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: widget.onReset,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Reset to All'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      widget.onApply(
-                        _selectedType,
-                        _calendarModeIndex == 0 ? _selectedSingleDate : null,
-                        _calendarModeIndex == 1 ? _selectedRange : null,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Apply Filter'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _buildPresetChip(String type, String label) {
-    final isSelected = _selectedType == type;
-    return ChoiceChip(
-      label: Text(
-        label,
-        style: GoogleFonts.inter(
-          fontSize: 11.5,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-          color: isSelected ? Colors.white : null,
-        ),
-      ),
-      selected: isSelected,
-      selectedColor: AppColors.orange,
-      onSelected: (_) {
-        setState(() {
-          _selectedType = type;
-        });
-      },
     );
   }
 }
@@ -1455,11 +1181,12 @@ class _DeliveryOperationalCard extends ConsumerWidget {
 
     switch (order.status) {
       case 'delivered':
-        statusLeftColor = const Color(0xFF10B981); // WhatsApp Emerald
+      case 'completed':
+        statusLeftColor = const Color(0xFF10B981); // Emerald
         statusBg = const Color(0xFFDCFCE7);
         statusTextColor = const Color(0xFF15803D);
-        statusLabel = 'DELIVERED';
-        statusIcon = Icons.done_all_rounded; // WhatsApp double check
+        statusLabel = 'COMPLETED ✓';
+        statusIcon = Icons.check_circle_rounded;
         break;
       case 'in_transit':
         statusLeftColor = const Color(0xFF2563EB); // Electric Blue
@@ -1747,10 +1474,35 @@ class _DeliveryOperationalCard extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
 
-                        // Action Buttons: WhatsApp Prompt & Map & Call
+                        // Action Buttons: In-App Chat, WhatsApp, Map & Call
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // In-App Order Pipeline Chat (DC Ops, Merchant & Telesales)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Tooltip(
+                                message: 'Chat with DC Ops & Merchant',
+                                child: InkWell(
+                                  onTap: () => OrderPipelineChatSheet.showForOrder(context, order),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.35)),
+                                    ),
+                                    child: const Icon(
+                                      Icons.forum_rounded,
+                                      size: 15,
+                                      color: Color(0xFF6366F1),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
                             // WhatsApp Live Pin Request
                             if (order.customerPhone.isNotEmpty)
                               Padding(

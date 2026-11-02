@@ -6,8 +6,20 @@ import '../../domain/entities/merchant_financial_metrics.dart';
 class ExpenditureRepository {
   final SupabaseClient _supabase;
 
+  static SupabaseClient _safeGetSupabase() {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return SupabaseClient(
+        'https://mock.supabase.co',
+        'mock-anon-key',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+    }
+  }
+
   ExpenditureRepository({SupabaseClient? supabase})
-      : _supabase = supabase ?? Supabase.instance.client;
+      : _supabase = supabase ?? _safeGetSupabase();
 
   /// Fetch expenditures list for a client/merchant
   Future<List<BusinessExpenditureEntity>> fetchMerchantExpenditures({

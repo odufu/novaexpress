@@ -1133,12 +1133,7 @@ class _ClientMarketerDetailModalState extends ConsumerState<ClientMarketerDetail
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: Color(0xFF10B981)),
-                    tooltip: 'Order Pipeline Chat',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => OrderPipelineChatSheet.showForOrder(context, o),
-                  ),
+
                   InkWell(
                     onTap: () => ClientOrderTrackingModal.show(context, o),
                     borderRadius: BorderRadius.circular(4),

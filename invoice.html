@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice INV-NX-2026-001 - Nova Express Logistics Enterprise Platform</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 6mm 10mm 6mm 10mm;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #0f172a;
+            margin: 0;
+            padding: 12px 18px;
+            font-size: 12px;
+            line-height: 1.4;
+            background: #ffffff;
+        }
+
+        /* Interactive Print Control Banner (Hidden in Print) */
+        .no-print-bar {
+            background: #0f172a;
+            color: #ffffff;
+            padding: 10px 18px;
+            margin: -12px -18px 12px -18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            border-bottom: 2px solid #16a34a;
+        }
+
+        .print-btn {
+            background: #16a34a;
+            color: #ffffff;
+            border: none;
+            padding: 7px 16px;
+            font-weight: 700;
+            font-size: 12.5px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: background 0.15s ease;
+        }
+
+        .print-btn:hover {
+            background: #15803d;
+        }
+
+        /* Header Branding */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2.5px solid #14532d;
+            padding-bottom: 9px;
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+        }
+
+        .brand-logo {
+            width: 68px;
+            height: 68px;
+            object-fit: contain;
+            border-radius: 10px;
+            border: 1px solid #d1fae5;
+            background: #f8fafc;
+        }
+
+        .brand-title {
+            font-size: 21px;
+            font-weight: 900;
+            color: #14532d;
+            letter-spacing: 0.8px;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .brand-tagline {
+            font-size: 12px;
+            font-weight: 700;
+            color: #166534;
+            margin-top: 1px;
+            letter-spacing: 0.2px;
+        }
+
+        .reg-details {
+            font-size: 11px;
+            color: #334155;
+            margin-top: 2px;
+            line-height: 1.35;
+        }
+
+        .invoice-tag {
+            text-align: right;
+        }
+
+        .invoice-title {
+            font-size: 28px;
+            font-weight: 900;
+            color: #14532d;
+            letter-spacing: 1.5px;
+            margin: 0;
+            line-height: 1;
+        }
+
+        .invoice-number {
+            margin: 3px 0 0 0;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #15803d;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            margin-top: 3px;
+            padding: 2px 9px;
+            background: #dcfce7;
+            color: #14532d;
+            font-size: 10px;
+            font-weight: 800;
+            border-radius: 12px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            border: 1px solid #86efac;
+        }
+
+        /* Two Column Client & Schedule Grid */
+        .grid-two {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 12px;
+            margin: 9px 0;
+            background: #f0fdf4;
+            padding: 8px 12px;
+            border-radius: 7px;
+            border-left: 4px solid #16a34a;
+            border-top: 1px solid #dcfce7;
+            border-right: 1px solid #dcfce7;
+            border-bottom: 1px solid #dcfce7;
+        }
+
+        .grid-two h4 {
+            margin: 0 0 4px 0;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: #14532d;
+            font-weight: 800;
+            border-bottom: 1px solid #bbf7d0;
+            padding-bottom: 2px;
+        }
+
+        .grid-two p {
+            margin: 2px 0;
+            font-size: 12px;
+            color: #1e293b;
+        }
+
+        .grid-two strong {
+            color: #0f172a;
+        }
+
+        /* Official Coverage Declaration Box */
+        .coverage-statement-box {
+            background: #f0fdf4;
+            border: 1.5px solid #86efac;
+            border-radius: 6px;
+            padding: 7px 11px;
+            margin: 7px 0;
+            font-size: 12px;
+            color: #14532d;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            line-height: 1.35;
+        }
+
+        .coverage-statement-box svg {
+            flex-shrink: 0;
+        }
+
+        /* Data Table */
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+        }
+
+        table.data-table thead th {
+            background: #14532d;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 6px 7px;
+            text-align: left;
+            border: none;
+        }
+
+        table.data-table td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 5px 7px;
+            vertical-align: middle;
+            font-size: 12px;
+        }
+
+        table.data-table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .item-number {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #14532d;
+        }
+
+        .desc-title {
+            font-weight: 800;
+            font-size: 12px;
+            color: #0f172a;
+            letter-spacing: -0.1px;
+        }
+
+        .desc-sub {
+            font-size: 11.5px;
+            color: #334155;
+            margin-top: 1.5px;
+            line-height: 1.32;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .amount-col {
+            font-weight: 800;
+            font-size: 12px;
+            color: #0f172a;
+            white-space: nowrap;
+        }
+
+        .period-badge {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #1e293b;
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 2px 5px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+
+        /* Bottom Section: Totals, Words, Payment */
+        .bottom-summary-grid {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 12px;
+            margin-top: 7px;
+            align-items: start;
+        }
+
+        .in-words-box {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .in-words-box strong {
+            color: #14532d;
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 1px;
+        }
+
+        .in-words-box span {
+            font-weight: 700;
+            color: #0f172a;
+            font-style: italic;
+        }
+
+        .payment-box {
+            background: #f0fdf4;
+            border: 1.5px dashed #16a34a;
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 12px;
+        }
+
+        .payment-box-title {
+            color: #14532d;
+            font-weight: 800;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .bank-details-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 2px 8px;
+            font-size: 12px;
+        }
+
+        .bank-label {
+            color: #475569;
+            font-weight: 600;
+        }
+
+        .bank-val {
+            color: #0f172a;
+            font-weight: 700;
+        }
+
+        .account-num-highlight {
+            font-size: 13px;
+            font-weight: 900;
+            color: #15803d;
+            letter-spacing: 0.8px;
+            font-family: "Courier New", Courier, monospace;
+        }
+
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .totals-table td {
+            padding: 4px 8px;
+            font-size: 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .totals-table td:last-child {
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .grand-total {
+            background: #14532d !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+            font-size: 13.5px !important;
+        }
+
+        .grand-total td {
+            color: #ffffff !important;
+            padding: 6px 8px !important;
+            border: none !important;
+        }
+
+        /* Signatures Section */
+        .signatures-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-top: 7px;
+            padding-top: 6px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .sig-block {
+            position: relative;
+        }
+
+        .sig-title {
+            font-size: 10.5px;
+            font-weight: 800;
+            color: #14532d;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 2px;
+        }
+
+        .sig-img-container {
+            height: 38px;
+            display: flex;
+            align-items: flex-end;
+            margin-bottom: -3px;
+        }
+
+        .sig-img {
+            max-height: 40px;
+            max-width: 135px;
+            object-fit: contain;
+            filter: contrast(1.1);
+        }
+
+        .sig-line {
+            border-bottom: 1.5px solid #334155;
+            height: 3px;
+            margin-bottom: 3px;
+        }
+
+        .sig-meta {
+            font-size: 11.5px;
+            color: #334155;
+            line-height: 1.3;
+        }
+
+        .sig-meta strong {
+            color: #0f172a;
+        }
+
+        /* Print Media Styles */
+        @media print {
+
+            html,
+            body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #ffffff !important;
+            }
+
+            .no-print-bar {
+                display: none !important;
+            }
+
+            @page {
+                size: A4 portrait;
+                margin: 6mm 9mm 6mm 9mm;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+
+            .bottom-summary-grid,
+            .signatures-section,
+            .coverage-statement-box {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Non-printing Interactive Toolbar for 1-Click PDF Generation -->
+    <div class="no-print-bar">
+        <div>
+            <strong>Emerald Codelines Official Invoice Portal</strong> — Ready for PDF generation
+        </div>
+        <button class="print-btn" onclick="window.print()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Print / Save as PDF (A4)
+        </button>
+    </div>
+
+    <!-- Official Header -->
+    <div class="header">
+        <div class="brand-section">
+            <img src="ecl.jpg" alt="Emerald Codelines" class="brand-logo" onerror="this.style.display='none'">
+            <div>
+                <h1 class="brand-title">EMERALD CODELINES</h1>
+                <div class="brand-tagline">Software Engineering &amp; Digital Solutions</div>
+                <div class="reg-details">
+                    <strong>BN:</strong> 8374060 &nbsp;|&nbsp; <strong>TIN:</strong> 33021703-0001<br>
+                    SUIT D301 GREY PLAZA DUNUKOFIA ST, AREA 11 GARKI, ABUJA, FCT<br>
+                    <strong>Email:</strong> emeraldcodelines@gmail.com &nbsp;|&nbsp; <strong>Phone:</strong> +234 (0)
+                    808 504 0146
+                </div>
+            </div>
+        </div>
+        <div class="invoice-tag">
+            <h2 class="invoice-title">INVOICE</h2>
+            <div class="invoice-number"># INV-NX-2026-001</div>
+            <div class="status-badge">Payment Pending</div>
+        </div>
+    </div>
+
+    <!-- Billed To & Schedule Card -->
+    <div class="grid-two">
+        <div>
+            <h4>Billed To (Client):</h4>
+            <p><strong>Nova Express Logistics Limited (NovaXpress)</strong></p>
+            <p>L66, Behind Sure Start School, F01, Kubwa, Abuja</p>
+            <p><strong>Attn:</strong> Executive Management &amp; Operations Directorate</p>
+            <p><strong>Project:</strong> NovaXpress Logistics ERP &amp; Multi-Portal Ecosystem</p>
+        </div>
+        <div>
+            <h4>Invoice &amp; Scope Schedule:</h4>
+            <p><strong>Invoice Date:</strong> October 19, 2026</p>
+            <p><strong>Payment Due:</strong> November 2, 2026 (14 Days)</p>
+            <p><strong>Payment Structure:</strong> 70% Mobilization / 30% Final Delivery</p>
+            <p><strong>Contract Scope:</strong> Development + 1 Year Stable Resource Hosting</p>
+        </div>
+    </div>
+
+    <!-- Official Coverage & Hosting Declaration Statement -->
+    <div class="coverage-statement-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <polyline points="9 12 11 14 15 10"></polyline>
+        </svg>
+        <span><strong>Official Scope &amp; Resource Acquisition Guarantee:</strong> This total contract sum of
+            <strong>&#8358;2,500,000.00</strong> allocates <strong>&#8358;1,760,000.00</strong> to high-throughput
+            production server infrastructure, cloud database cluster, corporate domain &amp; email services, developer
+            licensing, and Gemini AI business intelligence for <strong>one (1) full calendar year</strong> (guaranteed
+            99.95% stable uptime), with <strong>&#8358;740,000.00</strong> covering end-to-end multi-platform
+            software engineering development.</span>
+    </div>
+
+    <!-- Deliverables Table -->
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 5%;" class="text-center">#</th>
+                <th style="width: 57%;">Deliverables &amp; Scope of Engineering Work</th>
+                <th style="width: 18%;" class="text-center">Term / Period</th>
+                <th style="width: 20%;" class="text-right">Amount (NGN)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="text-center item-number">1.0</td>
+                <td>
+                    <div class="desc-title">Core Multi-Platform Logistics Software Engineering &amp; ERP Development
+                    </div>
+                    <div class="desc-sub">
+                        &bull; Distribution Center (DC) Console &amp; Grand DC Command Center with multi-hub
+                        jurisdiction &amp; hierarchy<br>
+                        &bull; Client Merchant Portal with custom product package deals, bulk ordering &amp; dynamic
+                        tier pricing<br>
+                        &bull; Rider &amp; Field Agent Mobile Application (Android APK) with dispatch routing &amp;
+                        digital Proof of Delivery (POD)<br>
+                        &bull; Telesales CRM with rapid dialing pipeline, order verification &amp; automated order
+                        editing<br>
+                        &bull; DC Financial Intelligence &amp; P&amp;L Engine with automated executive Excel report
+                        generation (.xlsx)<br>
+                        &bull; Payment Gateway Integration (Paystack/Monnify), COD cash handling &amp; daily merchant
+                        settlement engine
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">Core Development</span></td>
+                <td class="text-right amount-col">&#8358;740,000.00</td>
+            </tr>
+            <tr>
+                <td class="text-center item-number">2.0</td>
+                <td>
+                    <div class="desc-title">Enterprise Production Server Cluster, Cloud Database &amp; 24/7 Hosting (1
+                        Year)</div>
+                    <div class="desc-sub">
+                        &bull; Dedicated High-Throughput Production Cloud Server &amp; Compute Infrastructure with
+                        99.95% uptime SLA<br>
+                        &bull; Enterprise Supabase PostgreSQL cluster with connection pooling, transactional caching
+                        &amp; sub-100ms response<br>
+                        &bull; Realtime WebSocket event broadcast engine for live order dispatch, rider telemetry &amp;
+                        instant sync<br>
+                        &bull; Encrypted Cloud Object Storage buckets for delivery photo proof (POD), customer
+                        signatures &amp; expense vouchers<br>
+                        &bull; Automated daily disaster-recovery snapshot backups, failover redundancy &amp;
+                        zero-downtime maintenance
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">12 Months (1 Year)</span></td>
+                <td class="text-right amount-col">&#8358;640,000.00</td>
+            </tr>
+            <tr>
+                <td class="text-center item-number">3.0</td>
+                <td>
+                    <div class="desc-title">Domain Name, Cloud Web Hosting &amp; Corporate Email Suite for NovaXpress (1
+                        Year)</div>
+                    <div class="desc-sub">
+                        &bull; Official domain registration &amp; high-availability enterprise DNS routing
+                        (novaxpress.ng / novaexpress.ng)<br>
+                        &bull; Enterprise business email hosting suite (dedicated mailboxes for operations, finance,
+                        management &amp; dispatch)<br>
+                        &bull; Dedicated high-performance cloud web hosting for Dispatcher Web Consoles &amp; Merchant
+                        Portals (12 Months)<br>
+                        &bull; SSL/TLS security certification, DDoS mitigation &amp; global CDN edge caching
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">12 Months (1 Year)</span></td>
+                <td class="text-right amount-col">&#8358;490,000.00</td>
+            </tr>
+            <tr>
+                <td class="text-center item-number">4.0</td>
+                <td>
+                    <div class="desc-title">Google Play Console Developer Account License &amp; Production App Hosting
+                    </div>
+                    <div class="desc-sub">
+                        &bull; Official Google Play Console Developer registration fee &amp; corporate identity
+                        verification<br>
+                        &bull; Android Rider APK production signing, Google Play Store policy compliance &amp; release
+                        deployment<br>
+                        &bull; Developer console lifetime licensing, automated app updates &amp; ongoing mobile
+                        distribution hosting
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">License &amp; Hosting</span></td>
+                <td class="text-right amount-col">&#8358;300,000.00</td>
+            </tr>
+            <tr>
+                <td class="text-center item-number">5.0</td>
+                <td>
+                    <div class="desc-title">Google Gemini AI Subscription &amp; Fast Business Intelligence Allocation (1
+                        Year)</div>
+                    <div class="desc-sub">
+                        &bull; Foundational inferencing token quota and server middleware integration for Google Gemini
+                        AI<br>
+                        &bull; Future-ready Business Intelligence (BI) pipeline: route optimization, delivery risk
+                        analysis &amp; operational insights<br>
+                        &bull; Prepared for phased activation so NovaXpress can leverage the dividends of fast, capable
+                        AI as operations scale
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">12 Months (1 Year)</span></td>
+                <td class="text-right amount-col">&#8358;330,000.00</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Financial Breakdown, Words & Remittance Grid -->
+    <div class="bottom-summary-grid">
+        <div>
+            <div class="in-words-box">
+                <strong>Amount Payable in Words:</strong>
+                <span>Two Million, Five Hundred Thousand Nigerian Naira Only.</span>
+            </div>
+
+            <div class="payment-box">
+                <div class="payment-box-title">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#14532d" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                        <line x1="2" y1="10" x2="22" y2="10"></line>
+                    </svg>
+                    Direct Remittance Account Details:
+                </div>
+                <div class="bank-details-grid">
+                    <span class="bank-label">Bank:</span>
+                    <span class="bank-val">Moniepoint Microfinance Bank (MFB)</span>
+
+                    <span class="bank-label">Account Name:</span>
+                    <span class="bank-val">Emerald Codelines</span>
+
+                    <span class="bank-label">Account Number:</span>
+                    <span class="bank-val account-num-highlight">6384486305</span>
+
+                    <span class="bank-label">Reference:</span>
+                    <span class="bank-val">INV-NX-2026-001 / Nova Express</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <table class="totals-table">
+                <tr>
+                    <td>Annual Server, Infrastructure &amp; Resources (Items 2–5):</td>
+                    <td>&#8358;1,760,000.00</td>
+                </tr>
+                <tr>
+                    <td>Software Engineering &amp; ERP Development (Item 1):</td>
+                    <td>&#8358;740,000.00</td>
+                </tr>
+                <tr>
+                    <td>Value Added Tax (VAT):</td>
+                    <td style="color: #166534;"><em>Inclusive (0.00)</em></td>
+                </tr>
+                <tr>
+                    <td>Initial Mobilization (70%):</td>
+                    <td>&#8358;1,750,000.00</td>
+                </tr>
+                <tr>
+                    <td>Final Delivery Balance (30%):</td>
+                    <td>&#8358;750,000.00</td>
+                </tr>
+                <tr class="grand-total">
+                    <td>TOTAL PAYABLE:</td>
+                    <td>&#8358;2,500,000.00</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Official Signatures Section -->
+    <div class="signatures-section">
+        <div class="sig-block">
+            <div class="sig-title">Authorized Signatory (Emerald Codelines)</div>
+            <div class="sig-img-container">
+                <img src="my signature.png" alt="Signature - Joel Odufu" class="sig-img">
+            </div>
+            <div class="sig-line"></div>
+            <div class="sig-meta">
+                <strong>Joel Odufu</strong><br>
+                Lead Solutions Architect &amp; Engineering Director<br>
+                Date: October 19, 2026
+            </div>
+        </div>
+
+        <div class="sig-block">
+            <div class="sig-title">Client Acceptance (Nova Express Logistics Ltd)</div>
+            <div class="sig-img-container">
+                <!-- Signature line placeholder for client signing -->
+            </div>
+            <div class="sig-line"></div>
+            <div class="sig-meta">
+                <strong>Authorized Management Signatory</strong><br>
+                Managing Director / Operations Directorate<br>
+                Date: ________________________
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

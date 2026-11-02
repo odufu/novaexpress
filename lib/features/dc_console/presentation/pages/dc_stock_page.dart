@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
 import '../../../../core/widgets/product_image_widget.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../stock/domain/entities/stock_item.dart';
@@ -90,27 +91,45 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
             tabs: [
               Tab(
                 icon: const Icon(Icons.dashboard_customize_outlined, size: 17),
-                text: 'Master Products & Inventory (${stockState.stockItems.length})',
+                child: NovaTooltip(
+                  message: 'Master catalog of all client & DC product SKUs and inventory',
+                  child: Text('Products (${stockState.stockItems.length})'),
+                ),
               ),
               Tab(
                 icon: const Icon(Icons.inventory_2_outlined, size: 17),
-                text: 'DC Warehouse Stock Batches (${dcState.warehouseBatches.length})',
+                child: NovaTooltip(
+                  message: 'Physical stock batches stored in DC warehouse bins',
+                  child: Text('Batches (${dcState.warehouseBatches.length})'),
+                ),
               ),
               Tab(
                 icon: const Icon(Icons.mark_email_unread_outlined, size: 17),
-                text: 'Inbound Consignments (${stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length})',
+                child: NovaTooltip(
+                  message: 'Incoming supply shipments from merchants and inter-DC transfers',
+                  child: Text('Inbound (${stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length})'),
+                ),
               ),
               Tab(
                 icon: const Icon(Icons.checklist_outlined, size: 17),
-                text: 'Rider Picking Queue (${stockState.stockTransfers.where((t) => t.status == "pending_rider_acceptance" || t.status == "requested").length})',
+                child: NovaTooltip(
+                  message: 'Stock orders requested by riders waiting for warehouse bin picking',
+                  child: Text('Picking (${stockState.stockTransfers.where((t) => t.status == "pending_rider_acceptance" || t.status == "requested").length})'),
+                ),
               ),
               const Tab(
                 icon: Icon(Icons.qr_code_scanner_rounded, size: 17),
-                text: 'Dispatch Handover Counter',
+                child: NovaTooltip(
+                  message: 'Scan barcodes or PINs to confirm stock handoff to couriers',
+                  child: Text('Handover Counter'),
+                ),
               ),
               const Tab(
                 icon: Icon(Icons.assignment_return_outlined, size: 17),
-                text: 'Inbound Rider Returns',
+                child: NovaTooltip(
+                  message: 'Inspect and restock returned consignments from delivery riders',
+                  child: Text('Rider Returns'),
+                ),
               ),
             ],
           ),
@@ -251,11 +270,12 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                     SizedBox(
                       width: cardWidth,
                       child: _buildStockKpiCard(
-                        '📦 Total DC Stock',
+                        'Total Stock',
                         '${stockState.totalDCStock} Units',
                         'Valuation: ${CurrencyFormatter.formatNaira(stockState.totalDCStockValuation)}',
                         const Color(0xFF2563EB),
                         isDark,
+                        tooltip: 'Total combined inventory units across DC bins and rider custody',
                       ),
                     ),
 
@@ -263,11 +283,12 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                     SizedBox(
                       width: cardWidth,
                       child: _buildStockKpiCard(
-                        '🏢 Warehouse Shelf Stock',
+                        'Warehouse Shelf',
                         '${stockState.totalWarehouseAvailable} Units',
                         'Available in DC bins to allocate',
                         const Color(0xFF10B981),
                         isDark,
+                        tooltip: 'Available inventory units stored in warehouse bins ready for dispatch',
                       ),
                     ),
 
@@ -275,11 +296,12 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                     SizedBox(
                       width: cardWidth,
                       child: _buildStockKpiCard(
-                        '🛵 In Rider Custody',
+                        'Rider Custody',
                         '${stockState.totalInRiderCustody} Units',
                         'Across all active fleet vehicles',
                         const Color(0xFF8B5CF6),
                         isDark,
+                        tooltip: 'Consignment inventory currently allocated across active field riders',
                       ),
                     ),
 
@@ -287,19 +309,18 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                     SizedBox(
                       width: cardWidth,
                       child: _buildStockKpiCard(
-                        stockState.outOfStockCountFiltered > 0
-                            ? '🚨 Critical Depletion Alerts'
-                            : (stockState.lowStockCountFiltered > 0 ? '⚠️ Low Stock Alerts' : '✓ Stock Health Alerts'),
+                        'Stock Alerts',
                         stockState.outOfStockCountFiltered > 0
                             ? '${stockState.outOfStockCountFiltered} Out of Stock'
-                            : (stockState.lowStockCountFiltered > 0 ? '${stockState.lowStockCountFiltered} Products Low' : '0 Alerts'),
+                            : (stockState.lowStockCountFiltered > 0 ? '${stockState.lowStockCountFiltered} Low' : '0 Alerts'),
                         stockState.outOfStockCountFiltered > 0
-                            ? '${stockState.outOfStockCountFiltered} product(s) exhausted on shelf!'
-                            : (stockState.lowStockCountFiltered > 0 ? 'Requires warehouse restock' : 'All stock levels healthy ✓'),
+                            ? '${stockState.outOfStockCountFiltered} exhausted on shelf'
+                            : (stockState.lowStockCountFiltered > 0 ? 'Requires restock' : 'All levels healthy ✓'),
                         stockState.outOfStockCountFiltered > 0
                             ? const Color(0xFFDC2626)
                             : (stockState.lowStockCountFiltered > 0 ? const Color(0xFFF59E0B) : const Color(0xFF059669)),
                         isDark,
+                        tooltip: 'Critical exhaustion and low inventory threshold notifications',
                       ),
                     ),
                   ],
@@ -327,13 +348,19 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Master Products & Stock',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                'Products Catalog',
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const NovaInfoIcon(tooltip: 'Master catalog of all product SKUs and stock inventory', size: 13),
+                            ],
                           ),
                           Row(
                             children: [
@@ -367,30 +394,36 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                       Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _tabController.animateTo(2),
-                              icon: const Icon(Icons.mark_email_unread_rounded, size: 15, color: Colors.white),
-                              label: Text(
-                                (stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length) > 0
-                                    ? 'Inbound (${stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length})'
-                                    : 'Inbound',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0D9488),
-                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                            child: NovaTooltip(
+                              message: 'View inbound merchant shipments and inter-hub stock transfers',
+                              child: ElevatedButton.icon(
+                                onPressed: () => _tabController.animateTo(2),
+                                icon: const Icon(Icons.mark_email_unread_rounded, size: 15, color: Colors.white),
+                                label: Text(
+                                  (stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length) > 0
+                                      ? 'Inbound (${stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length})'
+                                      : 'Inbound',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0D9488),
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _showAddNewProductDialog(context, isDark),
-                              icon: const Icon(Icons.add_rounded, size: 15, color: Colors.white),
-                              label: const Text('Add Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2563EB),
-                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                            child: NovaTooltip(
+                              message: 'Register a new product SKU into warehouse inventory',
+                              child: ElevatedButton.icon(
+                                onPressed: () => _showAddNewProductDialog(context, isDark),
+                                icon: const Icon(Icons.add_rounded, size: 15, color: Colors.white),
+                                label: const Text('Add Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2563EB),
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                ),
                               ),
                             ),
                           ),
@@ -405,7 +438,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                               children: [
                                 Flexible(
                                   child: Text(
-                                    '📦 Products Master Catalogue',
+                                    'Products Catalog',
                                     style: GoogleFonts.inter(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -414,6 +447,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                const SizedBox(width: 6),
+                                const NovaInfoIcon(tooltip: 'Central master catalog of all client and DC products', size: 14),
                                 const SizedBox(width: 10),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -441,23 +476,29 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                 tooltip: 'Refresh Stock & Catalog',
                               ),
                               const SizedBox(width: 4),
-                              ElevatedButton.icon(
-                                onPressed: () => _tabController.animateTo(2),
-                                icon: const Icon(Icons.mark_email_unread_rounded, size: 16, color: Colors.white),
-                                label: Text(
-                                  (stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length) > 0
-                                      ? 'Inbound Consignments (${stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length})'
-                                      : 'Inbound Consignments',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              NovaTooltip(
+                                message: 'View inbound merchant shipments and inter-hub transfers',
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _tabController.animateTo(2),
+                                  icon: const Icon(Icons.mark_email_unread_rounded, size: 16, color: Colors.white),
+                                  label: Text(
+                                    (stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length) > 0
+                                        ? 'Inbound (${stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length})'
+                                        : 'Inbound',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D9488)),
                                 ),
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D9488)),
                               ),
                               const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: () => _showAddNewProductDialog(context, isDark),
-                                icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                                label: const Text('Add New Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                              NovaTooltip(
+                                message: 'Register a new product SKU into warehouse inventory',
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _showAddNewProductDialog(context, isDark),
+                                  icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                                  label: const Text('Add Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                                ),
                               ),
                             ],
                           ),
@@ -1176,7 +1217,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
   void _showNotifyMerchantRestockDialog(BuildContext context, bool isDark, StockItemEntity item) {
     final dcState = ref.read(dcConsoleProvider);
     final activeDc = dcState.distributionCenters.where((d) => d.id == dcState.activeHubId).firstOrNull;
-    final dcName = activeDc?.name ?? 'Wuse Grand Central Distribution Center';
+    final dcName = activeDc?.name ?? 'Central Command Distribution Center';
 
     DCNotifyMerchantRestockModal.show(
       context,
@@ -1394,8 +1435,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     );
   }
 
-  Widget _buildStockKpiCard(String title, String val, String sub, Color color, bool isDark) {
-    return Container(
+  Widget _buildStockKpiCard(String title, String val, String sub, Color color, bool isDark, {String? tooltip}) {
+    final card = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -1416,6 +1457,11 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
         ],
       ),
     );
+
+    if (tooltip != null) {
+      return NovaTooltip(message: tooltip, child: card);
+    }
+    return card;
   }
 
   // ==========================================

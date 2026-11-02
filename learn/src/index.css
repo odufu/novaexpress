@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --nx-navy: #082658;
+    --nx-navy-dark: #05193B;
+    --nx-navy-light: #0E3574;
+    --nx-orange: #FD7A02;
+    --nx-orange-hover: #E06900;
+    --nx-orange-glow: rgba(253, 122, 2, 0.20);
+    --nx-canvas: #F8FAFC;
+    --nx-surface: #FFFFFF;
+    --nx-border: #E2E8F0;
+    --nx-text-primary: #082658;
+    --nx-text-secondary: #475569;
+    --nx-text-muted: #94A3B8;
+  }
+
+  body {
+    background-color: #F8FAFC;
+    color: #1E293B;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #FD7A02;
+}
+
+/* Certificate Print Stylesheet */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #certificate-print-area, #certificate-print-area * {
+    visibility: visible;
+  }
+  #certificate-print-area {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 36px;
+    background: #FFFFFF !important;
+    color: #082658 !important;
+    box-shadow: none !important;
+    border: 8px double #082658 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

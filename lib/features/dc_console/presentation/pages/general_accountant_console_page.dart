@@ -29,6 +29,8 @@ class PendingReconciliationOrder {
   final String clientId;
   final String clientName;
   final String clientEmail;
+  final String? distributionCenterId;
+  final String productName;
   final double packagePrice; // Order total_amount
   final double deliveryFee; // Delivery fee arranged with merchant
   final double transactionFee; // Transaction / platform fee
@@ -49,6 +51,8 @@ class PendingReconciliationOrder {
     required this.clientId,
     required this.clientName,
     required this.clientEmail,
+    this.distributionCenterId,
+    this.productName = 'Product Consignment',
     required this.packagePrice,
     required this.deliveryFee,
     required this.transactionFee,
@@ -93,6 +97,7 @@ class ClientReconciliationGroup {
     required this.orders,
   });
 
+  String? get distributionCenterId => orders.firstOrNull?.distributionCenterId;
   double get totalPackagePrice => orders.fold(0.0, (sum, o) => sum + o.packagePrice);
   double get totalDeliveryFee => orders.fold(0.0, (sum, o) => sum + o.deliveryFee);
   double get totalTransactionFee => orders.fold(0.0, (sum, o) => sum + o.transactionFee);
@@ -167,7 +172,7 @@ class _GeneralAccountantConsolePageState
       final ordersRes = await client
           .from('orders')
           .select(
-              'id, order_number, customer_name, total_amount, client_delivery_fee, agent_entitlement, client_id, client_name, client_company, status, remittance_status, financial_settlement_status, delivery_agent_id, delivered_at, created_at')
+              'id, order_number, customer_name, product_name, total_amount, client_delivery_fee, agent_entitlement, client_id, client_name, client_company, status, remittance_status, financial_settlement_status, delivery_agent_id, distribution_center_id, delivered_at, created_at')
           .eq('status', 'delivered')
           .neq('financial_settlement_status', 'reconciled')
           .neq('financial_settlement_status', 'settled');
@@ -232,6 +237,8 @@ class _GeneralAccountantConsolePageState
           clientId: cId.isNotEmpty ? cId : '00000000-0000-4000-8000-791731264594',
           clientName: cName,
           clientEmail: cEmail,
+          distributionCenterId: oMap['distribution_center_id']?.toString(),
+          productName: oMap['product_name']?.toString() ?? 'Product Consignment',
           packagePrice: pkgPrice,
           deliveryFee: delFee,
           transactionFee: txFee,
@@ -1568,10 +1575,13 @@ class _GeneralAccountantConsolePageState
 
                         try {
                           // 1. Insert into client_settlements
+                          final orderIds = group.orders.map((o) => o.orderId).toList();
+                          final dcHubId = group.distributionCenterId ?? ref.read(dcConsoleProvider).activeHubId;
                           await adminClient.from('client_settlements').insert({
                             'settlement_number': settleNumber,
                             'client_id': group.clientId,
                             'company_id': '11111111-1111-4111-8111-111111111111',
+                            if (dcHubId.isNotEmpty) 'distribution_center_id': dcHubId,
                             'period_start': DateTime.now().subtract(const Duration(days: 7)).toIso8601String(),
                             'period_end': DateTime.now().toIso8601String(),
                             'total_orders_count': group.orders.length,
@@ -1585,15 +1595,34 @@ class _GeneralAccountantConsolePageState
                             'payout_reference': refController.text.trim(),
                             'proof_of_payment_url': proofUrl,
                             'status': 'pending_merchant_confirmation',
+                            'charges_breakdown': {
+                              'order_ids': orderIds,
+                              'delivery_fees': group.totalDeliveryFee,
+                              'platform_fees': group.totalTransactionFee,
+                              'reconciliation_price': group.totalReconciliationPrice,
+                              'dc_interest': group.totalDcCenterInterest,
+                              'orders': group.orders.map((o) => {
+                                'id': o.orderId,
+                                'order_number': o.orderNumber,
+                                'customer_name': o.customerName,
+                                'product_name': o.productName,
+                                'rider_name': o.riderName,
+                                'package_price': o.packagePrice,
+                                'delivery_fee': o.deliveryFee,
+                                'transaction_fee': o.transactionFee,
+                                'net_amount': o.reconciliationPrice,
+                                'delivered_at': o.deliveredAt?.toIso8601String(),
+                              }).toList(),
+                            },
                             'notes': 'Reconciled to ${group.clientName} (${group.clientEmail}). DC Interest retained: ₦${group.totalDcCenterInterest.toStringAsFixed(2)}',
                             'settled_at': DateTime.now().toIso8601String(),
                             'created_at': DateTime.now().toIso8601String(),
                           });
 
-                          // 2. Mark orders as reconciled in database
-                          final orderIds = group.orders.map((o) => o.orderId).toList();
+                          // 2. Mark orders as reconciled with remittance reference in database
                           await adminClient.from('orders').update({
                             'financial_settlement_status': 'reconciled',
+                            'remittance_reference': settleNumber,
                             'updated_at': DateTime.now().toIso8601String(),
                           }).inFilter('id', orderIds);
 

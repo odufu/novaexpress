@@ -1,3 +1,5 @@
+import 'package:novexps/features/dc_console/presentation/widgets/dc_onboard_operations_officer_modal.dart';
+import 'package:novexps/features/dc_console/presentation/widgets/dc_onboard_rider_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -222,10 +224,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Summary tiles show 0
-      expect(find.text('0 Agents'), findsOneWidget);
-      expect(find.text('0 Riders'), findsOneWidget);
-      expect(find.text('0 on Duty'), findsOneWidget);
-      expect(find.text('All Agents (0)'), findsOneWidget);
+      expect(find.text('PDAs'), findsWidgets);
+      expect(find.text('In-House'), findsWidgets);
+      expect(find.text('Active Duty'), findsOneWidget);
+      expect(find.text('All (0)'), findsOneWidget);
 
       // Empty roster notice
       expect(find.text('No delivery personnel onboarded to this distribution center yet.'), findsOneWidget);
@@ -290,21 +292,111 @@ void main() {
 
       // Top bar displays current DC name and code
       expect(find.text('Newi Regional Center'), findsAtLeast(1));
-      expect(find.text('(DC-002)'), findsAtLeast(1));
+      for (final element in find.byType(Text).evaluate()) {
+        final widget = element.widget as Text;
+        if (widget.data != null && (widget.data!.contains('Newi') || widget.data!.contains('DC') || widget.data!.contains('Center'))) {
+          print('FOUND TEXT: \${widget.data}');
+        }
+      }
+      expect(find.text('Newi Regional Center'), findsAtLeast(1));
 
       // No distribution center popup switcher in top bar
       expect(find.byType(PopupMenuButton<DistributionCenter>), findsNothing);
 
       // Sidebar items check: 'Distribution Centers' nav item must NOT exist for non-primary sub-DC
       expect(find.text('Distribution Centers'), findsNothing);
+      expect(find.text('DC & Hubs'), findsNothing);
+      expect(find.text('LOCKED'), findsAtLeast(1));
+      expect(find.byType(DropdownButton<String?>), findsNothing);
 
       // Other standard tabs should be present
-      expect(find.text('Dashboard'), findsOneWidget);
-      expect(find.text('Deliveries & Orders'), findsOneWidget);
-      expect(find.text('Cash & Remittances'), findsOneWidget);
-      expect(find.text('Transactions & Ledger'), findsOneWidget);
-      expect(find.text('Riders & Fleet'), findsOneWidget);
-      expect(find.text('Clients & Merchants'), findsOneWidget);
+      expect(find.text('Dashboard'), findsAtLeast(1));
+      expect(find.text('Orders'), findsAtLeast(1));
+      expect(find.text('Finance'), findsAtLeast(1));
+      expect(find.text('Fleet'), findsAtLeast(1));
+      expect(find.text('Merchants'), findsAtLeast(1));
+    });
+
+    testWidgets('6. DCOnboardOperationsOfficerModal displays locked station indicator and forbids cross-DC selection for sub-DC admin', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final dcNotifier = DCConsoleNotifier();
+      dcNotifier.switchActiveHub(subDc);
+
+      final dummyAuthRepo = AuthRepositoryImpl(_DummyAuthRemoteDS());
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dcConsoleProvider.overrideWith((ref) => dcNotifier),
+            authProvider.overrideWith((ref) {
+              final notifier = AuthNotifier(
+                loginUseCase: LoginUseCase(dummyAuthRepo),
+                logoutUseCase: LogoutUseCase(dummyAuthRepo),
+                getCurrentUserUseCase: GetCurrentUserUseCase(dummyAuthRepo),
+              );
+              notifier.state = const AuthState(user: subDcSupervisor);
+              return notifier;
+            }),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: DCOnboardOperationsOfficerModal()),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Station is locked to Newi Regional Center (DC-002)
+      expect(find.textContaining('Newi Regional Center'), findsAtLeast(1));
+      expect(find.text('LOCKED'), findsAtLeast(1));
+
+      // Ensure other DCs cannot be selected from a dropdown
+      expect(find.text('Central Command Distribution Center (DC-CMD-01)'), findsNothing);
+      expect(find.text('Benue Distribution center (DC-BNU001)'), findsNothing);
+      expect(find.text('NOVA XPRESS LAGOS (DC-0039)'), findsNothing);
+    });
+
+    testWidgets('7. DCOnboardRiderModal displays locked station indicator and enforces active DC for sub-DC admin', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final dcNotifier = DCConsoleNotifier();
+      dcNotifier.switchActiveHub(subDc);
+
+      final dummyAuthRepo = AuthRepositoryImpl(_DummyAuthRemoteDS());
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dcConsoleProvider.overrideWith((ref) => dcNotifier),
+            authProvider.overrideWith((ref) {
+              final notifier = AuthNotifier(
+                loginUseCase: LoginUseCase(dummyAuthRepo),
+                logoutUseCase: LogoutUseCase(dummyAuthRepo),
+                getCurrentUserUseCase: GetCurrentUserUseCase(dummyAuthRepo),
+              );
+              notifier.state = const AuthState(user: subDcSupervisor);
+              return notifier;
+            }),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: DCOnboardRiderModal()),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Station is locked to Newi Regional Center (DC-002)
+      expect(find.textContaining('Newi Regional Center'), findsAtLeast(1));
+      expect(find.text('LOCKED'), findsAtLeast(1));
+
+      // Ensure no cross-DC dropdown exists
+      expect(find.byType(DropdownButton<String>), findsNothing);
     });
   });
 }

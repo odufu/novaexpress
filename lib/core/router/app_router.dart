@@ -35,7 +35,9 @@ import '../../features/client_portal/presentation/pages/client_portal_layout.dar
 import '../../features/client_portal/presentation/pages/closer_mobile_portal_page.dart';
 import '../../features/client_portal/presentation/pages/merchant_sales_supervisor_page.dart';
 import '../../features/client_portal/presentation/pages/marketer_mobile_portal_page.dart';
+import '../../features/client_portal/presentation/pages/merchant_settlements_mobile_page.dart';
 import '../../features/client_portal/presentation/pages/public_lead_form_page.dart';
+import '../../features/admin_console/presentation/pages/admin_console_layout.dart';
 import '../../presentation/presentation_root.dart';
 
 class RouterRefreshNotifier extends ChangeNotifier {
@@ -49,6 +51,7 @@ class RouterRefreshNotifier extends ChangeNotifier {
             previous?.isAuthenticated != next.isAuthenticated ||
             previous?.isInitialized != next.isInitialized ||
             previous?.user?.role != next.user?.role ||
+            previous?.user?.isSuperAdmin != next.user?.isSuperAdmin ||
             previous?.user?.isClient != next.user?.isClient ||
             previous?.user?.isDcManager != next.user?.isDcManager ||
             previous?.user?.isDcOperations != next.user?.isDcOperations ||
@@ -67,7 +70,7 @@ final routerRefreshNotifierProvider = Provider<RouterRefreshNotifier>((ref) {
   return RouterRefreshNotifier(ref);
 });
 
-/// Pure, deterministic route redirection & isolation logic for all 4 operational consoles
+/// Pure, deterministic route redirection & isolation logic for all operational consoles
 String? appRouteRedirect({
   required AuthState authState,
   required String matchedLocation,
@@ -100,6 +103,7 @@ String? appRouteRedirect({
       return '/splash';
     }
 
+    final isSuperAdmin = user.isSuperAdmin;
     final isDc = user.isDcManager;
     final isDcOrders = user.isDcOrdersAdmin;
     final isDcStock = user.isDcStockAdmin || isDc;
@@ -117,6 +121,14 @@ String? appRouteRedirect({
     if (isLoggingIn) {
       debugPrint('[AUTH_ROUTER] 🎯 Authenticated ${user.roleDescription} -> Directing to designated console: $homePath');
       return homePath;
+    }
+
+    // 0. Super Admin Command Console (/admin/**)
+    if (matchedLocation.startsWith('/admin')) {
+      if (!isSuperAdmin) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Super Admin Console -> Redirecting to $homePath');
+        return homePath;
+      }
     }
 
     // 2. Strict Console Isolation: Distribution Center Console (/dc/**)
@@ -185,10 +197,23 @@ String? appRouteRedirect({
 
     // 4. Strict Console Isolation: Client Merchant Portal (/client/**)
     if (matchedLocation.startsWith('/client')) {
-      if (!isClientAdmin) {
+      if (!isClientAdmin && !user.isMerchantAccountant && !isSuperAdmin) {
         debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Client Merchant Portal -> Redirecting to $homePath');
         return homePath;
       }
+    }
+
+    // Merchant Finance / Settlement Portal (/merchant-settlements/**)
+    if (matchedLocation.startsWith('/merchant-settlements')) {
+      if (!user.isMerchantAccountant && !isClientAdmin && !isSuperAdmin) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Merchant Settlements Portal -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+    if (user.isMerchantAccountant &&
+        !matchedLocation.startsWith('/merchant-settlements') &&
+        !matchedLocation.startsWith('/client')) {
+      return '/merchant-settlements';
     }
 
     // 5. Strict Console Isolation: Telesales Closer Portal (/closer/**)
@@ -262,6 +287,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PresentationRoot(),
       ),
       GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminConsoleLayout(),
+      ),
+      GoRoute(
         path: '/',
         builder: (context, state) => const MainBottomNavShell(),
       ),
@@ -312,6 +341,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           final formId = state.pathParameters['formId'] ?? '';
           return PublicLeadFormPage(formId: formId);
         },
+      ),
+      GoRoute(
+        path: '/merchant-settlements',
+        builder: (context, state) => const MerchantSettlementsMobilePage(),
       ),
       GoRoute(
         path: '/client',

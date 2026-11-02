@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
@@ -856,7 +857,8 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
       }
 
       return true;
-    }).toList();
+    }).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     final double totalValuation = filtered.fold(0.0, (acc, o) => acc + o.totalAmount);
     final double deliveredRevenue = filtered.where((o) => o.status == 'delivered').fold(0.0, (acc, o) => acc + o.totalAmount);
@@ -894,52 +896,57 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                     children: [
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: 'Total Filtered Orders',
+                        title: 'All Orders',
                         value: '${filtered.length} Orders',
                         subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
                         icon: Icons.inventory_2_rounded,
                         iconColor: const Color(0xFF2563EB),
                         width: cardWidth,
+                        tooltip: 'Total filtered orders across date range and filters',
                       ),
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '📦 Unassigned Pool',
+                        title: 'Unassigned',
                         value: '$unassignedCount Pending',
-                        subtitle: 'Awaiting rider dispatch',
+                        subtitle: 'Awaiting dispatch',
                         icon: Icons.outbox_rounded,
                         iconColor: const Color(0xFFF37021),
                         width: cardWidth,
+                        tooltip: 'Orders waiting for rider route assignment',
                       ),
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '🚴 In-Transit Live',
+                        title: 'In Transit',
                         value: '$inTransitCount Active',
-                        subtitle: 'Out on delivery routes',
+                        subtitle: 'On route',
                         icon: Icons.local_shipping_rounded,
                         iconColor: const Color(0xFF0284C7),
                         width: cardWidth,
+                        tooltip: 'Consignments actively out on courier delivery routes',
                       ),
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '🟢 Fulfilled / POD',
+                        title: 'Fulfilled',
                         value: '$deliveredCount Delivered',
                         subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
                         icon: Icons.check_circle_rounded,
                         iconColor: const Color(0xFF16A34A),
                         width: cardWidth,
+                        tooltip: 'Delivered orders with proof of delivery verified',
                       ),
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '🟡 Cash in Custody',
+                        title: 'Fleet Cash',
                         value: CurrencyFormatter.formatNaira(unremittedCash),
-                        subtitle: '$unremittedCount awaiting remittance',
+                        subtitle: '$unremittedCount pending',
                         icon: Icons.payments_rounded,
                         iconColor: const Color(0xFFD97706),
                         width: cardWidth,
+                        tooltip: 'Total unremitted cash collected by couriers awaiting station clearance',
                         onTap: () {
                           ref.read(dcMasterStatusFilterProvider.notifier).state = 'awaiting_remittance';
                         },
@@ -947,12 +954,13 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '⚠️ Failed / Returns',
+                        title: 'Issues',
                         value: '$failedCount Issues',
                         subtitle: 'Call backs & returns',
                         icon: Icons.warning_amber_rounded,
                         iconColor: const Color(0xFFDC2626),
                         width: cardWidth,
+                        tooltip: 'Failed deliveries, customer reschedule call backs, and returns',
                       ),
                     ],
                   );
@@ -966,52 +974,57 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                     children: [
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: 'Total Filtered Orders',
+                        title: 'All Orders',
                         value: '${filtered.length} Orders',
                         subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
                         icon: Icons.inventory_2_rounded,
                         iconColor: const Color(0xFF2563EB),
                         width: 175,
+                        tooltip: 'Total filtered orders across date range and filters',
                       ),
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '📦 Unassigned Pool',
+                        title: 'Unassigned',
                         value: '$unassignedCount Pending',
-                        subtitle: 'Awaiting rider dispatch',
+                        subtitle: 'Awaiting dispatch',
                         icon: Icons.outbox_rounded,
                         iconColor: const Color(0xFFF37021),
                         width: 175,
+                        tooltip: 'Orders waiting for rider route assignment',
                       ),
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '🚴 In-Transit Live',
+                        title: 'In Transit',
                         value: '$inTransitCount Active',
-                        subtitle: 'Out on delivery routes',
+                        subtitle: 'On route',
                         icon: Icons.local_shipping_rounded,
                         iconColor: const Color(0xFF0284C7),
                         width: 175,
+                        tooltip: 'Consignments actively out on courier delivery routes',
                       ),
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '🟢 Fulfilled / POD',
+                        title: 'Fulfilled',
                         value: '$deliveredCount Delivered',
                         subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
                         icon: Icons.check_circle_rounded,
                         iconColor: const Color(0xFF16A34A),
                         width: 175,
+                        tooltip: 'Delivered orders with proof of delivery verified',
                       ),
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '🟡 Cash in Custody',
+                        title: 'Fleet Cash',
                         value: CurrencyFormatter.formatNaira(unremittedCash),
-                        subtitle: '$unremittedCount awaiting remittance',
+                        subtitle: '$unremittedCount pending',
                         icon: Icons.payments_rounded,
                         iconColor: const Color(0xFFD97706),
                         width: 175,
+                        tooltip: 'Total unremitted cash collected by couriers awaiting station clearance',
                         onTap: () {
                           ref.read(dcMasterStatusFilterProvider.notifier).state = 'awaiting_remittance';
                         },
@@ -1019,12 +1032,13 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                       const SizedBox(width: 8),
                       _buildDeliveredKpiCard(
                         isDark,
-                        title: '⚠️ Failed / Returns',
+                        title: 'Issues',
                         value: '$failedCount Issues',
                         subtitle: 'Call backs & returns',
                         icon: Icons.warning_amber_rounded,
                         iconColor: const Color(0xFFDC2626),
                         width: 175,
+                        tooltip: 'Failed deliveries, customer reschedule call backs, and returns',
                       ),
                     ],
                   ),
@@ -1039,50 +1053,59 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (ctx) => const DCCreateOrderModal(),
-                  );
-                },
-                icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                label: const Text('Create New Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF37021),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              NovaTooltip(
+                message: 'Create and book a new delivery consignment order',
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (ctx) => const DCCreateOrderModal(),
+                    );
+                  },
+                  icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                  label: const Text('New Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF37021),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (ctx) => const DCCsvOrderImportModal(),
-                  );
-                },
-                icon: const Icon(Icons.upload_file_rounded, size: 16, color: Colors.white),
-                label: const Text('Import CSV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              NovaTooltip(
+                message: 'Bulk upload delivery orders from CSV or Excel file',
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (ctx) => const DCCsvOrderImportModal(),
+                    );
+                  },
+                  icon: const Icon(Icons.upload_file_rounded, size: 16, color: Colors.white),
+                  label: const Text('Import CSV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               ),
               if (unassignedCount > 0)
-                ElevatedButton.icon(
-                  onPressed: () {
-                    final unassignedList = allOrders.where((o) => (o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty) && o.status != 'delivered').toList();
-                    _autoAssignPool(unassignedList, dcState, ordersState);
-                  },
-                  icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.white),
-                  label: const Text('Auto-Assign Pool', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                NovaTooltip(
+                  message: 'Intelligently allocate unassigned orders to active zone riders',
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      final unassignedList = allOrders.where((o) => (o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty) && o.status != 'delivered').toList();
+                      _autoAssignPool(unassignedList, dcState, ordersState);
+                    },
+                    icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.white),
+                    label: const Text('Auto Assign', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
                   ),
                 ),
             ],
@@ -1379,6 +1402,17 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
           ),
           const SizedBox(height: 16),
 
+          // Quick Status Tab Ribbon (Most Recent sits above table by default)
+          _buildQuickStatusTabStrip(
+            isDark: isDark,
+            currentStatus: masterStatus,
+            totalCount: allOrders.length,
+            completedCount: deliveredCount,
+            inTransitCount: inTransitCount,
+            unassignedCount: unassignedCount,
+            failedCount: failedCount,
+          ),
+
           // 4. Orders Directory View (Table or Grid)
           RepaintBoundary(
             child: ordersState.isLoading
@@ -1446,6 +1480,160 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     );
   }
 
+  Widget _buildQuickStatusTabStrip({
+    required bool isDark,
+    required String currentStatus,
+    required int totalCount,
+    required int completedCount,
+    required int inTransitCount,
+    required int unassignedCount,
+    required int failedCount,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: [
+            _buildStatusTabPill(
+              label: 'Most Recent (All)',
+              count: totalCount,
+              icon: Icons.history_rounded,
+              color: const Color(0xFF2563EB),
+              isSelected: currentStatus == 'all',
+              isDark: isDark,
+              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'all',
+            ),
+            const SizedBox(width: 8),
+            _buildStatusTabPill(
+              label: 'Completed ✓',
+              count: completedCount,
+              icon: Icons.check_circle_rounded,
+              color: const Color(0xFF10B981),
+              isSelected: currentStatus == 'delivered',
+              isDark: isDark,
+              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'delivered',
+            ),
+            const SizedBox(width: 8),
+            _buildStatusTabPill(
+              label: 'In Transit',
+              count: inTransitCount,
+              icon: Icons.local_shipping_rounded,
+              color: const Color(0xFF0284C7),
+              isSelected: currentStatus == 'in_transit',
+              isDark: isDark,
+              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'in_transit',
+            ),
+            const SizedBox(width: 8),
+            _buildStatusTabPill(
+              label: 'Unassigned',
+              count: unassignedCount,
+              icon: Icons.outbox_rounded,
+              color: const Color(0xFFF37021),
+              isSelected: currentStatus == 'unassigned',
+              isDark: isDark,
+              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'unassigned',
+            ),
+            const SizedBox(width: 8),
+            _buildStatusTabPill(
+              label: 'Issues',
+              count: failedCount,
+              icon: Icons.warning_amber_rounded,
+              color: const Color(0xFFDC2626),
+              isSelected: currentStatus == 'failed',
+              isDark: isDark,
+              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'failed',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusTabPill({
+    required String label,
+    required int count,
+    required IconData icon,
+    required Color color,
+    required bool isSelected,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color
+              : (isDark ? const Color(0xFF1E293B) : Colors.white),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? color
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            width: isSelected ? 1.5 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.white : const Color(0xFF0F172A)),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.22)
+                    : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMasterOrdersTable(
     BuildContext context,
     bool isDark,
@@ -1484,6 +1672,22 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
               brandPrimary: const Color(0xFF2563EB),
               dateExtractor: (order) => order.createdAt,
               onRowTap: (order) => _openOrderDetail(order),
+              rowColorBuilder: (order, isDark) {
+                final s = order.status.toLowerCase();
+                if (s == 'delivered' || s == 'completed') {
+                  return isDark
+                      ? const Color(0xFF064E3B).withValues(alpha: 0.15)
+                      : const Color(0xFFF0FDF4);
+                }
+                return null;
+              },
+              rowLeftBorderBuilder: (order, isDark) {
+                final s = order.status.toLowerCase();
+                if (s == 'delivered' || s == 'completed') {
+                  return const BorderSide(color: Color(0xFF10B981), width: 3.5);
+                }
+                return null;
+              },
               columns: [
                 // 1. Order # & Date
                 ExcelColumnDef<OrderEntity>(
@@ -2047,16 +2251,30 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     final status = order.status.toLowerCase();
     final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
 
-    if (status == 'delivered') {
+    if (status == 'delivered' || status == 'completed') {
       final isCashAwaitingRemittance = order.isUnremitted && !order.isDirectTransfer;
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-            decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
-            child: Text('DELIVERED ✓', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
+                const SizedBox(width: 4),
+                Text(
+                  'COMPLETED ✓',
+                  style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF10B981), letterSpacing: 0.3),
+                ),
+              ],
+            ),
           ),
           if (isCashAwaitingRemittance) ...[
             const SizedBox(height: 3),
@@ -2245,6 +2463,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     required IconData icon,
     required Color iconColor,
     required double width,
+    String? tooltip,
     VoidCallback? onTap,
   }) {
     final cardContent = Container(
@@ -2310,14 +2529,22 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
       ),
     );
 
+    Widget result = cardContent;
     if (onTap != null) {
-      return InkWell(
+      result = InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: cardContent,
       );
     }
-    return cardContent;
+
+    if (tooltip != null) {
+      return NovaTooltip(
+        message: tooltip,
+        child: result,
+      );
+    }
+    return result;
   }
 }
 

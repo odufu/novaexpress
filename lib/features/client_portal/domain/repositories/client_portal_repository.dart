@@ -10,6 +10,7 @@ import '../entities/stock_holder_custody.dart';
 import '../entities/client_marketer.dart';
 import '../entities/client_marketer_payout.dart';
 import '../entities/lead_form.dart';
+import '../entities/client_accountant.dart';
 
 abstract class ClientPortalRepository {
   /// Onboards a new Closer for an Enterprise Client
@@ -62,6 +63,30 @@ abstract class ClientPortalRepository {
     String? accountName,
     List<String>? assignedProductIds,
     List<String>? assignedProductNames,
+  });
+
+  /// Merchant Accountants
+  Future<List<ClientAccountant>> getAccountants(String clientId);
+  Future<ClientAccountant> createAccountant({
+    required String clientId,
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? accountantCode,
+    bool canApproveSettlements = true,
+    bool canManageExpenses = true,
+    bool canDisbursePayouts = true,
+    String? avatarUrl,
+  });
+  Future<void> toggleAccountantStatus({
+    required String accountantId,
+    required bool isActive,
+  });
+  Future<void> resetAccountantPassword({
+    required String accountantId,
+    String? userId,
+    required String newPassword,
   });
 
   /// Digital Marketer & Lead Form Operations

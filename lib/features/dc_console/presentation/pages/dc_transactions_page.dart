@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
 import '../../domain/entities/dc_transaction_record.dart';
 import '../providers/dc_console_provider.dart';
 import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
@@ -42,12 +43,17 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
     final isDesktop = screenWidth >= 1000;
     final isCompact = screenWidth < 700;
 
-    final dcRiderIds = dcState.drivers.map((d) => d.id).toSet();
-    final dcRiderCodes = dcState.drivers.map((d) => d.driverCode.toLowerCase()).toSet();
-    final txns = dcState.isCurrentHubGrandDc
+    final isGrandDcCumulative = dcState.isCurrentHubGrandDc && dcState.selectedDcId == null;
+    final dcRiderIds = isGrandDcCumulative
+        ? dcState.drivers.map((d) => d.id).toSet()
+        : dcState.dcDrivers.map((d) => d.id).toSet();
+    final dcRiderCodes = isGrandDcCumulative
+        ? dcState.drivers.map((d) => d.driverCode.toLowerCase()).toSet()
+        : dcState.dcDrivers.map((d) => d.driverCode.toLowerCase()).toSet();
+    final txns = isGrandDcCumulative
         ? dcState.transactions
         : dcState.transactions.where((t) => dcRiderIds.contains(t.riderId) || dcRiderCodes.contains(t.riderCode.toLowerCase())).toList();
-    final filteredTxns = dcState.isCurrentHubGrandDc
+    final filteredTxns = isGrandDcCumulative
         ? dcState.filteredTransactions
         : dcState.filteredTransactions.where((t) => dcRiderIds.contains(t.riderId) || dcRiderCodes.contains(t.riderCode.toLowerCase())).toList();
 
@@ -69,63 +75,54 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
             // 1. PAGE HEADER & QUICK ACTIONS
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF00A2D3), size: 22),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Transactions & Audit Ledger',
-                                  style: GoogleFonts.inter(
-                                    fontSize: isCompact ? 18 : 22,
-                                    fontWeight: FontWeight.w900,
-                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                Text(
-                                  'Real-time financial audit trail of all orders, rider entitlements, partial/complete remittances, and Paystack settlements',
-                                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF00A2D3), size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Audit Ledger',
+                        style: GoogleFonts.inter(
+                          fontSize: isCompact ? 18 : 22,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const NovaInfoIcon(
+                        message: 'Real-time financial audit trail of all orders, rider entitlements, partial/complete remittances, and Paystack settlements',
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    dcNotifier.loadTransactionsFromDatabase();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Transactions ledger refreshed from live database.')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00A2D3),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                NovaTooltip(
+                  message: 'Synchronize transactions and audit entries directly with live database',
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      dcNotifier.loadTransactionsFromDatabase();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Transactions ledger refreshed from live database.')),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00A2D3),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.sync_rounded, size: 16),
+                    label: Text('Sync Live', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
-                  icon: const Icon(Icons.sync_rounded, size: 16),
-                  label: Text('Sync Live', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -148,7 +145,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                     SizedBox(
                       width: cardWidth,
                       child: _buildMetricTile(
-                        title: 'Total Gross Volume',
+                        title: 'Gross Volume',
                         value: CurrencyFormatter.formatNaira(totalVolume),
                         subtitle: '${txns.length} Recorded Transactions',
                         icon: Icons.account_balance_wallet_rounded,
@@ -159,7 +156,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                     SizedBox(
                       width: cardWidth,
                       child: _buildMetricTile(
-                        title: 'Paystack Direct Transfers',
+                        title: 'Paystack Pool',
                         value: CurrencyFormatter.formatNaira(paystackVolume),
                         subtitle: '$paystackCount Instant Settlements ⚡',
                         icon: Icons.bolt_rounded,
@@ -170,7 +167,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                     SizedBox(
                       width: cardWidth,
                       child: _buildMetricTile(
-                        title: 'Cash POD Handled',
+                        title: 'Cash Handled',
                         value: CurrencyFormatter.formatNaira(cashVolume),
                         subtitle: '$cashCount Handover Orders 💵',
                         icon: Icons.payments_rounded,
@@ -181,7 +178,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                     SizedBox(
                       width: cardWidth,
                       child: _buildMetricTile(
-                        title: 'Rider Entitlements',
+                        title: 'Rider Earnings',
                         value: CurrencyFormatter.formatNaira(totalRiderEntitlements),
                         subtitle: 'Commissions & Allowances 🛵',
                         icon: Icons.two_wheeler_rounded,
@@ -239,7 +236,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildFilterChip('all', 'All Transactions (${txns.length})', dcState.transactionFilter == 'all', isDark, () {
+                        _buildFilterChip('all', 'All (${txns.length})', dcState.transactionFilter == 'all', isDark, () {
                           dcNotifier.setTransactionFilter('all');
                         }),
                         const SizedBox(width: 8),
@@ -247,7 +244,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                           dcNotifier.setTransactionFilter('paystack');
                         }),
                         const SizedBox(width: 8),
-                        _buildFilterChip('cash', 'Cash POD 💵 ($cashCount)', dcState.transactionFilter == 'cash', isDark, () {
+                        _buildFilterChip('cash', 'Cash 💵 ($cashCount)', dcState.transactionFilter == 'cash', isDark, () {
                           dcNotifier.setTransactionFilter('cash');
                         }),
                         const SizedBox(width: 8),
@@ -1106,7 +1103,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                       const Divider(height: 12),
                       _buildReceiptRow('Assigned Rider', '${txn.riderName} (${txn.riderCode})'),
                       const Divider(height: 12),
-                      _buildReceiptRow('Distribution Hub', 'Wuse DC Hub (DC-WUSE-01)'),
+                      _buildReceiptRow('Distribution Hub', 'Central Command Hub (DC-CMD-01)'),
                       const Divider(height: 12),
                       _buildReceiptRow('Payment Method', txn.channel),
                       const Divider(height: 12),

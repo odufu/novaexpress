@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/services/audit_logging_service.dart';
+import '../../../../core/widgets/nova_tooltip.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/dc_operations_officer.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_onboard_operations_officer_modal.dart';
@@ -24,6 +27,109 @@ class _DCOperationsPageState extends ConsumerState<DCOperationsPage> {
     super.dispose();
   }
 
+  String _getRoleTitle(String role) {
+    switch (role) {
+      case 'dc_manager':
+        return 'General Distribution Manager (DC Admin)';
+      case 'dc_stock_admin':
+        return 'Stock & Inventory Admin';
+      case 'dc_finance_admin':
+        return 'Station Finance Admin';
+      case 'general_accountant':
+        return 'General Accountant';
+      default:
+        return 'Orders & Dispatch Officer';
+    }
+  }
+
+  String _getPortalRoute(String role) {
+    switch (role) {
+      case 'dc_manager':
+        return '/dc';
+      case 'dc_stock_admin':
+        return '/stock-ops';
+      case 'dc_finance_admin':
+        return '/finance-ops';
+      case 'general_accountant':
+        return '/accountant';
+      default:
+        return '/ops (Strictly Mobile)';
+    }
+  }
+
+  String _getRoleScope(String role) {
+    switch (role) {
+      case 'dc_manager':
+        return 'Full DC Operations, Admin User Creation & Distribution Management';
+      case 'dc_stock_admin':
+        return 'Stock Reconciliation & Hub Inventory Management';
+      case 'dc_finance_admin':
+        return 'COD Remittances, Station Cashflow & Reconciliation';
+      case 'general_accountant':
+        return 'National Audits, Ledger Entries & Financial Reports';
+      default:
+        return 'Live Order Monitoring & Rider Dispatching (Strictly Mobile)';
+    }
+  }
+
+  Widget _buildRoleBadge(String role) {
+    final String label;
+    final Color color;
+    final IconData icon;
+
+    switch (role) {
+      case 'dc_manager':
+        label = 'DC MANAGER';
+        color = const Color(0xFFF37021);
+        icon = Icons.apartment_rounded;
+        break;
+      case 'dc_stock_admin':
+        label = 'STOCK ADMIN';
+        color = const Color(0xFF0284C7);
+        icon = Icons.inventory_2_rounded;
+        break;
+      case 'dc_finance_admin':
+        label = 'FINANCE ADMIN';
+        color = const Color(0xFFD97706);
+        icon = Icons.account_balance_wallet_rounded;
+        break;
+      case 'general_accountant':
+        label = 'ACCOUNTANT';
+        color = const Color(0xFF7C3AED);
+        icon = Icons.account_balance_rounded;
+        break;
+      default:
+        label = 'DISPATCH OPS';
+        color = const Color(0xFF0D9488);
+        icon = Icons.alt_route_rounded;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _sendViaWhatsApp(DCOperationsOfficer officer, String dcName) async {
     final cleanPhone = officer.phone.replaceAll(RegExp(r'[^0-9]'), '');
     String intlPhone = cleanPhone;
@@ -33,21 +139,23 @@ class _DCOperationsPageState extends ConsumerState<DCOperationsPage> {
       intlPhone = '234$intlPhone';
     }
 
-    final message = '''*NovaXpress DC Operations Portal - Login Details*
+    final roleTitle = _getRoleTitle(officer.role);
+    final portalRoute = _getPortalRoute(officer.role);
+    final scope = _getRoleScope(officer.role);
+
+    final message = '''*NovaXpress Operations Portal - Login Details*
 ----------------------------------------
 Hello ${officer.name},
-Your login details for the *NovaXpress DC Operations Portal* at *${dcName.isNotEmpty ? dcName : 'Assigned DC'}*:
+Your login credentials for the *NovaXpress Operations Portal* as *$roleTitle* at *${dcName.isNotEmpty ? dcName : 'Assigned DC'}*:
 
-📱 *Mobile Portal:* Access strictly from your phone browser or mobile app
+📱 *Portal Route:* $portalRoute
 👤 *Staff Code:* ${officer.staffCode}
 📧 *Email:* ${officer.email}
 🔑 *Password:* ${officer.rawPassword ?? 'Use your registered password'}
 🏢 *Assigned DC:* $dcName
 
 *Your Operations Scope:*
-• View live incoming orders targeting this DC
-• Route and dispatch orders to active delivery riders
-• Reroute orders to other distribution centers
+• $scope
 
 ----------------------------------------
 *NovaXpress Logistics Operations*''';
@@ -73,15 +181,20 @@ Your login details for the *NovaXpress DC Operations Portal* at *${dcName.isNotE
   }
 
   void _copyCredentials(DCOperationsOfficer officer, String dcName) {
-    final text = '''NovaXpress DC Operations Officer Credentials
+    final roleTitle = _getRoleTitle(officer.role);
+    final portalRoute = _getPortalRoute(officer.role);
+    final scope = _getRoleScope(officer.role);
+
+    final text = '''NovaXpress Staff Credentials
 ----------------------------------------
 Officer Name: ${officer.name}
+Role: $roleTitle
 Staff Code: ${officer.staffCode}
 Email: ${officer.email}
 Password: ${officer.rawPassword ?? '(Registered Password)'}
 Assigned DC: $dcName
-Portal Route: /ops (Strictly Mobile)
-Scope: Incoming Order Routing & Dispatch Only
+Portal Route: $portalRoute
+Scope: $scope
 ----------------------------------------''';
 
     Clipboard.setData(ClipboardData(text: text));
@@ -152,23 +265,21 @@ Scope: Incoming Order Routing & Dispatch Only
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
                             Text(
-                              'DC Operations Department',
+                              'Operations Team',
                               style: GoogleFonts.inter(
                                 fontSize: isMobile ? 18 : 22,
                                 fontWeight: FontWeight.bold,
                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
                             ),
-                            Text(
-                              'Strictly Mobile Dispatch & Live Routing Hub (${dcState.activeHubName})',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.5,
-                                color: const Color(0xFF64748B),
-                              ),
+                            const SizedBox(width: 6),
+                            NovaInfoIcon(
+                              tooltip: 'Strictly mobile dispatch & live routing hub for ${dcState.activeHubName}',
+                              size: 16,
+                              color: const Color(0xFF0D9488),
                             ),
                           ],
                         ),
@@ -178,22 +289,25 @@ Scope: Incoming Order Routing & Dispatch Only
                 ],
               );
 
-              final onboardBtn = ElevatedButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => const DCOnboardOperationsOfficerModal(),
-                  );
-                },
-                icon: const Icon(Icons.person_add_rounded, size: 18, color: Colors.white),
-                label: const Text(
-                  'Onboard Operations Officer',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              final onboardBtn = NovaTooltip(
+                message: 'Onboard a new operations manager, stock admin, finance admin or dispatch officer',
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => const DCOnboardOperationsOfficerModal(),
+                    );
+                  },
+                  icon: const Icon(Icons.person_add_rounded, size: 18, color: Colors.white),
+                  label: const Text(
+                    'Onboard Staff',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D9488),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               );
 
@@ -240,23 +354,25 @@ Scope: Incoming Order Routing & Dispatch Only
                   SizedBox(
                     width: cardWidth,
                     child: _buildMetricCard(
-                      title: 'Operations Officers',
+                      title: 'Operations Staff',
                       value: '$totalOfficers Staff',
                       subtext: '$activeOfficers active on duty',
                       icon: Icons.people_alt_rounded,
                       color: const Color(0xFF0D9488),
                       isDark: isDark,
+                      tooltip: 'Total registered operations personnel on roster',
                     ),
                   ),
                   SizedBox(
                     width: cardWidth,
                     child: _buildMetricCard(
-                      title: 'Mobile Access Portal',
+                      title: 'Mobile Portal',
                       value: '/ops',
                       subtext: 'Strictly mobile interface',
                       icon: Icons.phone_android_rounded,
                       color: const Color(0xFF3B82F6),
                       isDark: isDark,
+                      tooltip: 'Dedicated mobile dispatch interface for route assignment and order monitoring',
                     ),
                   ),
                   SizedBox(
@@ -268,17 +384,19 @@ Scope: Incoming Order Routing & Dispatch Only
                       icon: Icons.hub_rounded,
                       color: const Color(0xFFF37021),
                       isDark: isDark,
+                      tooltip: 'Jurisdictional hub code and facility command scope',
                     ),
                   ),
                   SizedBox(
                     width: cardWidth,
                     child: _buildMetricCard(
-                      title: 'Access Restriction',
+                      title: 'Access Scope',
                       value: 'Scoped to DC',
-                      subtext: 'Zero access to other DCs/finance',
+                      subtext: 'Zero cross-hub leakage',
                       icon: Icons.security_rounded,
                       color: const Color(0xFF10B981),
                       isDark: isDark,
+                      tooltip: 'Staff credentials and activities are strictly isolated to this distribution center',
                     ),
                   ),
                 ],
@@ -359,6 +477,28 @@ Scope: Incoming Order Routing & Dispatch Only
                   dcName: dcState.activeHubName,
                   onToggleStatus: (val) async {
                     await dcNotifier.toggleOperationsOfficerStatus(officer.id, val);
+                    final currentUser = ref.read(authProvider).user;
+                    final roleTitle = _getRoleTitle(officer.role);
+                    await AuditLoggingService.instance.logAction(
+                      actorId: currentUser?.id ?? currentUser?.authUserId,
+                      actorName: (currentUser != null && (currentUser.firstName.isNotEmpty || currentUser.lastName.isNotEmpty))
+                          ? '${currentUser.firstName} ${currentUser.lastName}'.trim()
+                          : (currentUser?.email ?? 'Distribution Center Supervisor'),
+                      actorEmail: currentUser?.email ?? 'dc.manager@novaxpress.ng',
+                      actorRole: currentUser?.role ?? 'dc_manager',
+                      action: val ? 'ENABLE_STAFF_ACCESS' : 'SUSPEND_STAFF_ACCESS',
+                      resource: 'USER_ROSTER',
+                      details: '${val ? "Enabled" : "Suspended"} console access for $roleTitle "${officer.name}" (${officer.staffCode}) at ${dcState.activeHubName}.',
+                      distributionCenterId: dcState.activeHubId,
+                      distributionCenterName: dcState.activeHubName,
+                      metadata: {
+                        'officer_id': officer.id,
+                        'officer_name': officer.name,
+                        'officer_code': officer.staffCode,
+                        'new_status': val ? 'active' : 'suspended',
+                        'role': officer.role,
+                      },
+                    );
                   },
                   onDelete: () => _confirmDeleteOfficer(officer),
                 );
@@ -403,8 +543,9 @@ Scope: Incoming Order Routing & Dispatch Only
     required IconData icon,
     required Color color,
     required bool isDark,
+    String? tooltip,
   }) {
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF151D36) : Colors.white,
@@ -459,6 +600,11 @@ Scope: Incoming Order Routing & Dispatch Only
         ],
       ),
     );
+
+    if (tooltip != null) {
+      return NovaTooltip(message: tooltip, child: card);
+    }
+    return card;
   }
 
   Widget _buildOfficerCard({
@@ -550,6 +696,8 @@ Scope: Incoming Order Routing & Dispatch Only
                             ),
                           ),
                         ),
+                        const SizedBox(width: 6),
+                        _buildRoleBadge(officer.role),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -673,6 +821,30 @@ Scope: Incoming Order Routing & Dispatch Only
             onPressed: () async {
               Navigator.of(ctx).pop();
               await ref.read(dcConsoleProvider.notifier).deleteOperationsOfficer(officer.id);
+
+              final currentUser = ref.read(authProvider).user;
+              final dcState = ref.read(dcConsoleProvider);
+              final roleTitle = _getRoleTitle(officer.role);
+              await AuditLoggingService.instance.logAction(
+                actorId: currentUser?.id ?? currentUser?.authUserId,
+                actorName: (currentUser != null && (currentUser.firstName.isNotEmpty || currentUser.lastName.isNotEmpty))
+                    ? '${currentUser.firstName} ${currentUser.lastName}'.trim()
+                    : (currentUser?.email ?? 'Distribution Center Supervisor'),
+                actorEmail: currentUser?.email ?? 'dc.manager@novaxpress.ng',
+                actorRole: currentUser?.role ?? 'dc_manager',
+                action: 'DELETE_STAFF_RECORD',
+                resource: 'USER_ROSTER',
+                details: 'Permanently removed $roleTitle "${officer.name}" (${officer.staffCode}) from ${dcState.activeHubName} operations roster.',
+                distributionCenterId: dcState.activeHubId,
+                distributionCenterName: dcState.activeHubName,
+                metadata: {
+                  'officer_id': officer.id,
+                  'officer_name': officer.name,
+                  'officer_code': officer.staffCode,
+                  'role': officer.role,
+                },
+              );
+
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

@@ -161,12 +161,7 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Order Pipeline Chat (DC Hub & Rider)',
-                    icon: const Icon(Icons.forum_outlined, color: Color(0xFF2DD4BF), size: 20),
-                    onPressed: () => OrderPipelineChatSheet.showForOrder(context, currentOrder),
-                  ),
-                  const SizedBox(width: 4),
+
                   IconButton(
                     icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
                     onPressed: () => Navigator.of(context).pop(),

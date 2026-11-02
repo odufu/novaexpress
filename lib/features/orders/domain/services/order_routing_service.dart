@@ -242,7 +242,7 @@ class OrderRoutingService {
   ///      - It is assigned to a different DC, OR
   ///      - Its delivery location (State / LGA) is outside this Regional DC's coverage.
   ///
-  /// 2. Grand DC (Primary Hub Headquarters, e.g. Wuse Central / Abuja Main DC):
+  /// 2. Grand DC (Central Command Distribution Center HQ):
   ///    - If an active dedicated Regional DC exists in [allDcs] that handles the order's State / LGA
   ///      (e.g. Otukpo DC covering Benue):
   ///      -> The order belongs to that Regional DC and MUST NOT show in the Grand DC!
@@ -263,7 +263,7 @@ class OrderRoutingService {
     final grandDc = allDcs.where((d) => d.isGrandDc && d.isActive).firstOrNull ??
         allDcs.where((d) => d.isHub && d.isActive).firstOrNull;
     final grandDcId = grandDc?.id ?? '22222222-2222-4222-8222-222222222222';
-    final grandDcCode = grandDc?.code ?? 'DC-WUSE-01';
+    final grandDcCode = grandDc?.code ?? 'DC-CMD-01';
 
     // 1. Regional DC (Dedicated, non-Grand DC, e.g. Otukpo DC)
     if (!currentDc.isGrandDc) {

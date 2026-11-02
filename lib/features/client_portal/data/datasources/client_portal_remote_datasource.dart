@@ -15,6 +15,7 @@ import '../../domain/entities/stock_holder_custody.dart';
 import '../../domain/entities/client_marketer.dart';
 import '../../domain/entities/client_marketer_payout.dart';
 import '../../domain/entities/lead_form.dart';
+import '../../domain/entities/client_accountant.dart';
 import '../../../../core/helpers/uuid_helper.dart';
 
 abstract class ClientPortalRemoteDataSource {
@@ -53,6 +54,30 @@ abstract class ClientPortalRemoteDataSource {
     String? accountName,
     List<String>? assignedProductIds,
     List<String>? assignedProductNames,
+  });
+
+  /// Merchant Accountants
+  Future<List<ClientAccountant>> fetchAccountants(String clientId);
+  Future<ClientAccountant> createAccountant({
+    required String clientId,
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? accountantCode,
+    bool canApproveSettlements = true,
+    bool canManageExpenses = true,
+    bool canDisbursePayouts = true,
+    String? avatarUrl,
+  });
+  Future<void> updateAccountantStatus({
+    required String accountantId,
+    required bool isActive,
+  });
+  Future<void> resetAccountantPassword({
+    required String accountantId,
+    String? userId,
+    required String newPassword,
   });
 
   /// Digital Marketers & Lead Forms
@@ -728,6 +753,315 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
         if (isActive != null) 'is_active': isActive,
       }).eq('id', closerId);
     }
+  }
+
+  // ==========================================
+  // MERCHANT ACCOUNTANTS
+  // ==========================================
+
+  @override
+  Future<ClientAccountant> createAccountant({
+    required String clientId,
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? accountantCode,
+    bool canApproveSettlements = true,
+    bool canManageExpenses = true,
+    bool canDisbursePayouts = true,
+    String? avatarUrl,
+  }) async {
+    final adminDb = _getAdminClient();
+    final cleanEmail = email.trim().toLowerCase();
+    final rawPassword = (password != null && password.trim().isNotEmpty) ? password.trim() : 'Accountant123!';
+
+    // 1. Validate Email Uniqueness in users table
+    try {
+      final existingEmail = await adminDb
+          .from('users')
+          .select('id')
+          .eq('email', cleanEmail)
+          .maybeSingle();
+
+      if (existingEmail != null) {
+        throw Exception("Email '$cleanEmail' is already registered to another account.");
+      }
+    } catch (e) {
+      if (e.toString().contains('already registered')) rethrow;
+    }
+
+    // 2. Guaranteed-Unique Accountant Code Generation
+    final Set<String> existingCodes = {};
+    try {
+      final existingCodesRes = await adminDb
+          .from('client_accountants')
+          .select('accountant_code');
+      for (final row in (existingCodesRes as List)) {
+        final code = row['accountant_code']?.toString().trim().toUpperCase();
+        if (code != null && code.isNotEmpty) {
+          existingCodes.add(code);
+        }
+      }
+    } catch (_) {}
+
+    String prefix = 'ACC-NOVA-';
+    if (accountantCode != null && accountantCode.trim().isNotEmpty) {
+      final match = RegExp(r'^(.*?)(\d+)$').firstMatch(accountantCode.trim());
+      if (match != null && match.group(1)!.isNotEmpty) {
+        prefix = match.group(1)!;
+      }
+    }
+
+    int maxSuffix = 0;
+    for (final code in existingCodes) {
+      if (code.startsWith(prefix.toUpperCase())) {
+        final numPart = code.substring(prefix.length);
+        final val = int.tryParse(numPart);
+        if (val != null && val > maxSuffix) {
+          maxSuffix = val;
+        }
+      }
+    }
+
+    int nextNum = maxSuffix >= 100 ? maxSuffix + 1 : (maxSuffix > 0 ? maxSuffix + 1 : 101);
+    String candidateCode = '$prefix${nextNum.toString().padLeft(3, '0')}';
+    while (existingCodes.contains(candidateCode.toUpperCase())) {
+      nextNum++;
+      candidateCode = '$prefix${nextNum.toString().padLeft(3, '0')}';
+    }
+    final effectiveAccountantCode = candidateCode;
+    final accountantId = _generateUuid();
+
+    // 3. Provision Supabase Auth User
+    String authUserId = accountantId;
+    bool createdNewAuthUser = false;
+    try {
+      final authRes = await adminDb.auth.admin.createUser(
+        AdminUserAttributes(
+          email: cleanEmail,
+          password: rawPassword,
+          emailConfirm: true,
+          userMetadata: {
+            'role': 'merchant_accountant',
+            'client_id': clientId,
+            'full_name': fullName.trim(),
+          },
+        ),
+      );
+      if (authRes.user != null) {
+        authUserId = authRes.user!.id;
+        createdNewAuthUser = true;
+      }
+    } catch (authErr) {
+      final errStr = authErr.toString().toLowerCase();
+      if (errStr.contains('already') || errStr.contains('exists') || errStr.contains('unique') || errStr.contains('422')) {
+        try {
+          final usersList = await adminDb.auth.admin.listUsers();
+          final existing = usersList.firstWhere((u) => u.email?.toLowerCase() == cleanEmail);
+          await adminDb.auth.admin.updateUserById(
+            existing.id,
+            attributes: AdminUserAttributes(
+              password: rawPassword,
+              emailConfirm: true,
+              userMetadata: {
+                'role': 'merchant_accountant',
+                'client_id': clientId,
+                'full_name': fullName.trim(),
+              },
+            ),
+          );
+          authUserId = existing.id;
+        } catch (_) {
+          throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
+        }
+      } else {
+        rethrow;
+      }
+    }
+
+    final newAccountant = ClientAccountant(
+      id: accountantId,
+      clientId: clientId,
+      userId: authUserId,
+      accountantCode: effectiveAccountantCode,
+      fullName: fullName.trim(),
+      email: cleanEmail,
+      phone: phone.trim(),
+      isActive: true,
+      canApproveSettlements: canApproveSettlements,
+      canManageExpenses: canManageExpenses,
+      canDisbursePayouts: canDisbursePayouts,
+      avatarUrl: avatarUrl,
+      createdAt: DateTime.now(),
+    );
+
+    try {
+      // 4. Create in client_accountants table
+      try {
+        await adminDb.from('client_accountants').upsert(newAccountant.toJson());
+      } catch (upsertErr) {
+        debugPrint('[CLIENT_PORTAL] ⚠️ Warning upserting to client_accountants: $upsertErr');
+      }
+
+      // 5. Create User account in users table
+      final nameParts = fullName.trim().split(' ');
+      final fName = nameParts.isNotEmpty ? nameParts.first : 'Accountant';
+      final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+      await adminDb.from('users').upsert({
+        'id': authUserId,
+        'company_id': '11111111-1111-4111-8111-111111111111',
+        'client_id': clientId,
+        'email': cleanEmail,
+        'phone_number': phone.trim(),
+        'first_name': fName,
+        'last_name': lName,
+        'role': 'merchant_accountant',
+        if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatar_url': avatarUrl,
+        'is_active': true,
+      });
+
+      // 6. Register in-memory session for immediate local/test authentication
+      final accountantUser = UserModel(
+        id: authUserId,
+        authUserId: authUserId,
+        email: cleanEmail,
+        firstName: fName,
+        lastName: lName,
+        phone: phone.trim(),
+        role: 'merchant_accountant',
+        clientId: clientId,
+        accountantId: accountantId,
+        accountantCode: effectiveAccountantCode,
+        avatarUrl: avatarUrl,
+      );
+      AuthRemoteDataSourceImpl.registerUserInMemory(accountantUser, rawPassword);
+
+      return newAccountant;
+    } catch (upsertErr) {
+      debugPrint('[CLIENT_PORTAL] ❌ Upsert error during accountant onboarding: $upsertErr. Rolling back.');
+      try {
+        await adminDb.from('client_accountants').delete().eq('id', accountantId);
+      } catch (_) {}
+      try {
+        await adminDb.from('users').delete().eq('id', authUserId);
+      } catch (_) {}
+      if (createdNewAuthUser) {
+        try {
+          await adminDb.auth.admin.deleteUser(authUserId);
+        } catch (_) {}
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<ClientAccountant>> fetchAccountants(String clientId) async {
+    final client = _getClient();
+    try {
+      final response = await client
+          .from('client_accountants')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('created_at', ascending: false);
+
+      final List<ClientAccountant> list = [];
+      for (final item in (response as List)) {
+        try {
+          list.add(ClientAccountant.fromJson(item as Map<String, dynamic>));
+        } catch (_) {}
+      }
+      if (list.isNotEmpty) return list;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] Notice: client_accountants query: $e. Checking users fallback.');
+    }
+
+    // Fallback: check users table for role == 'merchant_accountant' or 'client_accountant'
+    try {
+      final usersRes = await client
+          .from('users')
+          .select('*')
+          .eq('client_id', clientId)
+          .or('role.eq.merchant_accountant,role.eq.client_accountant,role.eq.client_finance,role.eq.merchant_finance')
+          .order('created_at', ascending: false);
+
+      final List<ClientAccountant> fallbackList = [];
+      for (final item in (usersRes as List)) {
+        try {
+          fallbackList.add(ClientAccountant.fromJson(item as Map<String, dynamic>));
+        } catch (_) {}
+      }
+      return fallbackList;
+    } catch (err) {
+      debugPrint('[CLIENT_PORTAL] Error fetching accountants from users table: $err');
+      return [];
+    }
+  }
+
+  @override
+  Future<void> updateAccountantStatus({
+    required String accountantId,
+    required bool isActive,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      await adminDb.from('client_accountants').update({
+        'is_active': isActive,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', accountantId);
+    } catch (_) {}
+
+    try {
+      await adminDb.from('users').update({
+        'is_active': isActive,
+      }).eq('id', accountantId);
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> resetAccountantPassword({
+    required String accountantId,
+    String? userId,
+    required String newPassword,
+  }) async {
+    final adminDb = _getAdminClient();
+    var targetUserId = userId;
+    if (targetUserId == null || targetUserId.isEmpty) {
+      try {
+        final row = await adminDb.from('client_accountants').select('user_id').eq('id', accountantId).maybeSingle();
+        targetUserId = row?['user_id']?.toString();
+      } catch (_) {}
+    }
+
+    if (targetUserId != null && targetUserId.isNotEmpty) {
+      try {
+        await adminDb.auth.admin.updateUserById(
+          targetUserId,
+          attributes: AdminUserAttributes(password: newPassword),
+        );
+      } catch (authErr) {
+        debugPrint('[CLIENT_PORTAL] ⚠️ resetAccountantPassword auth admin error: $authErr');
+      }
+    } else {
+      try {
+        await adminDb.from('users').update({
+          'raw_user_meta_data': {'default_password_changed': true},
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', accountantId);
+      } catch (_) {}
+    }
+
+    try {
+      final accRes = await adminDb.from('client_accountants').select('email').eq('id', accountantId).maybeSingle();
+      final email = accRes?['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        final registered = AuthRemoteDataSourceImpl.getRegisteredUser(email);
+        if (registered != null) {
+          AuthRemoteDataSourceImpl.registerUserInMemory(registered, newPassword);
+        }
+      }
+    } catch (_) {}
   }
 
   @override

@@ -916,12 +916,15 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                CurrencyFormatter.formatNaira(rem.netAmount),
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFF10B981),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  CurrencyFormatter.formatNaira(rem.netAmount),
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF10B981),
+                                  ),
                                 ),
                               ),
                             ],
@@ -1460,19 +1463,34 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                 children: [
                   Row(
                     children: [
-                      Text(
-                        order.orderNumber,
-                        style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                      ),
-                      const SizedBox(width: 6),
                       Flexible(
+                        flex: 3,
                         child: Text(
-                          '• ${order.customerName}',
-                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                          order.orderNumber,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                         ),
                       ),
+                      if (order.customerName.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Flexible(
+                          flex: 2,
+                          child: Text(
+                            '• ${order.customerName}',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: const Color(0xFF64748B),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -1488,13 +1506,18 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
             const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  CurrencyFormatter.formatNaira(order.totalAmount),
-                  style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    CurrencyFormatter.formatNaira(order.totalAmount),
+                    style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     if (order.hasSignature) ...[
                       const Icon(Icons.draw_rounded, size: 12, color: Color(0xFF10B981)),

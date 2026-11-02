@@ -34,6 +34,8 @@ class UserEntity {
   final String? closerCode;
   final String? marketerId;
   final String? marketerCode;
+  final String? accountantId;
+  final String? accountantCode;
   final String? avatarUrl;
   final bool isSupervisor;
 
@@ -73,21 +75,38 @@ class UserEntity {
     this.closerCode,
     this.marketerId,
     this.marketerCode,
+    this.accountantId,
+    this.accountantCode,
     this.avatarUrl,
     this.isSupervisor = false,
   });
 
   String get fullName => '$firstName $lastName'.trim();
   String get riderCode => deliveryAgentCode ?? 'PDA';
+  bool get isAvailable =>
+      (agentStatus.toLowerCase() == 'available' ||
+          agentStatus.toLowerCase() == 'active' ||
+          agentStatus.toLowerCase() == 'online') &&
+      agentStatus.toLowerCase() != 'offline' &&
+      agentStatus.toLowerCase() != 'inactive' &&
+      agentStatus.toLowerCase() != 'banned' &&
+      agentStatus.toLowerCase() != 'unavailable';
+  bool get isUnavailable => !isAvailable;
   bool get isRider =>
       (role == 'delivery_agent' || role == 'pda' || role == 'rider') &&
       !isCloserSupervisor &&
       !isDcManager &&
       !isDcOperations &&
-      !isGeneralAccountant;
+      !isGeneralAccountant &&
+      !isMerchantAccountant;
   bool get isPda => isRider && personnelType == 'pda';
   bool get isInHouseRider => isRider && personnelType == 'in_house_rider';
-  bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || role == 'super_admin';
+  bool get isSuperAdmin =>
+      role == 'super_admin' ||
+      role == 'admin' ||
+      role == 'platform_admin' ||
+      role == 'system_admin';
+  bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || isSuperAdmin;
   bool get isDcOrdersAdmin =>
       role == 'dc_operations' ||
       role == 'operations_officer' ||
@@ -128,11 +147,18 @@ class UserEntity {
       role == 'supervisor_marketer';
   bool get isMarketer => isMarketerRaw || isMarketerSupervisor;
   bool get isClientAdmin => role == 'client' || role == 'merchant' || role == 'seller';
-  bool get isClient => isClientAdmin || isCloser || isMarketer;
+  bool get isMerchantAccountant =>
+      role == 'merchant_accountant' ||
+      role == 'client_accountant' ||
+      role == 'client_finance' ||
+      role == 'merchant_finance';
+  bool get isClient => isClientAdmin || isCloser || isMarketer || isMerchantAccountant;
 
   String get roleDescription {
+    if (isSuperAdmin) return 'Super Administrator';
     if (isCloserSupervisor) return 'Merchant Sales Rep Supervisor';
     if (isGeneralAccountant) return 'General Accountant';
+    if (isMerchantAccountant) return 'Merchant Finance Accountant';
     if (isDcManager) return 'DC Operations Supervisor';
     if (isDcStockAdmin) return 'DC Stock Management Officer';
     if (isDcFinanceAdmin) return 'DC Finance & Remittance Officer';
@@ -147,8 +173,10 @@ class UserEntity {
 
   /// Canonical console route strictly governed by the user's operational role
   String get homeConsoleRoute {
+    if (isSuperAdmin) return '/admin';
     if (isCloserSupervisor) return '/sales-supervisor';
     if (isGeneralAccountant) return '/accountant';
+    if (isMerchantAccountant) return '/merchant-settlements';
     if (isDcManager) return '/dc';
     if (isDcStockAdmin) return '/stock-ops';
     if (isDcFinanceAdmin) return '/finance-ops';
@@ -158,5 +186,89 @@ class UserEntity {
     if (isClientAdmin) return '/client';
     if (isRider) return '/';
     return '/login';
+  }
+
+  UserEntity copyWith({
+    String? id,
+    String? authUserId,
+    String? email,
+    String? firstName,
+    String? lastName,
+    String? phone,
+    String? role,
+    String? companyId,
+    String? deliveryAgentId,
+    String? deliveryAgentCode,
+    String? distributionCenterId,
+    String? distributionCenterName,
+    int? lifetimeDeliveriesCount,
+    double? rating,
+    String? personnelType,
+    String? compensationType,
+    double? commissionRate,
+    double? transportAllowance,
+    double? fuelAllowance,
+    double? failedDeliveryAllowance,
+    double? baseSalary,
+    String? vehicleType,
+    String? vehiclePlateNumber,
+    String? operatingState,
+    String? operatingCity,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    String? agentStatus,
+    String? clientId,
+    String? clientCompanyName,
+    String? closerId,
+    String? closerCode,
+    String? marketerId,
+    String? marketerCode,
+    String? accountantId,
+    String? accountantCode,
+    String? avatarUrl,
+    bool? isSupervisor,
+  }) {
+    return UserEntity(
+      id: id ?? this.id,
+      authUserId: authUserId ?? this.authUserId,
+      email: email ?? this.email,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      phone: phone ?? this.phone,
+      role: role ?? this.role,
+      companyId: companyId ?? this.companyId,
+      deliveryAgentId: deliveryAgentId ?? this.deliveryAgentId,
+      deliveryAgentCode: deliveryAgentCode ?? this.deliveryAgentCode,
+      distributionCenterId: distributionCenterId ?? this.distributionCenterId,
+      distributionCenterName: distributionCenterName ?? this.distributionCenterName,
+      lifetimeDeliveriesCount: lifetimeDeliveriesCount ?? this.lifetimeDeliveriesCount,
+      rating: rating ?? this.rating,
+      personnelType: personnelType ?? this.personnelType,
+      compensationType: compensationType ?? this.compensationType,
+      commissionRate: commissionRate ?? this.commissionRate,
+      transportAllowance: transportAllowance ?? this.transportAllowance,
+      fuelAllowance: fuelAllowance ?? this.fuelAllowance,
+      failedDeliveryAllowance: failedDeliveryAllowance ?? this.failedDeliveryAllowance,
+      baseSalary: baseSalary ?? this.baseSalary,
+      vehicleType: vehicleType ?? this.vehicleType,
+      vehiclePlateNumber: vehiclePlateNumber ?? this.vehiclePlateNumber,
+      operatingState: operatingState ?? this.operatingState,
+      operatingCity: operatingCity ?? this.operatingCity,
+      bankName: bankName ?? this.bankName,
+      bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
+      bankAccountName: bankAccountName ?? this.bankAccountName,
+      agentStatus: agentStatus ?? this.agentStatus,
+      clientId: clientId ?? this.clientId,
+      clientCompanyName: clientCompanyName ?? this.clientCompanyName,
+      closerId: closerId ?? this.closerId,
+      closerCode: closerCode ?? this.closerCode,
+      marketerId: marketerId ?? this.marketerId,
+      marketerCode: marketerCode ?? this.marketerCode,
+      accountantId: accountantId ?? this.accountantId,
+      accountantCode: accountantCode ?? this.accountantCode,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      isSupervisor: isSupervisor ?? this.isSupervisor,
+    );
   }
 }

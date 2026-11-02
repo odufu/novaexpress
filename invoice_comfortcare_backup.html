@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice INV-CC-2026-001 - ComfortCare App Development</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm 14mm 10mm 14mm;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #0f172a;
+            margin: 0;
+            padding: 20px 24px;
+            font-size: 13.5px;
+            line-height: 1.45;
+            background: #ffffff;
+        }
+
+        /* Interactive Print Control Banner (Hidden in Print) */
+        .no-print-bar {
+            background: #0f172a;
+            color: #ffffff;
+            padding: 10px 18px;
+            margin: -20px -24px 18px -24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            border-bottom: 2px solid #16a34a;
+        }
+
+        .print-btn {
+            background: #16a34a;
+            color: #ffffff;
+            border: none;
+            padding: 8px 18px;
+            font-weight: 700;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.15s ease;
+        }
+
+        .print-btn:hover {
+            background: #15803d;
+        }
+
+        /* Header Branding */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2.5px solid #14532d;
+            padding-bottom: 14px;
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-logo {
+            width: 76px;
+            height: 76px;
+            object-fit: contain;
+            border-radius: 12px;
+            border: 1px solid #d1fae5;
+            background: #f8fafc;
+        }
+
+        .brand-title {
+            font-size: 23px;
+            font-weight: 900;
+            color: #14532d;
+            letter-spacing: 0.8px;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .brand-tagline {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #166534;
+            margin-top: 2px;
+            letter-spacing: 0.2px;
+        }
+
+        .reg-details {
+            font-size: 11.5px;
+            color: #334155;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .invoice-tag {
+            text-align: right;
+        }
+
+        .invoice-title {
+            font-size: 32px;
+            font-weight: 900;
+            color: #14532d;
+            letter-spacing: 1.5px;
+            margin: 0;
+            line-height: 1;
+        }
+
+        .invoice-number {
+            margin: 4px 0 0 0;
+            font-size: 13px;
+            font-weight: 700;
+            color: #15803d;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            margin-top: 5px;
+            padding: 3px 10px;
+            background: #dcfce7;
+            color: #14532d;
+            font-size: 10.5px;
+            font-weight: 800;
+            border-radius: 12px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            border: 1px solid #86efac;
+        }
+
+        /* Two Column Client & Schedule Grid */
+        .grid-two {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 16px;
+            margin: 14px 0;
+            background: #f0fdf4;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 4.5px solid #16a34a;
+            border-top: 1px solid #dcfce7;
+            border-right: 1px solid #dcfce7;
+            border-bottom: 1px solid #dcfce7;
+        }
+
+        .grid-two h4 {
+            margin: 0 0 5px 0;
+            font-size: 11.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #14532d;
+            font-weight: 800;
+            border-bottom: 1px solid #bbf7d0;
+            padding-bottom: 2px;
+        }
+
+        .grid-two p {
+            margin: 2px 0;
+            font-size: 12.5px;
+            color: #1e293b;
+        }
+
+        .grid-two strong {
+            color: #0f172a;
+        }
+
+        /* Data Table */
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        table.data-table thead th {
+            background: #14532d;
+            color: #ffffff;
+            font-size: 11.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 9px 8px;
+            text-align: left;
+            border: none;
+        }
+
+        table.data-table td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 8px 8px;
+            vertical-align: middle;
+            font-size: 12.5px;
+        }
+
+        table.data-table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .item-number {
+            font-size: 12px;
+            font-weight: 800;
+            color: #14532d;
+        }
+
+        .desc-title {
+            font-weight: 800;
+            font-size: 13px;
+            color: #0f172a;
+            letter-spacing: -0.1px;
+        }
+
+        .desc-sub {
+            font-size: 11.5px;
+            color: #334155;
+            margin-top: 2px;
+            line-height: 1.4;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .amount-col {
+            font-weight: 800;
+            font-size: 13px;
+            color: #0f172a;
+            white-space: nowrap;
+        }
+
+        .period-badge {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #1e293b;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        /* Bottom Section: Totals, Words, Payment */
+        .bottom-summary-grid {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 16px;
+            margin-top: 12px;
+            align-items: start;
+        }
+
+        .in-words-box {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 9px 12px;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .in-words-box strong {
+            color: #14532d;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .in-words-box span {
+            font-weight: 700;
+            color: #0f172a;
+            font-style: italic;
+        }
+
+        .payment-box {
+            background: #f0fdf4;
+            border: 1.5px dashed #16a34a;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+        }
+
+        .payment-box-title {
+            color: #14532d;
+            font-weight: 800;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .bank-details-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 3px 12px;
+            font-size: 12px;
+        }
+
+        .bank-label {
+            color: #475569;
+            font-weight: 600;
+        }
+
+        .bank-val {
+            color: #0f172a;
+            font-weight: 700;
+        }
+
+        .account-num-highlight {
+            font-size: 14px;
+            font-weight: 900;
+            color: #15803d;
+            letter-spacing: 0.8px;
+            font-family: "Courier New", Courier, monospace;
+        }
+
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .totals-table td {
+            padding: 6px 12px;
+            font-size: 12.5px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .totals-table td:last-child {
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .grand-total {
+            background: #14532d !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+            font-size: 14.5px !important;
+        }
+
+        .grand-total td {
+            color: #ffffff !important;
+            padding: 9px 12px !important;
+            border: none !important;
+        }
+
+        /* Signatures Section */
+        .signatures-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 14px;
+            padding-top: 10px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .sig-block {
+            position: relative;
+        }
+
+        .sig-title {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #14532d;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 6px;
+        }
+
+        .sig-img-container {
+            height: 48px;
+            display: flex;
+            align-items: flex-end;
+            margin-bottom: -6px;
+        }
+
+        .sig-img {
+            max-height: 52px;
+            max-width: 160px;
+            object-fit: contain;
+            filter: contrast(1.1);
+        }
+
+        .sig-line {
+            border-bottom: 1.5px solid #334155;
+            height: 6px;
+            margin-bottom: 5px;
+        }
+
+        .sig-meta {
+            font-size: 11.5px;
+            color: #334155;
+            line-height: 1.35;
+        }
+
+        .sig-meta strong {
+            color: #0f172a;
+        }
+
+        /* Print Media Styles */
+        @media print {
+            .no-print-bar {
+                display: none !important;
+            }
+
+            body {
+                padding: 0;
+                margin: 0;
+            }
+
+            @page {
+                size: A4 portrait;
+                margin: 10mm 12mm 10mm 12mm;
+            }
+
+            .bottom-summary-grid,
+            .signatures-section,
+            table.data-table {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Non-printing Interactive Toolbar for 1-Click PDF Generation -->
+    <div class="no-print-bar">
+        <div>
+            <strong>Emerald Codelines Official Invoice Portal</strong> — Ready for PDF generation
+        </div>
+        <button class="print-btn" onclick="window.print()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Print / Save as PDF (A4)
+        </button>
+    </div>
+
+    <!-- Official Header -->
+    <div class="header">
+        <div class="brand-section">
+            <img src="ecl.jpg" alt="Emerald Codelines" class="brand-logo" onerror="this.style.display='none'">
+            <div>
+                <h1 class="brand-title">EMERALD CODELINES</h1>
+                <div class="brand-tagline">Software Engineering &amp; Digital Solutions</div>
+                <div class="reg-details">
+                    <strong>BN:</strong> 8374060 &nbsp;|&nbsp; <strong>TIN:</strong> 33021703-0001<br>
+                    L66, Behind Sure Start School, F01, Kubwa, Abuja<br>
+                    <strong>Email:</strong> emeraldcodelines@gmail.com &nbsp;|&nbsp; <strong>Phone:</strong> +234 (0)
+                    808 504 0146
+                </div>
+            </div>
+        </div>
+        <div class="invoice-tag">
+            <h2 class="invoice-title">INVOICE</h2>
+            <div class="invoice-number"># INV-CC-2026-001</div>
+            <div class="status-badge">Payment Pending</div>
+        </div>
+    </div>
+
+    <!-- Billed To & Schedule Card -->
+    <div class="grid-two">
+        <div>
+            <h4>Billed To (Client):</h4>
+            <p><strong>ComfortCare Pharmacy &amp; Clinic Limited</strong></p>
+            <p>Adetokunbo Ademola Crescent, Wuse 2, Abuja, FCT, Nigeria</p>
+            <p><strong>Project:</strong> ComfortCare Healthcare &amp; Telehealth Ecosystem (Mobile, Web &amp; Admin)</p>
+        </div>
+        <div>
+            <h4>Invoice &amp; Payment Schedule:</h4>
+            <p><strong>Invoice Date:</strong> October 9, 2026</p>
+            <p><strong>Payment Due:</strong> October 23, 2026 (14 Days)</p>
+            <p><strong>Billing Currency:</strong> Nigerian Naira (NGN - &#8358;)</p>
+            <p><strong>Payment Structure:</strong> 70% Mobilization / 30% Completion</p>
+        </div>
+    </div>
+
+    <!-- Deliverables Table -->
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 6%;" class="text-center">#</th>
+                <th style="width: 56%;">Deliverables &amp; Scope of Engineering Work</th>
+                <th style="width: 18%;" class="text-center">Term / Period</th>
+                <th style="width: 20%;" class="text-right">Amount (NGN)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="text-center item-number">1.0</td>
+                <td>
+                    <div class="desc-title">Core Multi-Platform Software Engineering &amp; Portal Development</div>
+                    <div class="desc-sub">
+                        &bull; Cross-platform Patient Mobile Application (Android &amp; iOS)<br>
+                        &bull; Pharmacist Dispensary &amp; Prescription Management Dashboard<br>
+                        &bull; Clinic &amp; B2B Wholesale Bulk Ordering Platform (Carton/Tier pricing)<br>
+                        &bull; Administrative Backend for Live Product Catalog CRUD &amp; Inventory<br>
+                        &bull; Telehealth Vitals Monitoring, ECG telemetry display &amp; UI/UX Design
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">Milestone</span></td>
+                <td class="text-right amount-col">&#8358;820,000.00</td>
+            </tr>
+            <tr>
+                <td class="text-center item-number">2.0</td>
+                <td>
+                    <div class="desc-title">Cloud Server &amp; Database Infrastructure Hosting (1 Year)</div>
+                    <div class="desc-sub">
+                        &bull; High-availability Cloud Database &amp; Backend Hosting (Supabase PostgreSQL)<br>
+                        &bull; Automated daily snapshot backups &amp; disaster recovery protocol<br>
+                        &bull; High-speed CDN asset delivery for medicine catalogs &amp; digital prescriptions<br>
+                        &bull; SSL certificate encryption and HIPAA/NDPR-compliant data protection
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">12 Months</span></td>
+                <td class="text-right amount-col">&#8358;220,000.00</td>
+            </tr>
+            <tr>
+                <td class="text-center item-number">3.0</td>
+                <td>
+                    <div class="desc-title">AI Clinical Assistant Server &amp; Inferencing Allocation (1 Year)</div>
+                    <div class="desc-sub">
+                        &bull; Integration of Google Gemini AI Clinical Reasoning Engine<br>
+                        &bull; Healthcare triage context, drug-drug interaction alerts &amp; dosage advice<br>
+                        &bull; Server middleware proxy &amp; token quota allocation for 12 months active usage
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">12 Months</span></td>
+                <td class="text-right amount-col">&#8358;150,000.00</td>
+            </tr>
+            <tr>
+                <td class="text-center item-number">4.0</td>
+                <td>
+                    <div class="desc-title">Apple Developer Program (App Store) Account &amp; Hosting</div>
+                    <div class="desc-sub">
+                        &bull; Official Apple Developer Organization membership ($99 USD eqv.)<br>
+                        &bull; iOS provisioning profiles, App Store Connect deployment &amp; TestFlight testing
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">1 Year (Annual)</span></td>
+                <td class="text-right amount-col">&#8358;160,000.00</td>
+            </tr>
+            <tr>
+                <td class="text-center item-number">5.0</td>
+                <td>
+                    <div class="desc-title">Google Play Console Developer Account License</div>
+                    <div class="desc-sub">
+                        &bull; Official Google Play Developer Console registration fee ($25 USD eqv.)<br>
+                        &bull; Developer identity verification, policy compliance &amp; Android store publishing
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">Lifetime License</span></td>
+                <td class="text-right amount-col">&#8358;40,000.00</td>
+            </tr>
+            <tr>
+                <td class="text-center item-number">6.0</td>
+                <td>
+                    <div class="desc-title">Payment Gateway Integration &amp; Medical Escrow Engine</div>
+                    <div class="desc-sub">
+                        &bull; Direct integration of Paystack / Monnify secure payment gateways<br>
+                        &bull; Automated Naira (&#8358;) checkout, instant payment webhooks &amp; digital receipts<br>
+                        &bull; Escrow and split-settlement routing for wholesale clinics vs. retail dispensary
+                    </div>
+                </td>
+                <td class="text-center"><span class="period-badge">Setup &amp; Audit</span></td>
+                <td class="text-right amount-col">&#8358;110,000.00</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Financial Breakdown, Words & Remittance Grid -->
+    <div class="bottom-summary-grid">
+        <div>
+            <div class="in-words-box">
+                <strong>Amount Payable in Words:</strong>
+                <span>One Million, Five Hundred Thousand Nigerian Naira Only.</span>
+            </div>
+
+            <div class="payment-box">
+                <div class="payment-box-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#14532d" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                        <line x1="2" y1="10" x2="22" y2="10"></line>
+                    </svg>
+                    Direct Remittance Account Details:
+                </div>
+                <div class="bank-details-grid">
+                    <span class="bank-label">Bank:</span>
+                    <span class="bank-val">Moniepoint Microfinance Bank (MFB)</span>
+
+                    <span class="bank-label">Account Name:</span>
+                    <span class="bank-val">Emerald Codelines</span>
+
+                    <span class="bank-label">Account Number:</span>
+                    <span class="bank-val account-num-highlight">6384486305</span>
+
+                    <span class="bank-label">Reference:</span>
+                    <span class="bank-val">INV-CC-2026-001 / ComfortCare</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <table class="totals-table">
+                <tr>
+                    <td>Engineering &amp; Infrastructure Subtotal:</td>
+                    <td>&#8358;1,500,000.00</td>
+                </tr>
+                <tr>
+                    <td>Value Added Tax (VAT):</td>
+                    <td style="color: #166534;"><em>Inclusive (0.00)</em></td>
+                </tr>
+                <tr>
+                    <td>Initial Mobilization (70%):</td>
+                    <td>&#8358;1,050,000.00</td>
+                </tr>
+                <tr>
+                    <td>Final Delivery Balance (30%):</td>
+                    <td>&#8358;450,000.00</td>
+                </tr>
+                <tr class="grand-total">
+                    <td>TOTAL PAYABLE:</td>
+                    <td>&#8358;1,500,000.00</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Official Signatures Section -->
+    <div class="signatures-section">
+        <div class="sig-block">
+            <div class="sig-title">Authorized Signatory (Emerald Codelines)</div>
+            <div class="sig-img-container">
+                <img src="my signature.png" alt="Signature - Joel Odufu" class="sig-img">
+            </div>
+            <div class="sig-line"></div>
+            <div class="sig-meta">
+                <strong>Joel Odufu</strong><br>
+                Lead Solutions Architect &amp; Engineering Director<br>
+                Date: October 9, 2026
+            </div>
+        </div>
+
+        <div class="sig-block">
+            <div class="sig-title">Client Acceptance (ComfortCare Pharmacy &amp; Clinic Ltd)</div>
+            <div class="sig-img-container">
+                <!-- Signature line placeholder for client signing -->
+            </div>
+            <div class="sig-line"></div>
+            <div class="sig-meta">
+                <strong>Authorized Management Signatory</strong><br>
+                Managing Director / Clinical Director<br>
+                Date: ________________________
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

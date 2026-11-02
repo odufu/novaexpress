@@ -18,6 +18,9 @@ class DCReturnsPage extends ConsumerWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 700;
 
+    final isGrandDcCumulative = dcState.isCurrentHubGrandDc && dcState.selectedDcId == null;
+    final returnsList = isGrandDcCumulative ? dcState.returnItems : dcState.dcReturnItems;
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(isCompact ? 14 : 20),
       child: Column(
@@ -52,7 +55,7 @@ class DCReturnsPage extends ConsumerWidget {
             Column(
               children: List.generate(3, (index) => const StockCardSkeleton()),
             )
-          else if (dcState.returnItems.isEmpty)
+          else if (returnsList.isEmpty)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 40),
@@ -72,9 +75,9 @@ class DCReturnsPage extends ConsumerWidget {
               ),
             )
           else if (isCompact)
-            _buildReturnsCards(context, dcState.returnItems, isDark, dcNotifier)
+            _buildReturnsCards(context, returnsList, isDark, dcNotifier)
           else
-            _buildReturnsExcelTable(context, dcState.returnItems, isDark, dcNotifier),
+            _buildReturnsExcelTable(context, returnsList, isDark, dcNotifier),
         ],
       ),
     );
