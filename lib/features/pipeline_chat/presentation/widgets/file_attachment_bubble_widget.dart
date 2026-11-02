@@ -126,7 +126,9 @@ class FileAttachmentBubbleWidget extends StatelessWidget {
             caption,
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: isMyMessage ? Colors.white : (isDark ? Colors.white : const Color(0xFF0F172A)),
+              color: isMyMessage
+                  ? (isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21))
+                  : (isDark ? Colors.white : const Color(0xFF0F172A)),
               height: 1.35,
             ),
           ),
@@ -210,7 +212,7 @@ class FileAttachmentBubbleWidget extends StatelessWidget {
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
                           color: isMyMessage
-                              ? Colors.white
+                              ? (isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21))
                               : (isDark ? Colors.white : const Color(0xFF0F172A)),
                         ),
                       ),
@@ -220,7 +222,7 @@ class FileAttachmentBubbleWidget extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 10.5,
                           color: isMyMessage
-                              ? Colors.white.withValues(alpha: 0.75)
+                              ? (isDark ? const Color(0xFF8696A0) : const Color(0xFF667781))
                               : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                         ),
                       ),
@@ -261,7 +263,9 @@ class FileAttachmentBubbleWidget extends StatelessWidget {
             caption,
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: isMyMessage ? Colors.white : (isDark ? Colors.white : const Color(0xFF0F172A)),
+              color: isMyMessage
+                  ? (isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21))
+                  : (isDark ? Colors.white : const Color(0xFF0F172A)),
               height: 1.35,
             ),
           ),

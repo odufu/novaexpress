@@ -156,15 +156,11 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
     final currentMs = _position.inMilliseconds.clamp(0, totalMs);
     final progress = (currentMs / totalMs).clamp(0.0, 1.0);
 
-    final primaryAccent = widget.isMyMessage
-        ? Colors.white
-        : const Color(0xFF0284C7);
-    final playedBarColor = widget.isMyMessage
-        ? Colors.white
-        : const Color(0xFF0284C7);
-    final unplayedBarColor = widget.isMyMessage
-        ? Colors.white.withValues(alpha: 0.35)
-        : (widget.isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1));
+    final primaryAccent = const Color(0xFF00A884); // WhatsApp Signature Emerald
+    final playedBarColor = const Color(0xFF00A884);
+    final unplayedBarColor = widget.isDark
+        ? const Color(0xFF8696A0).withOpacity(0.4)
+        : const Color(0xFF667781).withOpacity(0.35);
 
     return Container(
       constraints: const BoxConstraints(minWidth: 230, maxWidth: 300),
@@ -183,9 +179,7 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: widget.isMyMessage
-                        ? Colors.white.withValues(alpha: 0.22)
-                        : (widget.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    color: const Color(0xFF00A884).withOpacity(widget.isDark ? 0.22 : 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -287,9 +281,7 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
-                    color: widget.isMyMessage
-                        ? Colors.white.withValues(alpha: 0.8)
-                        : (widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                    color: widget.isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
                   ),
                 ),
                 Icon(

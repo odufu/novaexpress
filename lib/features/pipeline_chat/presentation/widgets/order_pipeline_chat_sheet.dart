@@ -126,7 +126,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     _shimmerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
+    );
     _shimmerAnimation = Tween<double>(begin: 0.35, end: 0.85).animate(
       CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOut),
     );
@@ -403,6 +403,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   Future<void> _startVoiceRecording() async {
     final started = await _voiceRecorder.start();
     if (started) {
+      if (!_shimmerController.isAnimating) {
+        _shimmerController.repeat(reverse: true);
+      }
       setState(() {
         _isRecordingVoice = true;
         _recordingDuration = Duration.zero;
@@ -424,6 +427,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   Future<void> _cancelVoiceRecording() async {
     await _voiceRecorder.cancel();
+    if (_shimmerController.isAnimating) {
+      _shimmerController.stop();
+    }
     if (mounted) {
       setState(() {
         _isRecordingVoice = false;
@@ -434,6 +440,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   Future<void> _sendVoiceRecording() async {
     final result = await _voiceRecorder.stop();
+    if (_shimmerController.isAnimating) {
+      _shimmerController.stop();
+    }
     if (mounted) {
       setState(() {
         _isRecordingVoice = false;
@@ -562,12 +571,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final matches = mentionRegex.allMatches(text);
 
     final defaultStyle = GoogleFonts.inter(
-      fontSize: 13.5,
-      height: 1.4,
-      color: isMyMessage
-          ? Colors.white
-          : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A)),
-      fontWeight: isMyMessage ? FontWeight.w500 : FontWeight.w400,
+      fontSize: 14.2,
+      height: 1.38,
+      color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
+      fontWeight: FontWeight.w400,
     );
 
     if (matches.isEmpty) {
@@ -607,17 +614,17 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: isMyMessage
-                      ? Colors.white.withValues(alpha: 0.24)
+                      ? (isDark ? Colors.white.withOpacity(0.15) : const Color(0xFF008069).withOpacity(0.12))
                       : (isDark
-                          ? const Color(0xFF38BDF8).withValues(alpha: 0.2)
-                          : const Color(0xFF0284C7).withValues(alpha: 0.12)),
+                          ? const Color(0xFF38BDF8).withOpacity(0.2)
+                          : const Color(0xFF008069).withOpacity(0.1)),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: isMyMessage
-                        ? Colors.white.withValues(alpha: 0.45)
+                        ? (isDark ? Colors.white.withOpacity(0.3) : const Color(0xFF008069).withOpacity(0.3))
                         : (isDark
-                            ? const Color(0xFF38BDF8).withValues(alpha: 0.45)
-                            : const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                            ? const Color(0xFF38BDF8).withOpacity(0.4)
+                            : const Color(0xFF008069).withOpacity(0.25)),
                     width: 0.8,
                   ),
                 ),
@@ -627,9 +634,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                     Icon(
                       Icons.alternate_email_rounded,
                       size: 11,
-                      color: isMyMessage
-                          ? Colors.white
-                          : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
+                      color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF007A65),
                     ),
                     const SizedBox(width: 2),
                     Text(
@@ -637,9 +642,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: isMyMessage
-                            ? Colors.white
-                            : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
+                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF007A65),
                         decoration: TextDecoration.underline,
                         decorationStyle: TextDecorationStyle.solid,
                         decorationThickness: 1.2,
@@ -675,96 +678,82 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             MediaQuery.of(context).platformBrightness == Brightness.dark);
     final conv = chatState.activeConversation;
 
+    // Signature WhatsApp Wallpaper Palette
+    final chatBg = isDark ? const Color(0xFF0B141A) : const Color(0xFFEFEAE2);
+
     return Container(
-      height: MediaQuery.of(context).size.height * 0.88,
+      height: MediaQuery.of(context).size.height * 0.90,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
+        color: chatBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: Colors.black26,
             blurRadius: 20,
-            offset: const Offset(0, -4),
+            offset: Offset(0, -4),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // Drag Handle
-          const SizedBox(height: 10),
-          Container(
-            width: 44,
-            height: 4,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-              borderRadius: BorderRadius.circular(2),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: Column(
+          children: [
+            // WhatsApp Header / App Bar
+            _buildHeader(context, conv, isDark),
+
+            // Pinned Order Info & Active Participants Bar (WhatsApp Group Context)
+            if (conv != null) _buildOrderInfoBanner(context, conv, isDark),
+            if (conv != null) _buildParticipantsBar(context, conv, isDark),
+
+            // Chat Messages Body with WhatsApp Doodle Wallpaper
+            Expanded(
+              child: CustomPaint(
+                painter: WhatsAppWallpaperPainter(isDark: isDark),
+                child: chatState.isLoading
+                    ? _buildSkeletalChatMessages(isDark)
+                    : chatState.errorMessage != null && chatState.activeConversation == null
+                        ? _buildAccessRestrictedState(chatState.errorMessage!, isDark)
+                        : chatState.messages.isEmpty
+                            ? _buildEmptyState(isDark)
+                            : ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                itemCount: chatState.messages.length,
+                                itemBuilder: (context, index) {
+                                  final msg = chatState.messages[index];
+                                  final bool showDateSeparator = (index == 0) ||
+                                      (msg.createdAt.year != chatState.messages[index - 1].createdAt.year ||
+                                          msg.createdAt.month != chatState.messages[index - 1].createdAt.month ||
+                                          msg.createdAt.day != chatState.messages[index - 1].createdAt.day);
+
+                                  if (showDateSeparator) {
+                                    return Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _buildDateSeparator(msg.createdAt, isDark),
+                                        _buildMessageItem(msg, isDark, conv),
+                                      ],
+                                    );
+                                  }
+                                  return _buildMessageItem(msg, isDark, conv);
+                                },
+                              ),
+              ),
             ),
-          ),
 
-          // Header
-          _buildHeader(context, conv, isDark),
-          const Divider(height: 1),
-
-          // Product & Dispatch Status Banner
-          if (conv != null) _buildOrderInfoBanner(context, conv, isDark),
-          if (conv != null) _buildParticipantsBar(context, conv, isDark),
-
-          // Chat Messages Body
-          Expanded(
-            child: chatState.isLoading
-                ? _buildSkeletalChatMessages(isDark)
-                : chatState.errorMessage != null && chatState.activeConversation == null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.lock_person_rounded, size: 48, color: Color(0xFFEF4444)),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Access Restricted',
-                                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                chatState.errorMessage!,
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                : chatState.messages.isEmpty
-                    ? _buildEmptyState(isDark)
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        itemCount: chatState.messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = chatState.messages[index];
-                          return _buildMessageItem(msg, isDark, conv);
-                        },
-                      ),
-          ),
-
-          // Input Footer (only rendered if user is authorized and conversation is loaded)
-          if (conv != null)
-            _buildInputFooter(context, isDark, chatState.isSending, conv),
-        ],
+            // WhatsApp Floating Two-Piece Input Composer
+            if (conv != null)
+              _buildInputFooter(context, isDark, chatState.isSending, conv),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSkeletalChatMessages(bool isDark) {
+    if (!_shimmerController.isAnimating) {
+      _shimmerController.repeat(reverse: true);
+    }
     final shimmerColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
     final altShimmerColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
 
@@ -842,7 +831,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                   width: 190,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0284C7).withValues(alpha: 0.35 * opacity),
+                    color: const Color(0xFF00A884).withOpacity(0.35 * opacity),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(16),
                       topRight: Radius.circular(16),
@@ -904,148 +893,158 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   }
 
   Widget _buildHeader(BuildContext context, OrderConversationEntity? conv, bool isDark) {
-
-    // Receiver is the customer who will receive the delivery
     final receiverName = (conv?.customerName != null && conv!.customerName.trim().isNotEmpty)
         ? conv.customerName.trim()
         : widget.customerName.trim();
     final receiverPhone = widget.customerPhone ?? conv?.customerPhone;
-    final orderStatus = (conv?.orderStatus.isNotEmpty == true)
-        ? conv!.orderStatus.toUpperCase()
-        : 'PENDING_DISPATCH';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          if (widget.showBackButton) ...[
-            Tooltip(
-              message: 'Back to Conversations',
-              child: InkWell(
-                onTap: widget.onBack ?? () => Navigator.of(context).pop(),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    size: 14,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                  ),
-                ),
+    // Classic WhatsApp App Bar Colors: Deep Teal-Green in Light, Dark Teal-Slate in Dark
+    final headerBg = isDark ? const Color(0xFF1F2C34) : const Color(0xFF008069);
+
+    return Container(
+      color: headerBg,
+      padding: const EdgeInsets.fromLTRB(4, 6, 8, 8),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            if (widget.showBackButton)
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+                tooltip: 'Back to Conversations',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                onPressed: widget.onBack ?? () => Navigator.of(context).pop(),
               ),
-            ),
-            const SizedBox(width: 10),
-          ],
 
-          // Receiver Avatar (Customer)
-          UserAvatarWidget(
-            fullName: receiverName,
-            radius: 18,
-            backgroundColor: const Color(0xFF0284C7),
-            textColor: Colors.white,
-          ),
-          const SizedBox(width: 10),
-
-          // Receiver Name (Header Title) & Order Number / Status (Subtitle)
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            // Receiver Avatar with online indicator
+            Stack(
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        receiverName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        orderStatus,
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF10B981),
-                        ),
-                      ),
-                    ),
-                  ],
+                UserAvatarWidget(
+                  fullName: receiverName,
+                  radius: 19,
+                  backgroundColor: isDark ? const Color(0xFF2A3942) : Colors.white.withOpacity(0.2),
+                  textColor: Colors.white,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Order #${widget.orderNumber}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366), // WhatsApp online beacon
+                      shape: BoxShape.circle,
+                      border: Border.all(color: headerBg, width: 1.8),
+                    ),
                   ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(width: 10),
 
-          // Action: Direct Call Receiver (if phone available)
-          if (receiverPhone != null && receiverPhone.trim().isNotEmpty) ...[
-            Tooltip(
-              message: 'Call $receiverName ($receiverPhone)',
+            // Contact / Group Info
+            Expanded(
               child: InkWell(
-                onTap: () => _callNumber(context, receiverPhone),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                onTap: () {
+                  if (conv != null) {
+                    _showOrderQuickDetailsModal(context, conv, isDark);
+                  }
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Customer: $receiverName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                  child: const Icon(
-                    Icons.phone_in_talk_rounded,
-                    size: 16,
-                    color: Color(0xFF10B981),
-                  ),
+                    const SizedBox(height: 1.5),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.orderNumber,
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            color: Colors.white.withOpacity(0.9),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Flexible(
+                          child: Text(
+                            ' • ${_getWhatsAppSubtitle(conv)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: Colors.white.withOpacity(0.85),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(width: 6),
+
+            // Direct Call Action
+            if (receiverPhone != null && receiverPhone.trim().isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.call_rounded, color: Colors.white, size: 20),
+                tooltip: 'Call $receiverName',
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                onPressed: () => _callNumber(context, receiverPhone),
+              ),
+
+            // WhatsApp More Menu
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.white, size: 21),
+              tooltip: 'More options',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              color: isDark ? const Color(0xFF233138) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              onSelected: (val) {
+                if (val == 'info' && conv != null) {
+                  _showOrderQuickDetailsModal(context, conv, isDark);
+                } else if (val == 'close') {
+                  (widget.onClose ?? () => Navigator.of(context).pop())();
+                }
+              },
+              itemBuilder: (ctx) => [
+                PopupMenuItem(
+                  value: 'info',
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 18, color: isDark ? Colors.white : const Color(0xFF111B21)),
+                      const SizedBox(width: 10),
+                      Text('Order Details', style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF111B21))),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'close',
+                  child: Row(
+                    children: [
+                      Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white : const Color(0xFF111B21)),
+                      const SizedBox(width: 10),
+                      Text('Close Chat', style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF111B21))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
-
-
-
-          // Close button
-          IconButton(
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            padding: const EdgeInsets.all(6),
-            visualDensity: VisualDensity.compact,
-            onPressed: widget.onClose ?? () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close_rounded, size: 20),
-            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            tooltip: 'Close',
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1056,8 +1055,16 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final isCloser = authUser?.isCloser == true;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF182229) : const Color(0xFFF0F2F5),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF222E35) : const Color(0xFFE9EDEF),
+            width: 1,
+          ),
+        ),
+      ),
       child: Row(
         children: [
           // Current product package & total price
@@ -1172,12 +1179,12 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   Widget _buildParticipantsBar(BuildContext context, OrderConversationEntity conv, bool isDark) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        color: isDark ? const Color(0xFF182229) : const Color(0xFFF7F8FA),
         border: Border(
           bottom: BorderSide(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            color: isDark ? const Color(0xFF222E35) : const Color(0xFFE9EDEF),
             width: 1,
           ),
         ),
@@ -1337,120 +1344,110 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final isDc = msg.senderRole == ChatSenderRole.dcManager;
     final isRider = msg.senderRole == ChatSenderRole.deliveryAgent;
 
-    Color roleColor = const Color(0xFF64748B);
+    Color roleColor = const Color(0xFF536471);
     String roleLabel = 'Member';
     if (isMarketer) {
-      roleColor = const Color(0xFF10B981); // Emerald
+      roleColor = const Color(0xFF10B981);
       roleLabel = 'Marketer';
     } else if (isCloser) {
-      roleColor = const Color(0xFF8B5CF6); // Vibrant Purple
+      roleColor = const Color(0xFF8B5CF6);
       roleLabel = 'Closer';
     } else if (isClient) {
-      roleColor = const Color(0xFF0D9488); // Teal
+      roleColor = const Color(0xFF0D9488);
       roleLabel = 'Merchant';
     } else if (isDc) {
-      roleColor = const Color(0xFF6366F1); // Indigo
+      roleColor = const Color(0xFF2563EB);
       roleLabel = 'DC Operations';
     } else if (isRider) {
-      roleColor = const Color(0xFFF59E0B); // Amber Courier
+      roleColor = const Color(0xFFD97706);
       roleLabel = 'Rider';
     }
 
     final timeStr = _formatMessageTime(msg.createdAt);
 
-    // 1. Right-aligned for current account
     if (isMyMessage) {
+      // Outgoing WhatsApp Bubble (Green #D9FDD3 in light, #005C4B in dark)
+      final bubbleBg = isDark ? const Color(0xFF005C4B) : const Color(0xFFD9FDD3);
+
       return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: 6),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const SizedBox(width: 48), // Padding on opposite side
+            const SizedBox(width: 48), // WhatsApp standard opposite indent
             Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF0284C7),
-                          Color(0xFF0369A1),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(18),
-                        topRight: Radius.circular(18),
-                        bottomLeft: Radius.circular(18),
-                        bottomRight: Radius.circular(4),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF0284C7).withValues(alpha: 0.22),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.80,
+                ),
+                padding: const EdgeInsets.fromLTRB(10, 7, 8, 5),
+                decoration: BoxDecoration(
+                  color: bubbleBg,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(2),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1F000000),
+                      offset: Offset(0, 1),
+                      blurRadius: 1,
                     ),
-                    child: _buildMessageContent(
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildMessageContent(
                       msg,
                       isMyMessage: true,
                       isDark: isDark,
                       conv: conv,
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        timeStr,
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          timeStr,
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w400,
+                            color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.done_all_rounded,
-                        size: 14,
-                        color: Color(0xFF0284C7),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 3),
+                        const Icon(
+                          Icons.done_all_rounded,
+                          size: 15,
+                          color: Color(0xFF53BDEB), // WhatsApp double blue checkmarks
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            // User Avatar / DP
-            UserAvatarWidget(
-              avatarUrl: msg.senderAvatarUrl ?? authUser?.avatarUrl,
-              fullName: authUser?.fullName.isNotEmpty == true ? authUser!.fullName : 'You',
-              radius: 14,
-              backgroundColor: const Color(0xFF0284C7),
-              textColor: Colors.white,
             ),
           ],
         ),
       );
     }
 
-    // 2. Left-aligned with role-based color differentiation for other accounts
-    final bubbleBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
-    final bubbleBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    // Incoming WhatsApp Bubble (White in light, #202C33 in dark)
+    final bubbleBg = isDark ? const Color(0xFF202C33) : Colors.white;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // DP of sender (interactive: tap to view profile card)
+          // WhatsApp Group Member Avatar
           InkWell(
             onTap: () {
               ChatUserProfileCardModal.show(
@@ -1461,103 +1458,119 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 onMention: _appendMentionTag,
               );
             },
-            borderRadius: BorderRadius.circular(16),
-            child: Tooltip(
-              message: 'View ${msg.senderName} profile',
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2, right: 6),
               child: UserAvatarWidget(
                 avatarUrl: msg.senderAvatarUrl,
                 fullName: msg.senderName,
-                radius: 16,
-                backgroundColor: roleColor.withValues(alpha: 0.18),
+                radius: 14,
+                backgroundColor: roleColor.withOpacity(0.18),
                 textColor: roleColor,
               ),
             ),
           ),
-          const SizedBox(width: 8),
           Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Sender name and role tag (interactive: tap to view profile card)
-                InkWell(
-                  onTap: () {
-                    ChatUserProfileCardModal.show(
-                      context: context,
-                      ref: ref,
-                      tag: msg.senderName,
-                      conversation: conv,
-                      onMention: _appendMentionTag,
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          msg.senderName,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: roleColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: roleColor.withValues(alpha: 0.2)),
-                        ),
-                        child: Text(
-                          roleLabel,
-                          style: GoogleFonts.inter(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: roleColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.80,
+              ),
+              padding: const EdgeInsets.fromLTRB(10, 7, 8, 5),
+              decoration: BoxDecoration(
+                color: bubbleBg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(2),
+                  topRight: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
                 ),
-                const SizedBox(height: 4),
-
-                // Organic Recipient Bubble with clickable mentions
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: bubbleBg,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(4),
-                      topRight: Radius.circular(18),
-                      bottomLeft: Radius.circular(18),
-                      bottomRight: Radius.circular(18),
-                    ),
-                    border: Border.all(color: bubbleBorder),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1F000000),
+                    offset: Offset(0, 1),
+                    blurRadius: 1,
                   ),
-                  child: _buildMessageContent(
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // WhatsApp Group Sender Title
+                  InkWell(
+                    onTap: () {
+                      ChatUserProfileCardModal.show(
+                        context: context,
+                        ref: ref,
+                        tag: msg.senderName,
+                        conversation: conv,
+                        onMention: _appendMentionTag,
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              msg.senderName,
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: roleColor,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 0.8),
+                            decoration: BoxDecoration(
+                              color: roleColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              roleLabel,
+                              style: GoogleFonts.inter(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w700,
+                                color: roleColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Message Content
+                  _buildMessageContent(
                     msg,
                     isMyMessage: false,
                     isDark: isDark,
                     conv: conv,
                   ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  timeStr,
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+
+                  // Timestamp
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        timeStr,
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w400,
+                          color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 48), // Padding on opposite side
+          const SizedBox(width: 48), // Indent on opposite side
         ],
       ),
     );
@@ -1569,12 +1582,12 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     OrderConversationEntity? conv,
   ) {
     IconData icon = Icons.info_outline_rounded;
-    Color color = const Color(0xFF0284C7);
+    Color color = const Color(0xFF00A884);
 
     switch (msg.messageType) {
       case ChatMessageType.riderAssigned:
         icon = Icons.two_wheeler_rounded;
-        color = const Color(0xFFF59E0B);
+        color = const Color(0xFFD97706);
         break;
       case ChatMessageType.deliveryCompleted:
         icon = Icons.check_circle_rounded;
@@ -1591,160 +1604,112 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         break;
       default:
         icon = Icons.notifications_active_outlined;
-        color = const Color(0xFF0D9488);
+        color = const Color(0xFF00A884);
     }
 
     final timeStr = DateFormat('h:mm a').format(msg.createdAt);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // NovaXpress System DP / Logo
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              border: Border.all(
-                color: color.withValues(alpha: 0.35),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.15),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF182229) : Colors.white.withOpacity(0.92),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
             ),
-            child: ClipOval(
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: AppLogoWidget(
-                  variant: AppLogoVariant.square,
-                  width: 24,
-                  height: 24,
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                msg.messageBody,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? const Color(0xFFD1D7DB) : const Color(0xFF54656F),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-
-          // Message Body from System
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Sender label & SYSTEM badge
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'NovaXpress System',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: color.withValues(alpha: 0.25)),
-                      ),
-                      child: Text(
-                        'SYSTEM',
-                        style: GoogleFonts.inter(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w800,
-                          color: color,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-
-                // Proper message bubble
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? color.withValues(alpha: 0.1)
-                        : color.withValues(alpha: 0.06),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(4),
-                      topRight: Radius.circular(18),
-                      bottomLeft: Radius.circular(18),
-                      bottomRight: Radius.circular(18),
-                    ),
-                    border: Border.all(
-                      color: color.withValues(alpha: isDark ? 0.25 : 0.18),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(icon, size: 16, color: color),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: _buildMessageBodyWithInteractiveMentions(
-                          msg.messageBody,
-                          isMyMessage: false,
-                          isDark: isDark,
-                          conv: conv,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  timeStr,
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                  ),
-                ),
-              ],
+            const SizedBox(width: 6),
+            Text(
+              timeStr,
+              style: GoogleFonts.inter(
+                fontSize: 9.5,
+                color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+              ),
             ),
-          ),
-          const SizedBox(width: 48), // Padding opposite side
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildEmptyState(bool isDark) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.chat_bubble_outline_rounded, size: 40, color: Color(0xFF94A3B8)),
-          const SizedBox(height: 10),
-          Text(
-            'Order Pipeline Conversation Active',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : const Color(0xFF0F172A),
-            ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF182229) : const Color(0xFFFFF7D6),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Updates, rider assignments, and notes appear in real-time.',
-            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.lock_rounded,
+                    size: 13,
+                    color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF54656F),
+                  ),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      'Order Pipeline Room Active',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                'Direct live coordination between Courier Rider, Distribution Center Operations, Merchant, and Telesales. Send a message to start.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1921,13 +1886,13 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final hasAttachment = _stagedAttachment != null;
 
     return Container(
-      padding: EdgeInsets.only(
-        left: 14,
-        right: 14,
-        top: 6,
-        bottom: bottomInset + (bottomPadding > 0 ? bottomPadding : 10),
+      padding: EdgeInsets.fromLTRB(
+        8,
+        4,
+        8,
+        bottomInset + (bottomPadding > 0 ? bottomPadding : 8),
       ),
-      color: isDark ? const Color(0xFF0F172A) : Colors.white,
+      color: Colors.transparent, // Floating over WhatsApp Wallpaper!
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1935,18 +1900,21 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           if (_showMentionSuggestions)
             _buildMentionSuggestionsOverlay(context, isDark, conv),
 
-          // 1. WhatsApp-style Attachment Staging Preview (if file/photo staged)
+          // Attachment preview if staged
           if (_stagedAttachment != null)
             Container(
-              margin: const EdgeInsets.only(bottom: 8),
+              margin: const EdgeInsets.only(bottom: 6),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                color: isDark ? const Color(0xFF202C33) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                  width: 0.8,
-                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
@@ -1962,10 +1930,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                         : Container(
                             width: 38,
                             height: 38,
-                            color: const Color(0xFF0284C7).withValues(alpha: 0.15),
+                            color: const Color(0xFF00A884).withOpacity(0.15),
                             child: const Icon(
                               Icons.insert_drive_file_rounded,
-                              color: Color(0xFF0284C7),
+                              color: Color(0xFF00A884),
                               size: 22,
                             ),
                           ),
@@ -1983,14 +1951,14 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            color: isDark ? Colors.white : const Color(0xFF111B21),
                           ),
                         ),
                         Text(
                           _formatFileSize(_stagedAttachment!.fileSize),
                           style: GoogleFonts.inter(
                             fontSize: 10.5,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
                           ),
                         ),
                       ],
@@ -2007,410 +1975,808 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
               ),
             ),
 
-          // 2. Main Input / Recording Container
+          // WhatsApp Live Voice Recording Mode
           if (_isRecordingVoice)
-            // WhatsApp Live Voice Recording Mode
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(
-                  color: const Color(0xFFEF4444).withValues(alpha: 0.5),
-                  width: 1.0,
+            _buildWhatsAppVoiceRecordingBar(isDark, isSending)
+          else
+            _buildWhatsAppInputBar(context, isDark, isSending, hasText, hasAttachment),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWhatsAppVoiceRecordingBar(bool isDark, bool isSending) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF202C33) : Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: Row(
+        children: [
+          // Pulsing recording red dot
+          FadeTransition(
+            opacity: _shimmerAnimation,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEF4444),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Stopwatch Duration Timer
+          Text(
+            '${_recordingDuration.inMinutes}:${(_recordingDuration.inSeconds % 60).toString().padLeft(2, '0')}',
+            style: GoogleFonts.inter(
+              fontSize: 13.5,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFFEF4444),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Waveform hint
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.graphic_eq_rounded,
+                  size: 18,
+                  color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    'Slide to cancel',
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // WhatsApp Trash / Discard Button
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 22),
+            tooltip: 'Cancel & Discard',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: _cancelVoiceRecording,
+          ),
+          const SizedBox(width: 6),
+
+          // WhatsApp Send Voice Note Button
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: Color(0xFF00A884), // WhatsApp Emerald
+              shape: BoxShape.circle,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: isSending ? null : _sendVoiceRecording,
+                child: Center(
+                  child: isSending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.arrow_upward_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              child: Row(
-                children: [
-                  // Pulsing recording red dot
-                  FadeTransition(
-                    opacity: _shimmerAnimation,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                  // Stopwatch Duration Timer
-                  Text(
-                    '${_recordingDuration.inMinutes}:${(_recordingDuration.inSeconds % 60).toString().padLeft(2, '0')}',
-                    style: GoogleFonts.inter(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFFEF4444),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
+  Widget _buildWhatsAppInputBar(
+    BuildContext context,
+    bool isDark,
+    bool isSending,
+    bool hasText,
+    bool hasAttachment,
+  ) {
+    final pillBg = isDark ? const Color(0xFF202C33) : Colors.white;
+    final iconColor = isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F);
 
-                  // Waveform hint
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.graphic_eq_rounded,
-                          size: 18,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            'Recording voice note...',
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // 1. WhatsApp Floating Input Pill
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: pillBg,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Emoji icon
+                IconButton(
+                  icon: Icon(
+                    Icons.sentiment_satisfied_alt_outlined,
+                    size: 23,
+                    color: iconColor,
                   ),
-                  const SizedBox(width: 8),
+                  padding: const EdgeInsets.all(7),
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Emoji',
+                  onPressed: () => _showQuickEmojiPicker(context, isDark),
+                ),
 
-                  // WhatsApp Trash / Discard Button
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 22),
-                    tooltip: 'Cancel & Discard',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    onPressed: _cancelVoiceRecording,
-                  ),
-                  const SizedBox(width: 6),
-
-                  // WhatsApp Send Voice Note Button
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF10B981), Color(0xFF059669)], // WhatsApp Emerald
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x4410B981),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(17),
-                        onTap: isSending ? null : _sendVoiceRecording,
-                        child: Center(
-                          child: isSending
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            // Standard WhatsApp Chat Bar
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(26),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // 1. WhatsApp Attachment Button (Paperclip)
-                  PopupMenuButton<String>(
-                    icon: Icon(
-                      Icons.attach_file_rounded,
-                      size: 20,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 190),
-                    tooltip: 'Attach photo or file',
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    offset: const Offset(0, -115),
-                    onSelected: (val) {
-                      if (val == 'photo') {
-                        _pickMediaAttachment(isImageOnly: true);
-                      } else if (val == 'doc') {
-                        _pickMediaAttachment(isImageOnly: false);
-                      }
-                    },
-                    itemBuilder: (ctx) => [
-                      PopupMenuItem(
-                        value: 'photo',
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(7),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.image_rounded, size: 18, color: Color(0xFF10B981)),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Photos & Media',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'doc',
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(7),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.insert_drive_file_rounded, size: 18, color: Color(0xFF3B82F6)),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Document / File',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 2),
-
-                  // 2. Pure borderless free input
-                  Expanded(
+                // Pure borderless text input
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: TextField(
                       controller: _msgController,
                       focusNode: _msgFocusNode,
                       minLines: 1,
-                      maxLines: 4,
+                      maxLines: 5,
                       textCapitalization: TextCapitalization.sentences,
-                      onSubmitted: (_) => _handleSendMessage(),
+                      cursorColor: const Color(0xFF00A884),
+                      cursorWidth: 2,
+                      cursorRadius: const Radius.circular(2),
                       style: GoogleFonts.inter(
-                        fontSize: 13.5,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontSize: 14.5,
                         height: 1.35,
+                        color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
                       ),
                       decoration: InputDecoration(
                         hintText: _stagedAttachment != null
                             ? 'Add a caption...'
-                            : 'Type a message... (type @ to tag)',
+                            : 'Message',
                         hintStyle: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                          fontSize: 14.5,
+                          color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
                         ),
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        contentPadding: EdgeInsets.zero,
                         border: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        errorBorder: InputBorder.none,
-                        disabledBorder: InputBorder.none,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                ),
 
-                  // 3. Emoji Quick Picker Popup Button
-                  Tooltip(
-                    message: 'Add Emoji',
-                    child: PopupMenuButton<String>(
-                      icon: Icon(
-                        Icons.sentiment_satisfied_alt_outlined,
-                        size: 20,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                // Paperclip attachment button
+                IconButton(
+                  icon: Transform.rotate(
+                    angle: -0.785,
+                    child: Icon(
+                      Icons.attach_file_rounded,
+                      size: 22,
+                      color: iconColor,
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(7),
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Attach file or media',
+                  onPressed: () => _showWhatsAppAttachmentSheet(context, isDark),
+                ),
+
+                // Camera button (when empty)
+                if (!hasText && !hasAttachment)
+                  IconButton(
+                    icon: Icon(
+                      Icons.camera_alt_rounded,
+                      size: 22,
+                      color: iconColor,
+                    ),
+                    padding: const EdgeInsets.all(7),
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Camera / Photos',
+                    onPressed: () => _pickMediaAttachment(isImageOnly: true),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+
+        // 2. WhatsApp Circular Action FAB (Mic / Send)
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: const Color(0xFF00A884), // WhatsApp Emerald
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00A884).withOpacity(0.35),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(23),
+              onTap: isSending
+                  ? null
+                  : (hasText || hasAttachment)
+                      ? _handleSendMessage
+                      : _startVoiceRecording,
+              child: Center(
+                child: isSending
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Icon(
+                        (hasText || hasAttachment)
+                            ? Icons.send_rounded
+                            : Icons.mic_rounded,
+                        color: Colors.white,
+                        size: (hasText || hasAttachment) ? 20 : 23,
                       ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      tooltip: 'Add emoji',
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      onSelected: (emoji) {
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showWhatsAppAttachmentSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1F2C34) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildWhatsAppAttachmentItem(
+                      icon: Icons.insert_drive_file_rounded,
+                      label: 'Document',
+                      color: const Color(0xFF5F66CD),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickMediaAttachment(isImageOnly: false);
+                      },
+                    ),
+                    _buildWhatsAppAttachmentItem(
+                      icon: Icons.camera_alt_rounded,
+                      label: 'Camera',
+                      color: const Color(0xFFD3396D),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickMediaAttachment(isImageOnly: true);
+                      },
+                    ),
+                    _buildWhatsAppAttachmentItem(
+                      icon: Icons.image_rounded,
+                      label: 'Gallery',
+                      color: const Color(0xFFAC44CF),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickMediaAttachment(isImageOnly: true);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildWhatsAppAttachmentItem(
+                      icon: Icons.mic_rounded,
+                      label: 'Audio Note',
+                      color: const Color(0xFFE0662D),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _startVoiceRecording();
+                      },
+                    ),
+                    _buildWhatsAppAttachmentItem(
+                      icon: Icons.alternate_email_rounded,
+                      label: 'Mention',
+                      color: const Color(0xFF0E9BD4),
+                      onTap: () {
+                        Navigator.pop(ctx);
                         final cur = _msgController.text;
-                        _msgController.text = '$cur $emoji '.trimLeft();
+                        _msgController.text = cur.isEmpty ? '@' : '$cur @';
                         _msgController.selection = TextSelection.fromPosition(
                           TextPosition(offset: _msgController.text.length),
                         );
                         _msgFocusNode.requestFocus();
                       },
-                      itemBuilder: (ctx) => [
-                        PopupMenuItem(
-                          enabled: false,
-                          child: Text(
-                            'Quick Reactions',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                        const PopupMenuDivider(height: 4),
-                        PopupMenuItem(
-                          padding: EdgeInsets.zero,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            child: Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                '👍', '✅', '📦', '🚚', '📍', '💰', '📞', '⚠️', '🚨', '🙏'
-                              ].map((emoji) {
-                                return InkWell(
-                                  onTap: () => Navigator.of(ctx).pop(emoji),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF334155).withValues(alpha: 0.5)
-                                          : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(emoji, style: const TextStyle(fontSize: 18)),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
-                  ),
-                  const SizedBox(width: 4),
+                    _buildWhatsAppAttachmentItem(
+                      icon: Icons.inventory_2_rounded,
+                      label: 'Order Info',
+                      color: const Color(0xFF1BA458),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        final conv = ref.read(pipelineChatProvider).activeConversation;
+                        if (conv != null) {
+                          _msgController.text = '📦 Order #${conv.orderNumber} (${conv.currentProductName ?? 'Package'}) - Status: ${conv.orderStatus.toUpperCase()}';
+                          _msgController.selection = TextSelection.fromPosition(
+                            TextPosition(offset: _msgController.text.length),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-                  // 4. Dynamic WhatsApp Button (Mic when empty, Send when has text/file)
-                  if (hasText || hasAttachment)
-                    // Send Button
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF0284C7),
-                            Color(0xFF0369A1),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0284C7).withValues(alpha: 0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1.5),
-                          ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: isSending ? null : _handleSendMessage,
-                          child: Center(
-                            child: isSending
-                                ? FadeTransition(
-                                    opacity: _shimmerAnimation,
-                                    child: const Icon(
-                                      Icons.arrow_upward_rounded,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.send_rounded,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    // WhatsApp Microphone Button
-                    Tooltip(
-                      message: 'Record voice note',
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFF10B981), // WhatsApp Emerald
-                              Color(0xFF059669),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.35),
-                              blurRadius: 5,
-                              offset: const Offset(0, 1.5),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: _startVoiceRecording,
-                            child: const Center(
-                              child: Icon(
-                                Icons.mic_rounded,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+  Widget _buildWhatsAppAttachmentItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color, color.withOpacity(0.85)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
                 ],
               ),
+              child: Icon(icon, color: Colors.white, size: 24),
             ),
+            const SizedBox(height: 7),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showQuickEmojiPicker(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1F2C34) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final emojis = ['👍', '❤️', '😂', '😮', '😢', '🙏', '✅', '📦', '🚚', '📍', '💰', '📞', '⚠️', '🚨', '🤝', '🔥'];
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Quick Reactions',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: emojis.map((e) {
+                    return InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        final cur = _msgController.text;
+                        _msgController.text = '$cur $e '.trimLeft();
+                        _msgController.selection = TextSelection.fromPosition(
+                          TextPosition(offset: _msgController.text.length),
+                        );
+                        _msgFocusNode.requestFocus();
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2A3942) : const Color(0xFFF0F2F5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(e, style: const TextStyle(fontSize: 22)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDateSeparator(DateTime date, bool isDark) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final msgDate = DateTime(date.year, date.month, date.day);
+
+    String text;
+    if (msgDate == today) {
+      text = 'TODAY';
+    } else if (msgDate == yesterday) {
+      text = 'YESTERDAY';
+    } else if (now.difference(msgDate).inDays < 7) {
+      text = DateFormat('EEEE').format(date).toUpperCase();
+    } else {
+      text = DateFormat('MMMM d, yyyy').format(date).toUpperCase();
+    }
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4.5),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF182229) : Colors.white.withOpacity(0.92),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+            color: isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showOrderQuickDetailsModal(BuildContext context, OrderConversationEntity conv, bool isDark) {
+    final currency = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1F2C34) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    UserAvatarWidget(
+                      fullName: conv.customerName,
+                      radius: 24,
+                      backgroundColor: const Color(0xFF008069),
+                      textColor: Colors.white,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            conv.customerName,
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF111B21),
+                            ),
+                          ),
+                          if (conv.customerPhone != null && conv.customerPhone!.isNotEmpty)
+                            Text(
+                              conv.customerPhone!,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 10),
+                Text(
+                  'ORDER SUMMARY',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                    color: const Color(0xFF00A884),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildQuickDetailRow('Order Number', conv.orderNumber, isDark),
+                _buildQuickDetailRow('Product', '${conv.currentProductName ?? 'Standard'} (${conv.currentPackageName ?? 'Deal'})', isDark),
+                _buildQuickDetailRow('Total Amount', currency.format(conv.currentTotalAmount), isDark),
+                _buildQuickDetailRow('Status', conv.orderStatus.toUpperCase(), isDark),
+                _buildQuickDetailRow('Distribution Center', conv.distributionCenterName ?? 'Central Command DC', isDark),
+                if (conv.deliveryAgentName != null && conv.deliveryAgentName!.isNotEmpty)
+                  _buildQuickDetailRow('Assigned Courier', conv.deliveryAgentName!, isDark),
+                if (conv.closerName != null && conv.closerName!.isNotEmpty)
+                  _buildQuickDetailRow('Telesales Closer', conv.closerName!, isDark),
+                _buildQuickDetailRow('Merchant Brand', conv.clientName, isDark),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildQuickDetailRow(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF111B21),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+
+  String _getWhatsAppSubtitle(OrderConversationEntity? conv) {
+    if (conv == null) return 'tap for order details';
+    final parts = <String>[];
+    if (conv.deliveryAgentName != null && conv.deliveryAgentName!.isNotEmpty) {
+      parts.add('Rider');
+    }
+    parts.add('DC Ops');
+    parts.add('Merchant');
+    if (conv.closerName != null && conv.closerName!.isNotEmpty) {
+      parts.add('Closer');
+    }
+    return parts.join(', ');
+  }
+
+  Widget _buildAccessRestrictedState(String error, bool isDark) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.lock_person_rounded, size: 48, color: Color(0xFFEF4444)),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Access Restricted',
+              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+/// Canvas Doodle Wallpaper mimicking WhatsApp's iconic background
+class WhatsAppWallpaperPainter extends CustomPainter {
+  final bool isDark;
+  const WhatsAppWallpaperPainter({required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final strokeColor = (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.025 : 0.038);
+    final paint = Paint()
+      ..color = strokeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    const stepX = 85.0;
+    const stepY = 85.0;
+    int row = 0;
+
+    for (double y = 20; y < size.height; y += stepY, row++) {
+      final offsetX = (row % 2 == 1) ? stepX / 2 : 0.0;
+      int col = 0;
+      for (double x = 20 + offsetX; x < size.width; x += stepX, col++) {
+        final iconType = (col + row * 3) % 6;
+        final c = Offset(x, y);
+
+        switch (iconType) {
+          case 0:
+            // Chat bubble
+            final path = Path();
+            path.addRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: c, width: 22, height: 16), const Radius.circular(5)));
+            path.moveTo(c.dx - 6, c.dy + 8);
+            path.lineTo(c.dx - 10, c.dy + 12);
+            path.lineTo(c.dx - 2, c.dy + 8);
+            canvas.drawPath(path, paint);
+            break;
+          case 1:
+            // 4-pointed star
+            final path = Path();
+            path.moveTo(c.dx, c.dy - 10);
+            path.lineTo(c.dx + 3, c.dy - 3);
+            path.lineTo(c.dx + 10, c.dy);
+            path.lineTo(c.dx + 3, c.dy + 3);
+            path.lineTo(c.dx, c.dy + 10);
+            path.lineTo(c.dx - 3, c.dy + 3);
+            path.lineTo(c.dx - 10, c.dy);
+            path.lineTo(c.dx - 3, c.dy - 3);
+            path.close();
+            canvas.drawPath(path, paint);
+            break;
+          case 2:
+            // Clock
+            canvas.drawCircle(c, 8, paint);
+            canvas.drawLine(c, Offset(c.dx, c.dy - 4), paint);
+            canvas.drawLine(c, Offset(c.dx + 3, c.dy), paint);
+            break;
+          case 3:
+            // Package / box
+            canvas.drawRect(Rect.fromCenter(center: c, width: 16, height: 14), paint);
+            canvas.drawLine(Offset(c.dx - 8, c.dy), Offset(c.dx + 8, c.dy), paint);
+            canvas.drawLine(Offset(c.dx, c.dy - 7), Offset(c.dx, c.dy + 7), paint);
+            break;
+          case 4:
+            // Musical note
+            final path = Path();
+            path.moveTo(c.dx - 4, c.dy + 5);
+            path.lineTo(c.dx - 4, c.dy - 6);
+            path.lineTo(c.dx + 4, c.dy - 9);
+            path.lineTo(c.dx + 4, c.dy + 2);
+            canvas.drawPath(path, paint);
+            canvas.drawCircle(Offset(c.dx - 6, c.dy + 5), 2.5, paint);
+            canvas.drawCircle(Offset(c.dx + 2, c.dy + 2), 2.5, paint);
+            break;
+          case 5:
+            // Heart
+            final path = Path();
+            path.moveTo(c.dx, c.dy + 6);
+            path.cubicTo(c.dx - 8, c.dy + 1, c.dx - 8, c.dy - 6, c.dx, c.dy - 3);
+            path.cubicTo(c.dx + 8, c.dy - 6, c.dx + 8, c.dy + 1, c.dx, c.dy + 6);
+            canvas.drawPath(path, paint);
+            break;
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant WhatsAppWallpaperPainter oldDelegate) => oldDelegate.isDark != isDark;
+}
+

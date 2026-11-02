@@ -13,6 +13,7 @@ import '../../../pipeline_chat/domain/entities/order_conversation.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
 import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
+import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
@@ -1196,6 +1197,7 @@ class _DCOperationsMobilePortalPageState
           ],
         ),
       ),
+      floatingActionButton: const PipelineChatFloatingActionButton(),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF031632) : Colors.white,
@@ -1889,29 +1891,32 @@ class _DCOperationsMobilePortalPageState
                               final unreadCount = conv?.unreadDcCount ?? 0;
                               final hasUnread = unreadCount > 0;
 
-                              return InkWell(
-                                onTap: () => OrderPipelineChatSheet.showForOrder(context, order),
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: (hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
-                                        .withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Center(
-                                    child: Badge(
-                                      isLabelVisible: hasUnread,
-                                      label: Text(
-                                        '$unreadCount',
-                                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
-                                      ),
-                                      backgroundColor: const Color(0xFFEF4444),
-                                      child: Icon(
-                                        hasUnread ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
-                                        size: 17,
-                                        color: hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488),
+                              return Tooltip(
+                                message: hasUnread ? 'Order Pipeline Chat ($unreadCount unread)' : 'Order Pipeline Chat',
+                                child: InkWell(
+                                  onTap: () => OrderPipelineChatSheet.showForOrder(context, order),
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration: BoxDecoration(
+                                      color: (hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
+                                          .withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Center(
+                                      child: Badge(
+                                        isLabelVisible: hasUnread,
+                                        label: Text(
+                                          '$unreadCount',
+                                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+                                        ),
+                                        backgroundColor: const Color(0xFFEF4444),
+                                        child: Icon(
+                                          hasUnread ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
+                                          size: 17,
+                                          color: hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488),
+                                        ),
                                       ),
                                     ),
                                   ),
