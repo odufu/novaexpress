@@ -38,7 +38,6 @@ class ChatPickedAttachment {
   });
 }
 
-
 class OrderPipelineChatSheet extends ConsumerStatefulWidget {
   final String orderId;
   final String orderNumber;
@@ -119,6 +118,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   Duration _recordingDuration = Duration.zero;
   StreamSubscription? _recordingSub;
   ChatPickedAttachment? _stagedAttachment;
+  OrderConversationMessageEntity? _replyingToMessage;
 
   @override
   void initState() {
@@ -508,12 +508,22 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   }
 
   Future<void> _handleSendMessage() async {
+    final Map<String, dynamic>? replyMeta = _replyingToMessage != null
+        ? {
+            'reply_to_id': _replyingToMessage!.id,
+            'reply_to_sender': _replyingToMessage!.senderName,
+            'reply_to_body': _replyingToMessage!.messageBody,
+            'reply_to_type': _replyingToMessage!.messageType.name,
+          }
+        : null;
+
     if (_stagedAttachment != null) {
       final attachment = _stagedAttachment!;
       final caption = _msgController.text.trim();
       _msgController.clear();
       setState(() {
         _stagedAttachment = null;
+        _replyingToMessage = null;
         _showMentionSuggestions = false;
       });
 
@@ -523,6 +533,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             mimeType: attachment.mimeType,
             caption: caption.isNotEmpty ? caption : null,
             isImage: attachment.isImage,
+            metadata: replyMeta,
           );
       if (ok) {
         Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
@@ -534,8 +545,11 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     if (text.isEmpty) return;
 
     _msgController.clear();
-    setState(() => _showMentionSuggestions = false);
-    final ok = await ref.read(pipelineChatProvider.notifier).sendTextMessage(text);
+    setState(() {
+      _showMentionSuggestions = false;
+      _replyingToMessage = null;
+    });
+    final ok = await ref.read(pipelineChatProvider.notifier).sendTextMessage(text, metadata: replyMeta);
     if (ok) {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     }
@@ -543,6 +557,28 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   void _appendMentionTag(String tag) {
     _selectMentionSuggestion(tag);
+  }
+
+  Widget _buildInitialsDp(String initials, Color bgColor) {
+    return Container(
+      width: 16,
+      height: 16,
+      decoration: BoxDecoration(
+        color: bgColor,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 7.5,
+            fontWeight: FontWeight.w700,
+            height: 1.0,
+          ),
+        ),
+      ),
+    );
   }
 
   String _formatMessageTime(DateTime dt) {
@@ -593,6 +629,39 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
       }
 
       final tag = match.group(0)!;
+      final rawName = tag.substring(1).trim();
+
+      // Look up participant profile from available profiles
+      final profiles = _getAvailableMentionProfiles(conv);
+      Map<String, dynamic>? matchedProfile;
+      final rawLower = rawName.toLowerCase();
+
+      for (final p in profiles) {
+        final pTag = (p['tag'] as String).substring(1).trim().toLowerCase();
+        final pName = (p['name'] as String).trim().toLowerCase();
+        if (pTag == rawLower || pName == rawLower || pName.contains(rawLower) || rawLower.contains(pName)) {
+          matchedProfile = p;
+          break;
+        }
+      }
+
+      final displayName = matchedProfile != null ? (matchedProfile['name'] as String) : rawName;
+      final avatarUrl = matchedProfile?['avatarUrl'] as String?;
+
+      // Calculate initials (e.g. "Oladele Omowaye" -> "OO")
+      final nameParts = displayName.trim().split(RegExp(r'\s+'));
+      final initials = nameParts.length >= 2
+          ? '\${nameParts[0][0]}\${nameParts[1][0]}'.toUpperCase()
+          : (nameParts.isNotEmpty && nameParts[0].isNotEmpty ? nameParts[0][0].toUpperCase() : '@');
+
+      // WhatsApp deep green colors
+      final deepGreen = isDark ? const Color(0xFF25D366) : const Color(0xFF008069);
+      final pillBg = isDark
+          ? const Color(0xFF005C4B).withOpacity(0.35)
+          : const Color(0xFF008069).withOpacity(0.09);
+      final pillBorder = isDark
+          ? const Color(0xFF00A884).withOpacity(0.35)
+          : const Color(0xFF008069).withOpacity(0.24);
 
       spans.add(
         WidgetSpan(
@@ -609,43 +678,42 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                   onMention: _appendMentionTag,
                 );
               },
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.fromLTRB(2.5, 1.5, 6, 1.5),
                 decoration: BoxDecoration(
-                  color: isMyMessage
-                      ? (isDark ? Colors.white.withOpacity(0.15) : const Color(0xFF008069).withOpacity(0.12))
-                      : (isDark
-                          ? const Color(0xFF38BDF8).withOpacity(0.2)
-                          : const Color(0xFF008069).withOpacity(0.1)),
-                  borderRadius: BorderRadius.circular(6),
+                  color: pillBg,
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isMyMessage
-                        ? (isDark ? Colors.white.withOpacity(0.3) : const Color(0xFF008069).withOpacity(0.3))
-                        : (isDark
-                            ? const Color(0xFF38BDF8).withOpacity(0.4)
-                            : const Color(0xFF008069).withOpacity(0.25)),
+                    color: pillBorder,
                     width: 0.8,
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.alternate_email_rounded,
-                      size: 11,
-                      color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF007A65),
-                    ),
-                    const SizedBox(width: 2),
+                    // Rounded DP
+                    if (avatarUrl != null && avatarUrl.isNotEmpty)
+                      ClipOval(
+                        child: Image.network(
+                          avatarUrl,
+                          width: 16,
+                          height: 16,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildInitialsDp(initials, deepGreen),
+                        ),
+                      )
+                    else
+                      _buildInitialsDp(initials, deepGreen),
+                    const SizedBox(width: 4),
+                    // Bold Name in Deep Green Color
                     Text(
-                      tag.substring(1),
+                      '@$displayName',
                       style: GoogleFonts.inter(
-                        fontSize: 12,
+                        fontSize: 12.2,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF007A65),
-                        decoration: TextDecoration.underline,
-                        decorationStyle: TextDecorationStyle.solid,
-                        decorationThickness: 1.2,
+                        color: deepGreen,
                       ),
                     ),
                   ],
@@ -1369,45 +1437,85 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
       // Outgoing WhatsApp Bubble (Green #D9FDD3 in light, #005C4B in dark)
       final bubbleBg = isDark ? const Color(0xFF005C4B) : const Color(0xFFD9FDD3);
 
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const SizedBox(width: 48), // WhatsApp standard opposite indent
-            Flexible(
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.80,
+      return Dismissible(
+        key: ValueKey('swipe_reply_\${msg.id}'),
+        direction: DismissDirection.startToEnd,
+        dismissThresholds: const {
+          DismissDirection.startToEnd: 0.16,
+        },
+        confirmDismiss: (direction) async {
+          HapticFeedback.lightImpact();
+          setState(() {
+            _replyingToMessage = msg;
+          });
+          _msgFocusNode.requestFocus();
+          return false;
+        },
+        background: Container(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 14),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1F2C34) : Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
                 ),
-                padding: const EdgeInsets.fromLTRB(10, 7, 8, 5),
-                decoration: BoxDecoration(
-                  color: bubbleBg,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                    bottomLeft: Radius.circular(12),
-                    bottomRight: Radius.circular(2),
+              ],
+            ),
+            child: const Icon(
+              Icons.reply_rounded,
+              color: Color(0xFF00A884),
+              size: 19,
+            ),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const SizedBox(width: 48), // WhatsApp standard opposite indent
+              Flexible(
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.80,
                   ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x1F000000),
-                      offset: Offset(0, 1),
-                      blurRadius: 1,
+                  padding: const EdgeInsets.fromLTRB(10, 7, 8, 5),
+                  decoration: BoxDecoration(
+                    color: bubbleBg,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(2),
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildMessageContent(
-                      msg,
-                      isMyMessage: true,
-                      isDark: isDark,
-                      conv: conv,
-                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1F000000),
+                        offset: Offset(0, 1),
+                        blurRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (msg.metadata['reply_to_sender'] != null)
+                        _buildQuotedReplyBox(msg, isDark, true),
+                      _buildMessageContent(
+                        msg,
+                        isMyMessage: true,
+                        isDark: isDark,
+                        conv: conv,
+                      ),
                     const SizedBox(height: 2),
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1435,18 +1543,57 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
     // Incoming WhatsApp Bubble (White in light, #202C33 in dark)
     final bubbleBg = isDark ? const Color(0xFF202C33) : Colors.white;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Dismissible(
+      key: ValueKey('swipe_reply_${msg.id}'),
+      direction: DismissDirection.startToEnd,
+      dismissThresholds: const {
+        DismissDirection.startToEnd: 0.16,
+      },
+      confirmDismiss: (direction) async {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _replyingToMessage = msg;
+        });
+        _msgFocusNode.requestFocus();
+        return false;
+      },
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 14),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1F2C34) : Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.reply_rounded,
+            color: Color(0xFF00A884),
+            size: 19,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // WhatsApp Group Member Avatar
           InkWell(
             onTap: () {
@@ -1543,6 +1690,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                     ),
                   ),
 
+                  if (msg.metadata['reply_to_sender'] != null)
+                    _buildQuotedReplyBox(msg, isDark, false),
+
                   // Message Content
                   _buildMessageContent(
                     msg,
@@ -1572,6 +1722,196 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           ),
           const SizedBox(width: 48), // Indent on opposite side
         ],
+      ),
+    ),
+  );
+}
+
+  Widget _buildQuotedReplyBox(
+    OrderConversationMessageEntity msg,
+    bool isDark,
+    bool isMyMessage,
+  ) {
+    final replySender = msg.metadata['reply_to_sender']?.toString();
+    final replyBody = msg.metadata['reply_to_body']?.toString();
+    final replyType = msg.metadata['reply_to_type']?.toString();
+
+    if (replySender == null || replySender.isEmpty) return const SizedBox.shrink();
+
+    String snippet = replyBody ?? '';
+    IconData? typeIcon;
+    if (replyType == ChatMessageType.voiceNote.name) {
+      typeIcon = Icons.mic_rounded;
+      snippet = 'Voice message';
+    } else if (replyType == ChatMessageType.fileAttachment.name || replyType == ChatMessageType.image.name) {
+      typeIcon = Icons.insert_drive_file_rounded;
+      snippet = 'Attachment';
+    }
+
+    const accentColor = Color(0xFF00A884);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 5),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.black.withOpacity(0.25)
+              : (isMyMessage
+                  ? const Color(0xFFB4EBB0).withOpacity(0.65)
+                  : const Color(0xFFF0F2F5)),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 3.5,
+                color: accentColor,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 4, 8, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        replySender,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: accentColor,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (typeIcon != null) ...[
+                            Icon(
+                              typeIcon,
+                              size: 11.5,
+                              color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              snippet,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReplyingToBanner(bool isDark) {
+    if (_replyingToMessage == null) return const SizedBox.shrink();
+
+    final isMine = _replyingToMessage!.senderId == ref.read(authProvider).user?.id;
+    final senderDisplay = isMine ? 'You' : _replyingToMessage!.senderName;
+
+    String previewText = _replyingToMessage!.messageBody;
+    IconData? previewIcon;
+    if (_replyingToMessage!.messageType == ChatMessageType.voiceNote) {
+      previewIcon = Icons.mic_rounded;
+      previewText = 'Voice message';
+    } else if (_replyingToMessage!.messageType == ChatMessageType.fileAttachment ||
+        _replyingToMessage!.messageType == ChatMessageType.image) {
+      previewIcon = Icons.insert_drive_file_rounded;
+      previewText = 'Attachment';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1F2C34) : const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A3942) : const Color(0xFFE2E8F0),
+          width: 0.8,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 4,
+                color: const Color(0xFF00A884),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Replying to $senderDisplay',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF00A884),
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Row(
+                        children: [
+                          if (previewIcon != null) ...[
+                            Icon(previewIcon, size: 12, color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781)),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Text(
+                              previewText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: () => setState(() => _replyingToMessage = null),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1900,6 +2240,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           if (_showMentionSuggestions)
             _buildMentionSuggestionsOverlay(context, isDark, conv),
 
+          // WhatsApp Replying To Banner
+          if (_replyingToMessage != null)
+            _buildReplyingToBanner(isDark),
+
           // Attachment preview if staged
           if (_stagedAttachment != null)
             Container(
@@ -2170,8 +2514,15 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                           color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
                         ),
                         isDense: true,
+                        filled: false,
+                        fillColor: Colors.transparent,
                         contentPadding: EdgeInsets.zero,
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
                       ),
                     ),
                   ),

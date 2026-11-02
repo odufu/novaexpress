@@ -397,7 +397,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
   }
 
   /// Send a text message in the active conversation
-  Future<bool> sendTextMessage(String body) async {
+  Future<bool> sendTextMessage(String body, {Map<String, dynamic>? metadata}) async {
     final conv = state.activeConversation;
     if (conv == null || body.trim().isEmpty) return false;
 
@@ -449,6 +449,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         senderAvatarUrl: senderAvatar,
         senderRole: role,
         messageBody: body.trim(),
+        metadata: metadata,
       );
 
       state = state.copyWith(isSending: false);
@@ -574,6 +575,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     String? mimeType,
     String? caption,
     bool isImage = false,
+    Map<String, dynamic>? metadata,
   }) async {
     final conv = state.activeConversation;
     if (conv == null || fileBytes.isEmpty) return false;
@@ -637,6 +639,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
           'file_size': fileBytes.length,
           if (mimeType != null) 'mime_type': mimeType,
           if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
+          if (metadata != null) ...metadata,
         },
       );
 
