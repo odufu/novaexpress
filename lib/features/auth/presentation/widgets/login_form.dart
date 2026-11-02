@@ -176,6 +176,10 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   final _passwordController = TextEditingController();
   _DevAccountOption? _selectedDevAccount;
 
+  /// Set to true to show Dev Pilot Fast-Login Dropdown during active development.
+  /// Set to false for live production builds (app.novaxpressng.com).
+  static const bool _enableDevPilotAccountSelector = false;
+
   @override
   void dispose() {
     _agentIdController.dispose();
@@ -245,9 +249,10 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Development Fast-Login Dropdown
-          Container(
-            margin: const EdgeInsets.only(bottom: 20),
+          // Development Fast-Login Dropdown (Toggled off for live production cPanel build)
+          if (_enableDevPilotAccountSelector) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 20),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFFF8FAFC),
@@ -521,6 +526,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               ],
             ),
           ),
+        ],
 
           if (authState.errorMessage != null) ...[
             Container(
