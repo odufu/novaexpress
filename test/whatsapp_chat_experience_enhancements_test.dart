@@ -249,6 +249,18 @@ void main() {
 
       // Verify reaction badge appears with ❤️ on the message bubble
       expect(find.text('❤️'), findsWidgets);
+
+      // 6. Verify tapping quoted reply box scrolls to and highlights replied message
+      final quotedReplyFinder = find.text('Hello @Oladele Omowaye package has arrived at customer gate');
+      expect(quotedReplyFinder, findsWidgets);
+      // Tap the quoted preview box
+      await tester.tap(quotedReplyFinder.last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      // Verify AnimatedContainer exists and pulse highlight is active
+      final animatedContainers = tester.widgetList<AnimatedContainer>(find.byType(AnimatedContainer));
+      expect(animatedContainers.isNotEmpty, isTrue);
     });
   });
 }

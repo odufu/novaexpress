@@ -109,6 +109,14 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   late AnimationController _shimmerController;
   late Animation<double> _shimmerAnimation;
 
+  final Map<String, GlobalKey> _messageKeys = {};
+  String? _highlightedMessageId;
+  Timer? _highlightTimer;
+
+  GlobalKey _getKeyForMessage(String messageId) {
+    return _messageKeys.putIfAbsent(messageId, () => GlobalKey());
+  }
+
   bool _showMentionSuggestions = false;
   String _mentionQuery = '';
   int _mentionStartIndex = -1;
@@ -150,6 +158,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   @override
   void dispose() {
+    _highlightTimer?.cancel();
     _recordingSub?.cancel();
     _voiceRecorder.dispose();
     _shimmerController.dispose();
@@ -794,16 +803,22 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                                           msg.createdAt.month != chatState.messages[index - 1].createdAt.month ||
                                           msg.createdAt.day != chatState.messages[index - 1].createdAt.day);
 
+                                  final messageWidget = _buildMessageItem(msg, isDark, conv);
+
                                   if (showDateSeparator) {
                                     return Column(
+                                      key: _getKeyForMessage(msg.id),
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         _buildDateSeparator(msg.createdAt, isDark),
-                                        _buildMessageItem(msg, isDark, conv),
+                                        messageWidget,
                                       ],
                                     );
                                   }
-                                  return _buildMessageItem(msg, isDark, conv);
+                                  return KeyedSubtree(
+                                    key: _getKeyForMessage(msg.id),
+                                    child: messageWidget,
+                                  );
                                 },
                               ),
               ),
@@ -1433,10 +1448,13 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
     final timeStr = _formatMessageTime(msg.createdAt);
     final reactions = _getMessageReactions(msg);
+    final isHighlighted = _highlightedMessageId == msg.id;
 
     if (isMyMessage) {
       // Outgoing WhatsApp Bubble (Green #D9FDD3 in light, #005C4B in dark)
-      final bubbleBg = isDark ? const Color(0xFF005C4B) : const Color(0xFFD9FDD3);
+      final bubbleBg = isHighlighted
+          ? (isDark ? const Color(0xFF007A65) : const Color(0xFFA7EBB0))
+          : (isDark ? const Color(0xFF005C4B) : const Color(0xFFD9FDD3));
 
       return Dismissible(
         key: ValueKey('swipe_reply_\${msg.id}'),
@@ -1490,7 +1508,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                     GestureDetector(
                       onLongPress: () => _showReactionPopup(context, msg, isDark),
                       onSecondaryTap: () => _showReactionPopup(context, msg, isDark),
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
                         margin: EdgeInsets.only(bottom: reactions.isNotEmpty ? 8 : 0),
                         constraints: BoxConstraints(
                           maxWidth: MediaQuery.of(context).size.width * 0.80,
@@ -1504,13 +1524,21 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                             bottomLeft: Radius.circular(12),
                             bottomRight: Radius.circular(2),
                           ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x1F000000),
-                              offset: Offset(0, 1),
-                              blurRadius: 1,
-                            ),
-                          ],
+                          boxShadow: isHighlighted
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF00A884).withOpacity(0.55),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ]
+                              : const [
+                                  BoxShadow(
+                                    color: Color(0x1F000000),
+                                    offset: Offset(0, 1),
+                                    blurRadius: 1,
+                                  ),
+                                ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1565,7 +1593,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   }
 
     // Incoming WhatsApp Bubble (White in light, #202C33 in dark)
-    final bubbleBg = isDark ? const Color(0xFF202C33) : Colors.white;
+    final bubbleBg = isHighlighted
+        ? (isDark ? const Color(0xFF2A3942) : const Color(0xFFE2F7E4))
+        : (isDark ? const Color(0xFF202C33) : Colors.white);
 
     return Dismissible(
       key: ValueKey('swipe_reply_${msg.id}'),
@@ -1640,7 +1670,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 GestureDetector(
                   onLongPress: () => _showReactionPopup(context, msg, isDark),
                   onSecondaryTap: () => _showReactionPopup(context, msg, isDark),
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
                     margin: EdgeInsets.only(bottom: reactions.isNotEmpty ? 8 : 0),
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.80,
@@ -1654,13 +1686,21 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                         bottomLeft: Radius.circular(12),
                         bottomRight: Radius.circular(12),
                       ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x1F000000),
-                          offset: Offset(0, 1),
-                          blurRadius: 1,
-                        ),
-                      ],
+                      boxShadow: isHighlighted
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF00A884).withOpacity(0.55),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : const [
+                              BoxShadow(
+                                color: Color(0x1F000000),
+                                offset: Offset(0, 1),
+                                blurRadius: 1,
+                              ),
+                            ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1765,6 +1805,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     bool isDark,
     bool isMyMessage,
   ) {
+    final replyToId = msg.metadata['reply_to_id']?.toString();
     final replySender = msg.metadata['reply_to_sender']?.toString();
     final replyBody = msg.metadata['reply_to_body']?.toString();
     final replyType = msg.metadata['reply_to_type']?.toString();
@@ -1783,76 +1824,184 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
     const accentColor = Color(0xFF00A884);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 5),
-        decoration: BoxDecoration(
-          color: isDark
-              ? Colors.black.withOpacity(0.25)
-              : (isMyMessage
-                  ? const Color(0xFFB4EBB0).withOpacity(0.65)
-                  : const Color(0xFFF0F2F5)),
-        ),
-        child: IntrinsicHeight(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                width: 3.5,
-                color: accentColor,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 4, 8, 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        replySender,
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: accentColor,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _scrollToRepliedMessage(replyToId, snippet: replyBody),
+        borderRadius: BorderRadius.circular(6),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 5),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.black.withOpacity(0.25)
+                  : (isMyMessage
+                      ? const Color(0xFFB4EBB0).withOpacity(0.65)
+                      : const Color(0xFFF0F2F5)),
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 3.5,
+                    color: accentColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 4, 8, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (typeIcon != null) ...[
-                            Icon(
-                              typeIcon,
-                              size: 11.5,
-                              color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                          Text(
+                            replySender,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: accentColor,
                             ),
-                            const SizedBox(width: 4),
-                          ],
-                          Flexible(
-                            child: Text(
-                              snippet,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F),
+                          ),
+                          const SizedBox(height: 1),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (typeIcon != null) ...[
+                                Icon(
+                                  typeIcon,
+                                  size: 11.5,
+                                  color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  snippet,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F),
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  void _scrollToRepliedMessage(String? replyToId, {String? snippet}) {
+    if (!mounted) return;
+    final chatState = ref.read(pipelineChatProvider);
+    final messages = chatState.messages;
+    if (messages.isEmpty) return;
+
+    OrderConversationMessageEntity? target;
+    if (replyToId != null && replyToId.isNotEmpty) {
+      final idx = messages.indexWhere((m) => m.id == replyToId);
+      if (idx != -1) target = messages[idx];
+    }
+    if (target == null && snippet != null && snippet.trim().isNotEmpty) {
+      final cleanSnippet = snippet.trim();
+      final idx = messages.indexWhere((m) =>
+          m.messageBody.trim() == cleanSnippet ||
+          m.messageBody.contains(cleanSnippet) ||
+          cleanSnippet.contains(m.messageBody));
+      if (idx != -1) target = messages[idx];
+    }
+
+    if (target == null) {
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Original message not found in this thread.',
+            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w500),
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+      return;
+    }
+
+    final targetMessageId = target.id;
+    HapticFeedback.selectionClick();
+
+    // Trigger visual pulse highlight on the target message
+    _highlightMessage(targetMessageId);
+
+    // If target widget context exists in viewport or nearby
+    final key = _getKeyForMessage(targetMessageId);
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.25, // Scroll into comfortable view near top-middle
+      );
+      return;
+    }
+
+    // Otherwise calculate estimated position in ListView and animate towards it
+    if (_scrollController.hasClients) {
+      final targetIndex = messages.indexWhere((m) => m.id == targetMessageId);
+      if (targetIndex >= 0) {
+        final total = messages.length <= 1 ? 1 : messages.length - 1;
+        final fraction = (targetIndex / total).clamp(0.0, 1.0);
+        final targetOffset = fraction * _scrollController.position.maxScrollExtent;
+
+        _scrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOutCubic,
+        ).then((_) {
+          if (!mounted) return;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final lateCtx = _getKeyForMessage(targetMessageId).currentContext;
+            if (lateCtx != null) {
+              Scrollable.ensureVisible(
+                lateCtx,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                alignment: 0.25,
+              );
+            }
+          });
+        });
+      }
+    }
+  }
+
+  void _highlightMessage(String messageId) {
+    setState(() {
+      _highlightedMessageId = messageId;
+    });
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(milliseconds: 1400), () {
+      if (mounted) {
+        setState(() {
+          if (_highlightedMessageId == messageId) {
+            _highlightedMessageId = null;
+          }
+        });
+      }
+    });
   }
 
   Widget _buildReplyingToBanner(bool isDark) {
