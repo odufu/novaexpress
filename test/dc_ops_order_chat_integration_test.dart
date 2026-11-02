@@ -84,6 +84,14 @@ class FakePipelineChatRemoteDataSource implements PipelineChatRemoteDataSource {
     required String actorRole,
     required String transferReason,
   }) async => {'success': true};
+
+  @override
+  Future<OrderConversationMessageEntity?> toggleMessageReaction({
+    required String messageId,
+    required String emoji,
+    required String userId,
+    required String userName,
+  }) async => null;
 }
 
 void main() {

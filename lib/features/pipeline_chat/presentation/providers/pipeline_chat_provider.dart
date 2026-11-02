@@ -699,6 +699,80 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       rethrow;
     }
   }
+
+  /// Toggle or add an emoji reaction to a message (optimistic UI)
+  Future<void> toggleReaction({
+    required String messageId,
+    required String emoji,
+  }) async {
+    final authUser = _ref.read(authProvider).user;
+    if (authUser == null) return;
+
+    final userId = authUser.id;
+    final userName = authUser.fullName.trim().isNotEmpty
+        ? authUser.fullName
+        : (authUser.email.split('@').first);
+
+    // Optimistic UI update
+    final updatedMessages = state.messages.map((m) {
+      if (m.id == messageId) {
+        final currentMeta = Map<String, dynamic>.from(m.metadata);
+        final rawReactions = currentMeta['reactions'] as List? ?? [];
+        final reactions = rawReactions.map((r) => Map<String, dynamic>.from(r as Map)).toList();
+
+        final existingIndex = reactions.indexWhere((r) => r['userId'] == userId);
+        if (existingIndex != -1) {
+          if (reactions[existingIndex]['emoji'] == emoji) {
+            reactions.removeAt(existingIndex);
+          } else {
+            reactions[existingIndex] = {
+              'emoji': emoji,
+              'userId': userId,
+              'userName': userName,
+            };
+          }
+        } else {
+          reactions.add({
+            'emoji': emoji,
+            'userId': userId,
+            'userName': userName,
+          });
+        }
+        currentMeta['reactions'] = reactions;
+
+        return OrderConversationMessageEntity(
+          id: m.id,
+          conversationId: m.conversationId,
+          orderId: m.orderId,
+          senderId: m.senderId,
+          senderName: m.senderName,
+          senderAvatarUrl: m.senderAvatarUrl,
+          senderRole: m.senderRole,
+          messageType: m.messageType,
+          messageBody: m.messageBody,
+          metadata: currentMeta,
+          readByClient: m.readByClient,
+          readByDc: m.readByDc,
+          readByRider: m.readByRider,
+          createdAt: m.createdAt,
+        );
+      }
+      return m;
+    }).toList();
+
+    state = state.copyWith(messages: updatedMessages);
+
+    try {
+      await _dataSource.toggleMessageReaction(
+        messageId: messageId,
+        emoji: emoji,
+        userId: userId,
+        userName: userName,
+      );
+    } catch (e) {
+      debugPrint('[PIPELINE_CHAT] Error toggling reaction: $e');
+    }
+  }
 }
 
 final pipelineChatProvider =

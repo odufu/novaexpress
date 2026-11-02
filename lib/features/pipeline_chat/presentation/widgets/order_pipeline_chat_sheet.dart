@@ -1432,6 +1432,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     }
 
     final timeStr = _formatMessageTime(msg.createdAt);
+    final reactions = _getMessageReactions(msg);
 
     if (isMyMessage) {
       // Outgoing WhatsApp Bubble (Green #D9FDD3 in light, #005C4B in dark)
@@ -1483,64 +1484,80 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             children: [
               const SizedBox(width: 48), // WhatsApp standard opposite indent
               Flexible(
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.80,
-                  ),
-                  padding: const EdgeInsets.fromLTRB(10, 7, 8, 5),
-                  decoration: BoxDecoration(
-                    color: bubbleBg,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      topRight: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
-                      bottomRight: Radius.circular(2),
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x1F000000),
-                        offset: Offset(0, 1),
-                        blurRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (msg.metadata['reply_to_sender'] != null)
-                        _buildQuotedReplyBox(msg, isDark, true),
-                      _buildMessageContent(
-                        msg,
-                        isMyMessage: true,
-                        isDark: isDark,
-                        conv: conv,
-                      ),
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          timeStr,
-                          style: GoogleFonts.inter(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w400,
-                            color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    GestureDetector(
+                      onLongPress: () => _showReactionPopup(context, msg, isDark),
+                      onSecondaryTap: () => _showReactionPopup(context, msg, isDark),
+                      child: Container(
+                        margin: EdgeInsets.only(bottom: reactions.isNotEmpty ? 8 : 0),
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.80,
+                        ),
+                        padding: const EdgeInsets.fromLTRB(10, 7, 8, 5),
+                        decoration: BoxDecoration(
+                          color: bubbleBg,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            topRight: Radius.circular(12),
+                            bottomLeft: Radius.circular(12),
+                            bottomRight: Radius.circular(2),
                           ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x1F000000),
+                              offset: Offset(0, 1),
+                              blurRadius: 1,
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 3),
-                        const Icon(
-                          Icons.done_all_rounded,
-                          size: 15,
-                          color: Color(0xFF53BDEB), // WhatsApp double blue checkmarks
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (msg.metadata['reply_to_sender'] != null)
+                              _buildQuotedReplyBox(msg, isDark, true),
+                            _buildMessageContent(
+                              msg,
+                              isMyMessage: true,
+                              isDark: isDark,
+                              conv: conv,
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  timeStr,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w400,
+                                    color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                                const Icon(
+                                  Icons.done_all_rounded,
+                                  size: 15,
+                                  color: Color(0xFF53BDEB), // WhatsApp double blue checkmarks
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
+                    if (reactions.isNotEmpty)
+                      Positioned(
+                        bottom: -4,
+                        left: 8,
+                        child: _buildReactionBadge(msg, isDark, true),
+                      ),
                   ],
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -1617,107 +1634,123 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             ),
           ),
           Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.80,
-              ),
-              padding: const EdgeInsets.fromLTRB(10, 7, 8, 5),
-              decoration: BoxDecoration(
-                color: bubbleBg,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(2),
-                  topRight: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x1F000000),
-                    offset: Offset(0, 1),
-                    blurRadius: 1,
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // WhatsApp Group Sender Title
-                  InkWell(
-                    onTap: () {
-                      ChatUserProfileCardModal.show(
-                        context: context,
-                        ref: ref,
-                        tag: msg.senderName,
-                        conversation: conv,
-                        onMention: _appendMentionTag,
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              msg.senderName,
-                              style: GoogleFonts.inter(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: roleColor,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 0.8),
-                            decoration: BoxDecoration(
-                              color: roleColor.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              roleLabel,
-                              style: GoogleFonts.inter(
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w700,
-                                color: roleColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                GestureDetector(
+                  onLongPress: () => _showReactionPopup(context, msg, isDark),
+                  onSecondaryTap: () => _showReactionPopup(context, msg, isDark),
+                  child: Container(
+                    margin: EdgeInsets.only(bottom: reactions.isNotEmpty ? 8 : 0),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.80,
                     ),
-                  ),
-
-                  if (msg.metadata['reply_to_sender'] != null)
-                    _buildQuotedReplyBox(msg, isDark, false),
-
-                  // Message Content
-                  _buildMessageContent(
-                    msg,
-                    isMyMessage: false,
-                    isDark: isDark,
-                    conv: conv,
-                  ),
-
-                  // Timestamp
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        timeStr,
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w400,
-                          color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                    padding: const EdgeInsets.fromLTRB(10, 7, 8, 5),
+                    decoration: BoxDecoration(
+                      color: bubbleBg,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(2),
+                        topRight: Radius.circular(12),
+                        bottomLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x1F000000),
+                          offset: Offset(0, 1),
+                          blurRadius: 1,
                         ),
-                      ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // WhatsApp Group Sender Title
+                        InkWell(
+                          onTap: () {
+                            ChatUserProfileCardModal.show(
+                              context: context,
+                              ref: ref,
+                              tag: msg.senderName,
+                              conversation: conv,
+                              onMention: _appendMentionTag,
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 3),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    msg.senderName,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: roleColor,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 0.8),
+                                  decoration: BoxDecoration(
+                                    color: roleColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    roleLabel,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: roleColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        if (msg.metadata['reply_to_sender'] != null)
+                          _buildQuotedReplyBox(msg, isDark, false),
+
+                        // Message Content
+                        _buildMessageContent(
+                          msg,
+                          isMyMessage: false,
+                          isDark: isDark,
+                          conv: conv,
+                        ),
+
+                        // Timestamp
+                        Align(
+                          alignment: Alignment.bottomRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              timeStr,
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w400,
+                                color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                if (reactions.isNotEmpty)
+                  Positioned(
+                    bottom: -4,
+                    right: 8,
+                    child: _buildReactionBadge(msg, isDark, false),
+                  ),
+              ],
             ),
           ),
           const SizedBox(width: 48), // Indent on opposite side
@@ -1911,6 +1944,366 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+
+  List<Map<String, dynamic>> _getMessageReactions(OrderConversationMessageEntity msg) {
+    final raw = msg.metadata['reactions'];
+    if (raw is List) {
+      return raw.map((r) => Map<String, dynamic>.from(r as Map)).toList();
+    }
+    return [];
+  }
+
+  void _showReactionPopup(BuildContext context, OrderConversationMessageEntity msg, bool isDark) {
+    HapticFeedback.lightImpact();
+    final reactions = _getMessageReactions(msg);
+    final currentUserId = ref.read(authProvider).user?.id;
+    final myReaction = reactions.firstWhere(
+      (r) => r['userId'] == currentUserId,
+      orElse: () => {},
+    )['emoji'];
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.2),
+      builder: (ctx) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF202C33) : Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+                border: Border.all(
+                  color: isDark ? const Color(0xFF2A3942) : const Color(0xFFE2E8F0),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji) {
+                    final isReacted = myReaction == emoji;
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        HapticFeedback.mediumImpact();
+                        ref.read(pipelineChatProvider.notifier).toggleReaction(
+                              messageId: msg.id,
+                              emoji: emoji,
+                            );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isReacted
+                              ? (isDark
+                                  ? const Color(0xFF00A884).withOpacity(0.35)
+                                  : const Color(0xFF008069).withOpacity(0.18))
+                              : Colors.transparent,
+                        ),
+                        child: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 24),
+                        ),
+                      ),
+                    );
+                  }),
+                  // More Emojis Button (+)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showMoreReactionsModal(context, msg, isDark);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      child: Icon(
+                        Icons.add_rounded,
+                        size: 24,
+                        color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showMoreReactionsModal(BuildContext context, OrderConversationMessageEntity msg, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1F2C34) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final emojis = [
+          '👍', '❤️', '😂', '😮', '😢', '🙏', '👏', '🎉',
+          '🔥', '💯', '✨', '🚀', '✅', '❌', '👀', '🤝',
+          '💪', '👌', '⚡', '📦', '🚚', '📍', '💰', '📞'
+        ];
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF374151) : const Color(0xFFD1D5DB),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'React with Emoji',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: emojis.map((e) {
+                    return InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        HapticFeedback.mediumImpact();
+                        ref.read(pipelineChatProvider.notifier).toggleReaction(
+                              messageId: msg.id,
+                              emoji: e,
+                            );
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2A3942) : const Color(0xFFF0F2F5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(e, style: const TextStyle(fontSize: 22)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showReactionDetailsModal(
+    BuildContext context,
+    OrderConversationMessageEntity msg,
+    List<Map<String, dynamic>> reactions,
+    bool isDark,
+  ) {
+    final currentUserId = ref.read(authProvider).user?.id;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1F2C34) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF374151) : const Color(0xFFD1D5DB),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text(
+                      'Reactions (${reactions.length})',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Tap your reaction to remove',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: reactions.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final r = reactions[index];
+                    final emoji = r['emoji']?.toString() ?? '👍';
+                    final userName = r['userName']?.toString() ?? 'User';
+                    final userId = r['userId']?.toString();
+                    final isMe = userId == currentUserId;
+
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00A884).withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF00A884),
+                            ),
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        isMe ? '$userName (You)' : userName,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: isMe ? FontWeight.w700 : FontWeight.w500,
+                          color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
+                        ),
+                      ),
+                      subtitle: isMe
+                          ? Text(
+                              'Click to remove',
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                color: const Color(0xFF00A884),
+                              ),
+                            )
+                          : null,
+                      trailing: Text(
+                        emoji,
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                      onTap: isMe
+                          ? () {
+                              Navigator.pop(ctx);
+                              ref.read(pipelineChatProvider.notifier).toggleReaction(
+                                    messageId: msg.id,
+                                    emoji: emoji,
+                                  );
+                            }
+                          : null,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReactionBadge(OrderConversationMessageEntity msg, bool isDark, bool isMyMessage) {
+    final reactions = _getMessageReactions(msg);
+    if (reactions.isEmpty) return const SizedBox.shrink();
+
+    final currentUserId = ref.watch(authProvider).user?.id;
+    final hasMyReaction = reactions.any((r) => r['userId'] == currentUserId);
+
+    final uniqueEmojis = <String>{};
+    for (final r in reactions) {
+      if (r['emoji'] != null) uniqueEmojis.add(r['emoji'].toString());
+    }
+
+    return InkWell(
+      onTap: () => _showReactionDetailsModal(context, msg, reactions, isDark),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 2),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1F2C34) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasMyReaction
+                ? const Color(0xFF00A884).withOpacity(0.6)
+                : (isDark ? const Color(0xFF2A3942) : const Color(0xFFE2E8F0)),
+            width: hasMyReaction ? 1.0 : 0.8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              uniqueEmojis.take(3).join(''),
+              style: const TextStyle(fontSize: 12),
+            ),
+            if (reactions.length > 1) ...[
+              const SizedBox(width: 3),
+              Text(
+                '${reactions.length}',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: hasMyReaction
+                      ? const Color(0xFF00A884)
+                      : (isDark ? const Color(0xFF8696A0) : const Color(0xFF667781)),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

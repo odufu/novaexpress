@@ -83,6 +83,14 @@ class EnhancementsFakeChatDataSource implements PipelineChatRemoteDataSource {
     required String actorRole,
     required String transferReason,
   }) async => {'success': true};
+
+  @override
+  Future<OrderConversationMessageEntity?> toggleMessageReaction({
+    required String messageId,
+    required String emoji,
+    required String userId,
+    required String userName,
+  }) async => null;
 }
 
 void main() {
@@ -220,6 +228,27 @@ void main() {
 
       // Verify the Replying to banner appeared above the composer
       expect(find.text('Replying to Oladele Omowaye'), findsOneWidget);
+
+      // 5. Verify Long Press triggers WhatsApp Reaction Popup
+      final secondMessage = find.text('Understood, proceed with delivery confirmation.');
+      await tester.longPress(secondMessage);
+      await tester.pumpAndSettle();
+
+      // Verify the 6 WhatsApp reaction emojis and '+' button appear in the floating bar
+      expect(find.text('👍'), findsWidgets);
+      expect(find.text('❤️'), findsWidgets);
+      expect(find.text('😂'), findsWidgets);
+      expect(find.text('😮'), findsWidgets);
+      expect(find.text('😢'), findsWidgets);
+      expect(find.text('🙏'), findsWidgets);
+      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+
+      // Tap ❤️ reaction to react to the message
+      await tester.tap(find.text('❤️').last);
+      await tester.pumpAndSettle();
+
+      // Verify reaction badge appears with ❤️ on the message bubble
+      expect(find.text('❤️'), findsWidgets);
     });
   });
 }

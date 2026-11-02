@@ -53,6 +53,12 @@ abstract class PipelineChatRemoteDataSource {
     required String actorRole,
     required String transferReason,
   });
+  Future<OrderConversationMessageEntity?> toggleMessageReaction({
+    required String messageId,
+    required String emoji,
+    required String userId,
+    required String userName,
+  });
 }
 
 class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
@@ -532,5 +538,50 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
     return res is Map<String, dynamic>
         ? res
         : {'success': true, 'data': res};
+  }
+
+  @override
+  Future<OrderConversationMessageEntity?> toggleMessageReaction({
+    required String messageId,
+    required String emoji,
+    required String userId,
+    required String userName,
+  }) async {
+    final db = _getAdminClient();
+    final res = await db.from('order_conversation_messages').select().eq('id', messageId).single();
+    final model = OrderConversationMessageModel.fromJson(res);
+    final currentMeta = Map<String, dynamic>.from(model.metadata);
+    final rawReactions = currentMeta['reactions'] as List? ?? [];
+    final reactions = rawReactions.map((r) => Map<String, dynamic>.from(r as Map)).toList();
+
+    final existingIndex = reactions.indexWhere((r) => r['userId'] == userId);
+    if (existingIndex != -1) {
+      if (reactions[existingIndex]['emoji'] == emoji) {
+        reactions.removeAt(existingIndex);
+      } else {
+        reactions[existingIndex] = {
+          'emoji': emoji,
+          'userId': userId,
+          'userName': userName,
+        };
+      }
+    } else {
+      reactions.add({
+        'emoji': emoji,
+        'userId': userId,
+        'userName': userName,
+      });
+    }
+
+    currentMeta['reactions'] = reactions;
+
+    final updated = await db
+        .from('order_conversation_messages')
+        .update({'metadata': currentMeta})
+        .eq('id', messageId)
+        .select()
+        .single();
+
+    return OrderConversationMessageModel.fromJson(updated);
   }
 }
