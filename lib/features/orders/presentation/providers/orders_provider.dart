@@ -877,8 +877,13 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     state = state.copyWith(isLoading: true);
     try {
       final isDirectTransfer = paymentMethod == 'bank_transfer' ||
+          paymentMethod == 'direct_transfer' ||
           paymentType == 'prepaid' ||
-          (notes != null && (notes.contains('Monnify') || notes.contains('Direct Transfer')));
+          paymentType == 'direct_transfer' ||
+          (notes != null &&
+              (notes.contains('Monnify') ||
+                  notes.contains('Direct Transfer') ||
+                  notes.contains('DIRECT COMPANY TRANSFER')));
       final resolvedPaymentType = isDirectTransfer ? 'prepaid' : paymentType;
       final resolvedPaymentStatus = isDirectTransfer ? 'paid' : 'collected';
 

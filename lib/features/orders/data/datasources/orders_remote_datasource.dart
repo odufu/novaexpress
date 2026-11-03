@@ -961,8 +961,13 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     double? longitude,
   }) async {
     final isDirectTransfer = paymentMethod == 'bank_transfer' ||
+        paymentMethod == 'direct_transfer' ||
         paymentType == 'prepaid' ||
-        (notes != null && (notes.contains('Monnify') || notes.contains('Direct Transfer')));
+        paymentType == 'direct_transfer' ||
+        (notes != null &&
+            (notes.contains('Monnify') ||
+                notes.contains('Direct Transfer') ||
+                notes.contains('DIRECT COMPANY TRANSFER')));
     final resolvedPaymentType = isDirectTransfer ? 'prepaid' : paymentType;
     final resolvedPaymentStatus = isDirectTransfer ? 'paid' : 'collected';
 
@@ -1000,6 +1005,33 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         } else {
           await adminDb.from(SupabaseConstants.ordersTable).update(directUpdate).eq('order_number', orderId.trim());
         }
+
+        // If direct company transfer, credit rider direct_transfer_balance in delivery_agents table
+        if (isDirectTransfer) {
+          try {
+            final agentLookup = await adminDb
+                .from('delivery_agents')
+                .select('id, direct_transfer_balance, commission_rate, transport_allowance, fuel_allowance, personnel_type')
+                .or('id.eq.$agentId,user_id.eq.$agentId,agent_code.eq.$agentId')
+                .limit(1);
+            if ((agentLookup as List).isNotEmpty) {
+              final agentRow = agentLookup.first as Map<String, dynamic>;
+              final currentBal = (agentRow['direct_transfer_balance'] as num?)?.toDouble() ?? 0.0;
+              final isHouse = agentRow['personnel_type'] == 'in_house_rider';
+              final comm = (agentRow['commission_rate'] as num?)?.toDouble() ?? (isHouse ? 700.0 : 1000.0);
+              final trans = (agentRow['transport_allowance'] as num?)?.toDouble() ??
+                  (agentRow['fuel_allowance'] as num?)?.toDouble() ??
+                  (isHouse ? 800.0 : 1500.0);
+              final earning = comm + trans;
+              await adminDb.from('delivery_agents').update({
+                'direct_transfer_balance': currentBal + earning,
+              }).eq('id', agentRow['id']);
+            }
+          } catch (agentErr) {
+            debugPrint('[ORDERS_DATASOURCE] ℹ️ Direct transfer balance sync notice: $agentErr');
+          }
+        }
+
         adminDb.dispose();
       }
     } catch (directErr) {

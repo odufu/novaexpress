@@ -1,3 +1,55 @@
+class CompanyBankAccount {
+  final String id;
+  final String bankName;
+  final String accountNumber;
+  final String accountName;
+  final bool isDefault;
+
+  const CompanyBankAccount({
+    required this.id,
+    required this.bankName,
+    required this.accountNumber,
+    required this.accountName,
+    this.isDefault = false,
+  });
+
+  CompanyBankAccount copyWith({
+    String? id,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+    bool? isDefault,
+  }) {
+    return CompanyBankAccount(
+      id: id ?? this.id,
+      bankName: bankName ?? this.bankName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      accountName: accountName ?? this.accountName,
+      isDefault: isDefault ?? this.isDefault,
+    );
+  }
+
+  factory CompanyBankAccount.fromJson(Map<String, dynamic> json) {
+    return CompanyBankAccount(
+      id: json['id']?.toString() ?? '',
+      bankName: json['bank_name']?.toString() ?? json['bankName']?.toString() ?? '',
+      accountNumber: json['account_number']?.toString() ?? json['accountNumber']?.toString() ?? '',
+      accountName: json['account_name']?.toString() ?? json['accountName']?.toString() ?? '',
+      isDefault: json['is_default'] == true || json['isDefault'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'bank_name': bankName,
+      'account_number': accountNumber,
+      'account_name': accountName,
+      'is_default': isDefault,
+    };
+  }
+}
+
 class DCFinanceSettings {
   final String posChargeMode; // 'dynamic' (tiered) or 'flat'
   final double posFlatRate; // e.g. 350.0
@@ -14,6 +66,7 @@ class DCFinanceSettings {
   final String settlementAccountNumber; // '0098234123'
   final String settlementAccountName; // 'NovaXpress Logistics Limited'
   final bool autoReconcileWebhooks; // true
+  final List<CompanyBankAccount> companyBankAccounts;
 
   // Merchant Billing & Daily Client Settlement Settings
   final double defaultClientDeliveryFee; // e.g. 3500.0
@@ -39,6 +92,29 @@ class DCFinanceSettings {
     this.settlementAccountNumber = '0098234123',
     this.settlementAccountName = 'NovaXpress Logistics Limited',
     this.autoReconcileWebhooks = true,
+    this.companyBankAccounts = const [
+      CompanyBankAccount(
+        id: 'cba-01',
+        bankName: 'Titan Trust Bank',
+        accountNumber: '0098234123',
+        accountName: 'NovaXpress Logistics Limited',
+        isDefault: true,
+      ),
+      CompanyBankAccount(
+        id: 'cba-02',
+        bankName: 'Zenith Bank',
+        accountNumber: '1224567890',
+        accountName: 'NovaXpress Logistics Limited',
+        isDefault: false,
+      ),
+      CompanyBankAccount(
+        id: 'cba-03',
+        bankName: 'Moniepoint MFB',
+        accountNumber: '6543210987',
+        accountName: 'NovaXpress Logistics Limited',
+        isDefault: false,
+      ),
+    ],
     this.defaultClientDeliveryFee = 5000.0,
     this.platformFeeType = 'flat',
     this.platformFeeValue = 500.0,
@@ -67,6 +143,21 @@ class DCFinanceSettings {
     return fee.clamp(100.0, paystackFeeCap);
   }
 
+  CompanyBankAccount get primaryCompanyAccount {
+    if (companyBankAccounts.isNotEmpty) {
+      final defaultAcc = companyBankAccounts.where((a) => a.isDefault).firstOrNull;
+      if (defaultAcc != null) return defaultAcc;
+      return companyBankAccounts.first;
+    }
+    return CompanyBankAccount(
+      id: 'default',
+      bankName: settlementBankName,
+      accountNumber: settlementAccountNumber,
+      accountName: settlementAccountName,
+      isDefault: true,
+    );
+  }
+
   DCFinanceSettings copyWith({
     String? posChargeMode,
     double? posFlatRate,
@@ -83,6 +174,7 @@ class DCFinanceSettings {
     String? settlementAccountNumber,
     String? settlementAccountName,
     bool? autoReconcileWebhooks,
+    List<CompanyBankAccount>? companyBankAccounts,
     double? defaultClientDeliveryFee,
     String? platformFeeType,
     double? platformFeeValue,
@@ -106,6 +198,7 @@ class DCFinanceSettings {
       settlementAccountNumber: settlementAccountNumber ?? this.settlementAccountNumber,
       settlementAccountName: settlementAccountName ?? this.settlementAccountName,
       autoReconcileWebhooks: autoReconcileWebhooks ?? this.autoReconcileWebhooks,
+      companyBankAccounts: companyBankAccounts ?? this.companyBankAccounts,
       defaultClientDeliveryFee: defaultClientDeliveryFee ?? this.defaultClientDeliveryFee,
       platformFeeType: platformFeeType ?? this.platformFeeType,
       platformFeeValue: platformFeeValue ?? this.platformFeeValue,
@@ -118,6 +211,41 @@ class DCFinanceSettings {
   double get defaultFailedDeliveryAllowance => defaultFailedStipend;
 
   factory DCFinanceSettings.fromJson(Map<String, dynamic> json) {
+    final rawAccounts = json['company_bank_accounts'] ?? json['companyBankAccounts'];
+    List<CompanyBankAccount> parsedAccounts = [];
+    if (rawAccounts is List && rawAccounts.isNotEmpty) {
+      parsedAccounts = rawAccounts
+          .map((a) => CompanyBankAccount.fromJson(Map<String, dynamic>.from(a as Map)))
+          .toList();
+    } else {
+      final sBank = json['settlement_bank_name']?.toString() ?? 'Titan Trust Bank';
+      final sNum = json['settlement_account_number']?.toString() ?? '0098234123';
+      final sName = json['settlement_account_name']?.toString() ?? 'NovaXpress Logistics Limited';
+      parsedAccounts = [
+        CompanyBankAccount(
+          id: 'cba-01',
+          bankName: sBank,
+          accountNumber: sNum,
+          accountName: sName,
+          isDefault: true,
+        ),
+        const CompanyBankAccount(
+          id: 'cba-02',
+          bankName: 'Zenith Bank',
+          accountNumber: '1224567890',
+          accountName: 'NovaXpress Logistics Limited',
+          isDefault: false,
+        ),
+        const CompanyBankAccount(
+          id: 'cba-03',
+          bankName: 'Moniepoint MFB',
+          accountNumber: '6543210987',
+          accountName: 'NovaXpress Logistics Limited',
+          isDefault: false,
+        ),
+      ];
+    }
+
     return DCFinanceSettings(
       posChargeMode: json['pos_charge_mode']?.toString() ?? json['posChargeMode'] ?? 'dynamic',
       posFlatRate: (json['pos_flat_rate'] as num?)?.toDouble() ?? (json['posFlatRate'] as num?)?.toDouble() ?? 350.0,
@@ -134,6 +262,7 @@ class DCFinanceSettings {
       settlementAccountNumber: json['settlement_account_number']?.toString() ?? '0098234123',
       settlementAccountName: json['settlement_account_name']?.toString() ?? 'NovaXpress Logistics Limited',
       autoReconcileWebhooks: json['auto_reconcile_webhooks'] ?? json['autoReconcileWebhooks'] ?? true,
+      companyBankAccounts: parsedAccounts,
       defaultClientDeliveryFee: (json['default_client_delivery_fee'] as num?)?.toDouble() ?? 5000.0,
       platformFeeType: json['platform_fee_type']?.toString() ?? 'flat',
       platformFeeValue: (json['platform_fee_value'] as num?)?.toDouble() ?? 500.0,
@@ -161,6 +290,7 @@ class DCFinanceSettings {
       'settlement_account_number': settlementAccountNumber,
       'settlement_account_name': settlementAccountName,
       'auto_reconcile_webhooks': autoReconcileWebhooks,
+      'company_bank_accounts': companyBankAccounts.map((a) => a.toJson()).toList(),
       'default_client_delivery_fee': defaultClientDeliveryFee,
       'platform_fee_type': platformFeeType,
       'platform_fee_value': platformFeeValue,
