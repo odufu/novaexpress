@@ -3,7 +3,8 @@ import 'dart:convert';
 class GeminiConstants {
   // Runtime-decoded key preventing secret scanner and push protection blocks
   static final String _defaultApiKey = utf8.decode(
-    base64.decode('QVEuQWI4Uk42SktiQThTSUpITFNweXppV1RjbkVCRlpGMndkdkVLVmdxd1dUQTVoN2o1dkE='),
+    base64.decode(
+        'QVEuQWI4Uk42SktiQThTSUpITFNweXppV1RjbkVCRlpGMndkdkVLVmdxd1dUQTVoN2o1dkE='),
   );
 
   /// Active Gemini API Key.
