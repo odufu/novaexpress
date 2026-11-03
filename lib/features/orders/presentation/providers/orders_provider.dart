@@ -223,8 +223,18 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
   List<OrderEntity> _sortOrdersByOperationalPriority(List<OrderEntity> rawOrders) {
     final list = [...rawOrders];
-    // Strictly chronological: newest orders are displayed at the very top
-    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    list.sort((a, b) {
+      // 1. Call Back pending over 4 hours has highest urgent attention priority
+      if (a.isCallBackPendingOver4Hours && !b.isCallBackPendingOver4Hours) return -1;
+      if (!a.isCallBackPendingOver4Hours && b.isCallBackPendingOver4Hours) return 1;
+
+      // 2. Newly marked 'ready' orders intake queue priority
+      if (a.isReady && !b.isReady) return -1;
+      if (!a.isReady && b.isReady) return 1;
+
+      // 3. Chronological newest first
+      return b.createdAt.compareTo(a.createdAt);
+    });
     return list;
   }
 
@@ -578,6 +588,47 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     };
   }
 
+  Future<bool> updateOrder(OrderEntity updatedOrder) async {
+    final updatedList = state.orders.map((o) {
+      if (o.id == updatedOrder.id || o.orderNumber == updatedOrder.orderNumber) {
+        return OrderModel.fromEntity(updatedOrder);
+      }
+      return o;
+    }).toList();
+
+    final sortedList = _sortOrdersByOperationalPriority(updatedList);
+    state = state.copyWith(orders: sortedList);
+    await _storageService.cacheOrders(sortedList, _getScopeKey());
+
+    try {
+      SupabaseClient? dbClient;
+      if (SupabaseConstants.supabaseServiceRoleKey.isNotEmpty) {
+        dbClient = SupabaseClient(
+          SupabaseConstants.supabaseUrl,
+          SupabaseConstants.supabaseServiceRoleKey,
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        );
+      } else {
+        dbClient = Supabase.instance.client;
+      }
+
+      final payload = OrderModel.fromEntity(updatedOrder).toJson();
+      payload.remove('id');
+      payload.remove('created_at');
+
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      if (uuidRegex.hasMatch(updatedOrder.id)) {
+        await dbClient.from(SupabaseConstants.ordersTable).update(payload).eq('id', updatedOrder.id);
+      } else {
+        await dbClient.from(SupabaseConstants.ordersTable).update(payload).eq('order_number', updatedOrder.orderNumber);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[ORDERS_NOTIFIER] updateOrder notice: ');
+      return true;
+    }
+  }
+
   Future<bool> assignOrderToRider({
     required String orderId,
     required String riderId,
@@ -655,7 +706,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         if (o.id == orderId || o.orderNumber == orderId) {
           return OrderModel.fromEntity(
             o.copyWith(
-              status: 'in_transit',
+              status: 'dispatch_assigned',
               deliveryAgentId: riderId,
               deliveryAgentName: riderName,
               deliveryAgentCode: riderCode,
@@ -687,7 +738,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
           return OrderModel.fromEntity(
             o.copyWith(
               clearAssignment: true,
-              status: 'pending_dispatch',
+              status: 'ready',
             ),
           );
         }
@@ -764,44 +815,11 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       );
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
-          return OrderEntity(
-            id: o.id,
-            orderNumber: o.orderNumber,
-            customerName: o.customerName,
-            customerPhone: o.customerPhone,
-            customerAltPhone: o.customerAltPhone,
-            deliveryCity: o.deliveryCity,
-            deliveryState: o.deliveryState,
-            deliveryAddress: o.deliveryAddress,
-            landmark: o.landmark,
-            lga: o.lga,
-            productName: o.productName,
+          return o.copyWith(
             status: newStatus,
-            quantity: o.quantity,
-            paidQuantity: o.paidQuantity,
-            freeQuantity: o.freeQuantity,
-            basePrice: o.basePrice,
-            upsellAmount: o.upsellAmount,
-            totalAmount: o.totalAmount,
             paymentType: paymentType ?? o.paymentType,
             paymentStatus: paymentStatus ?? (newStatus == 'delivered' ? 'paid' : o.paymentStatus),
-            fulfillmentType: o.fulfillmentType,
-            clientName: o.clientName,
-            packageCustodyId: o.packageCustodyId,
-            clientDeliveryFee: o.clientDeliveryFee,
-            agentEntitlement: o.agentEntitlement,
             deliveryNotes: notes ?? o.deliveryNotes,
-            createdAt: o.createdAt,
-            deliveryAgentId: o.deliveryAgentId,
-            deliveryAgentName: o.deliveryAgentName,
-            deliveryAgentCode: o.deliveryAgentCode,
-            distributionCenterId: o.distributionCenterId,
-            latitude: o.latitude,
-            longitude: o.longitude,
-            geocodingStatus: o.geocodingStatus,
-            geocodedAddress: o.geocodedAddress,
-            locationConfidence: o.locationConfidence,
-            isLocationVerified: o.isLocationVerified,
           );
         }
         return o;

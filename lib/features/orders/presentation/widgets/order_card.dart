@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/helpers/formatters.dart';
@@ -11,33 +12,39 @@ class OrderCard extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'delivered':
-        return AppColors.success;
-      case 'in_transit':
-        return AppColors.primary;
+      case 'assigned':
+        return const Color(0xFF8B5CF6);
+      case 'ready':
+        return const Color(0xFF0D9488);
+      case 'dispatch_assigned':
+        return const Color(0xFF2563EB);
+      case 'order_accepted':
       case 'accepted':
-        return AppColors.info;
+        return const Color(0xFF059669);
+      case 'delivery_in_progress':
+      case 'in_transit':
+        return const Color(0xFFF37021);
+      case 'rescheduled':
+        return const Color(0xFFEA580C);
+      case 'not_picking':
+        return const Color(0xFFD97706);
+      case 'call_back':
+        return const Color(0xFFE11D48);
+      case 'delivered':
+      case 'completed':
+        return const Color(0xFF00522A);
       case 'cancelled':
       case 'failed':
-        return AppColors.danger;
+      case 'rejected':
+      case 'not_ready':
+        return const Color(0xFFBA1A1A);
       default:
         return AppColors.warning;
     }
   }
 
   String _formatStatus(String status) {
-    switch (status.toLowerCase()) {
-      case 'in_transit':
-        return 'Out for Delivery';
-      case 'accepted':
-        return 'Assigned';
-      case 'delivered':
-        return 'Delivered';
-      case 'cancelled':
-        return 'Failed / Returned';
-      default:
-        return status.toUpperCase();
-    }
+    return order.statusDisplay;
   }
 
   @override
@@ -54,6 +61,51 @@ class OrderCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (order.isCallBackPendingOver4Hours) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFDC2626)),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '⚠️ CALL BACK PENDING (>4h) - Urgent action required',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (order.isRescheduled) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEDD5),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFED7AA)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.event_repeat_rounded, size: 14, color: Color(0xFFEA580C)),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Rescheduled: ',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFC2410C)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

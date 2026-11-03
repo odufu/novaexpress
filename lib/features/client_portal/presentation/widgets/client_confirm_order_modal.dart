@@ -8,6 +8,7 @@ import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../providers/client_portal_provider.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 
 class ClientConfirmOrderModal extends ConsumerStatefulWidget {
   final OrderEntity order;
@@ -94,6 +95,112 @@ class _ClientConfirmOrderModalState extends ConsumerState<ClientConfirmOrderModa
     return null;
   }
 
+  Future<DistributionCenter?> _showDcSelectorDialog(
+    BuildContext context,
+    List<DistributionCenter> dcs,
+    String stateName,
+    String lgaName,
+  ) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return showDialog<DistributionCenter>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.hub_rounded, color: Color(0xFF10B981), size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Select Handling DC',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      ', ',
+                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Multiple Distribution Centers cover this location. Tap the handling station to fulfill this order:',
+                  style: GoogleFonts.inter(fontSize: 12.5, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                ),
+                const SizedBox(height: 12),
+                ...dcs.map((dc) {
+                  return Card(
+                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        child: Text(
+                          dc.code.split('-').last,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF10B981)),
+                        ),
+                      ),
+                      title: Text(
+                        dc.name,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      subtitle: Text(
+                        ' ()',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+                      onTap: () => Navigator.of(dialogCtx).pop(dc),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(null),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _handleCloserDecision() async {
     if (_selectedAction == 'confirm' && !_formKey.currentState!.validate()) return;
     if (_selectedAction == 'cancel' && _cancellationReasonController.text.trim().isEmpty) {
@@ -111,6 +218,25 @@ class _ClientConfirmOrderModalState extends ConsumerState<ClientConfirmOrderModa
     try {
       final authUser = ref.read(authProvider).user;
       final closerId = authUser?.closerId ?? authUser?.id ?? widget.order.closerId ?? '';
+
+      DistributionCenter? handlingDc;
+      if (_selectedAction == 'confirm') {
+        final allDcs = ref.read(dcConsoleProvider).distributionCenters.where((d) => d.isActive).toList();
+        final matchingDcs = allDcs.where((d) => d.coversLocation(stateName: _selectedState, lgaName: _selectedLga)).toList();
+
+        if (matchingDcs.length > 1) {
+          handlingDc = await _showDcSelectorDialog(context, matchingDcs, _selectedState, _selectedLga);
+          if (handlingDc == null) {
+            setState(() => _isSubmitting = false);
+            return;
+          }
+        } else if (matchingDcs.length == 1) {
+          handlingDc = matchingDcs.first;
+        } else {
+          handlingDc = allDcs.where((d) => d.coversState(_selectedState)).firstOrNull ??
+              allDcs.firstWhere((d) => d.isGrandDc || d.isHub, orElse: () => allDcs.first);
+        }
+      }
 
       final result = await ref.read(clientPortalProvider.notifier).confirmCloserOrder(
         orderId: widget.order.id,
@@ -682,7 +808,7 @@ class _ClientConfirmOrderModalState extends ConsumerState<ClientConfirmOrderModa
                         _isSubmitting
                             ? 'Processing...'
                             : (_selectedAction == 'confirm'
-                                ? 'Approve & Route to DC'
+                                ? 'Confirm Ready & Route to DC'
                                 : (_selectedAction == 'reschedule' ? 'Save Call Back' : 'Confirm Cancellation')),
                         style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
                       ),

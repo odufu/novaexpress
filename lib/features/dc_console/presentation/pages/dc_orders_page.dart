@@ -216,6 +216,10 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
             final isDesktop = constraints.maxWidth >= 960;
             final isPanelOpen = liveSelectedOrder != null;
 
+            final readyOrders = dateFilteredOrders.where((o) => o.status == 'ready').toList();
+            final rescheduledOrders = dateFilteredOrders.where((o) => o.status == 'rescheduled').toList();
+            final dispatchAssignedOrders = dateFilteredOrders.where((o) => o.status == 'dispatch_assigned').toList();
+
             final mainView = _buildAllOrdersView(
               isDark,
               dateFilteredOrders,
@@ -225,6 +229,9 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
               inTransitOrders.length,
               deliveredOrders.length,
               failedOrders.length,
+              readyOrders.length,
+              rescheduledOrders.length,
+              dispatchAssignedOrders.length,
             );
 
             if (!isPanelOpen) {
@@ -764,6 +771,9 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     int inTransitCount,
     int deliveredCount,
     int failedCount,
+    int readyCount,
+    int rescheduledCount,
+    int dispatchAssignedCount,
   ) {
     final masterSearch = ref.watch(dcMasterSearchProvider).trim().toLowerCase();
     final masterStatus = ref.watch(dcMasterStatusFilterProvider);
@@ -794,6 +804,12 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
         } else if (masterStatus == 'remitted' || masterStatus == 'delivered_remitted') {
           final isRemitted = o.status == 'delivered' && (o.isRemitted || o.isDirectTransfer);
           if (!isRemitted) return false;
+        } else if (masterStatus == 'ready') {
+          if (o.status != 'ready') return false;
+        } else if (masterStatus == 'dispatch_assigned') {
+          if (o.status != 'dispatch_assigned') return false;
+        } else if (masterStatus == 'rescheduled') {
+          if (o.status != 'rescheduled') return false;
         } else if (masterStatus == 'failed') {
           if (o.status != 'cancelled' && o.status != 'failed' && o.status != 'call_back') return false;
         } else if (masterStatus == 'returned') {
@@ -1411,6 +1427,9 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
             inTransitCount: inTransitCount,
             unassignedCount: unassignedCount,
             failedCount: failedCount,
+            readyCount: readyCount,
+            rescheduledCount: rescheduledCount,
+            dispatchAssignedCount: dispatchAssignedCount,
           ),
 
           // 4. Orders Directory View (Table or Grid)
@@ -1488,6 +1507,9 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     required int inTransitCount,
     required int unassignedCount,
     required int failedCount,
+    required int readyCount,
+    required int rescheduledCount,
+    required int dispatchAssignedCount,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1507,13 +1529,33 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
             ),
             const SizedBox(width: 8),
             _buildStatusTabPill(
-              label: 'Completed ✓',
-              count: completedCount,
-              icon: Icons.check_circle_rounded,
-              color: const Color(0xFF10B981),
-              isSelected: currentStatus == 'delivered',
+              label: 'Ready 🚀',
+              count: readyCount,
+              icon: Icons.outbox_rounded,
+              color: const Color(0xFF0D9488),
+              isSelected: currentStatus == 'ready',
               isDark: isDark,
-              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'delivered',
+              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'ready',
+            ),
+            const SizedBox(width: 8),
+            _buildStatusTabPill(
+              label: 'Rescheduled 📅',
+              count: rescheduledCount,
+              icon: Icons.calendar_month_rounded,
+              color: const Color(0xFFEA580C),
+              isSelected: currentStatus == 'rescheduled',
+              isDark: isDark,
+              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'rescheduled',
+            ),
+            const SizedBox(width: 8),
+            _buildStatusTabPill(
+              label: 'Dispatch Assigned',
+              count: dispatchAssignedCount,
+              icon: Icons.two_wheeler_rounded,
+              color: const Color(0xFF2563EB),
+              isSelected: currentStatus == 'dispatch_assigned',
+              isDark: isDark,
+              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'dispatch_assigned',
             ),
             const SizedBox(width: 8),
             _buildStatusTabPill(
@@ -1527,13 +1569,13 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
             ),
             const SizedBox(width: 8),
             _buildStatusTabPill(
-              label: 'Unassigned',
-              count: unassignedCount,
-              icon: Icons.outbox_rounded,
-              color: const Color(0xFFF37021),
-              isSelected: currentStatus == 'unassigned',
+              label: 'Completed ✓',
+              count: completedCount,
+              icon: Icons.check_circle_rounded,
+              color: const Color(0xFF10B981),
+              isSelected: currentStatus == 'delivered',
               isDark: isDark,
-              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'unassigned',
+              onTap: () => ref.read(dcMasterStatusFilterProvider.notifier).state = 'delivered',
             ),
             const SizedBox(width: 8),
             _buildStatusTabPill(
@@ -2250,6 +2292,62 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
   Widget _buildOrderStatusBadge(OrderEntity order) {
     final status = order.status.toLowerCase();
     final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
+
+    if (status == 'ready') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFCCFBF1),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF5EEAD4)),
+        ),
+        child: Text('READY', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F766E))),
+      );
+    }
+    if (status == 'dispatch_assigned') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFDBEAFE),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF93C5FD)),
+        ),
+        child: Text('DISPATCH ASSIGNED', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF1D4ED8))),
+      );
+    }
+    if (status == 'order_accepted') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFD1FAE5),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF6EE7B7)),
+        ),
+        child: Text('ORDER ACCEPTED', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF047857))),
+      );
+    }
+    if (status == 'rescheduled') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEDD5),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFFDBA74)),
+        ),
+        child: Text('RESCHEDULED', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFC2410C))),
+      );
+    }
+    if (status == 'not_picking') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: Text('NOT PICKING', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFB45309))),
+      );
+    }
 
     if (status == 'delivered' || status == 'completed') {
       final isCashAwaitingRemittance = order.isUnremitted && !order.isDirectTransfer;

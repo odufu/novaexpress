@@ -172,6 +172,97 @@ class OrderDetailPage extends ConsumerWidget {
     }
   }
 
+  void _showRiderRejectDialog(BuildContext context, WidgetRef ref, OrderEntity order) {
+    String rejectReason = 'Bike breakdown / mechanical fault';
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: const [
+                  Icon(Icons.cancel_outlined, color: Color(0xFFEF4444)),
+                  SizedBox(width: 8),
+                  Text('Reject Order Assignment'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Select reason for rejecting this order (returns to DC queue):', style: TextStyle(fontSize: 13)),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: rejectReason,
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(value: 'Bike breakdown / mechanical fault', child: Text('Bike breakdown / mechanical fault')),
+                      DropdownMenuItem(value: 'Over capacity / too many active packages', child: Text('Over capacity / too many packages')),
+                      DropdownMenuItem(value: 'Customer location out of assigned beat', child: Text('Customer out of assigned beat')),
+                      DropdownMenuItem(value: 'End of shift / emergency', child: Text('End of shift / emergency')),
+                      DropdownMenuItem(value: 'Other reason', child: Text('Other reason')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setState(() => rejectReason = val);
+                    },
+                  ),
+                  if (rejectReason == 'Other reason') ...[
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: reasonController,
+                      decoration: const InputDecoration(hintText: 'Enter specific reason...'),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
+                  onPressed: () async {
+                    final finalReason = rejectReason == 'Other reason' && reasonController.text.trim().isNotEmpty
+                        ? reasonController.text.trim()
+                        : rejectReason;
+                    Navigator.pop(dialogCtx);
+
+                    final riderTag = (order.deliveryAgentName != null && order.deliveryAgentName!.isNotEmpty)
+                        ? '${order.deliveryAgentName} (${order.deliveryAgentCode ?? ""})'
+                        : 'Rider';
+                    final existingNotes = (order.deliveryNotes != null && order.deliveryNotes!.isNotEmpty)
+                        ? '${order.deliveryNotes} | '
+                        : '';
+                    final unassigned = order.copyWith(
+                      status: 'ready',
+                      clearAssignment: true,
+                      deliveryNotes: '$existingNotes[RIDER REJECTED] $riderTag rejected assignment: $finalReason. Returned to DC queue.',
+                    );
+                    await ref.read(ordersProvider.notifier).updateOrder(unassigned);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: const Color(0xFFEF4444),
+                          content: Text('Order rejected ($finalReason) and returned to DC queue.'),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Confirm Reject'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -1271,32 +1362,103 @@ class OrderDetailPage extends ConsumerWidget {
 
             // 7. Dynamic Contextual Action Area (Rider Trip Execution vs DC / Merchant / Closer Management)
             if (isRider) ...[
-              if (order.status == 'accepted' || order.status == 'pending' || order.status == 'assigned' || order.status == 'unassigned') ...[
-              // Context: Ready for departure / intake
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.orange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              if (order.isDispatchAssigned) ...[
+                // Stage 7: Rider Decision - Accept or Reject
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        onPressed: () async {
+                          await ref.read(ordersProvider.notifier).updateOrderStatus(
+                            order.id,
+                            'order_accepted',
+                            notes: 'Rider accepted order delivery assignment.',
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                backgroundColor: Color(0xFF10B981),
+                                content: Text('✅ Order Accepted! Tap Start Delivery when ready to ride.'),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.check_circle_rounded, size: 20),
+                        label: const Text('ACCEPT ORDER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ),
                     ),
-                    elevation: 0,
-                  ),
-                  onPressed: () => _startDelivery(context, ref, order),
-                  icon: const Icon(Icons.navigation_outlined, size: 20),
-                  label: const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      'ACCEPT & START DELIVERY TRIP',
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFEF4444),
+                          side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => _showRiderRejectDialog(context, ref, order),
+                        icon: const Icon(Icons.cancel_outlined, size: 20),
+                        label: const Text('REJECT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ] else if (order.isOrderAccepted || order.status == 'accepted') ...[
+                // Stage 8: Order Accepted - Rider initiates fulfillment trip
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () => _startDelivery(context, ref, order),
+                    icon: const Icon(Icons.local_shipping_rounded, size: 22),
+                    label: const Text(
+                      'START DELIVERY TRIP',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, letterSpacing: 0.4),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
+                const SizedBox(height: 10),
+              ] else if (order.status == 'pending' || order.status == 'assigned' || order.status == 'unassigned') ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () => _startDelivery(context, ref, order),
+                    icon: const Icon(Icons.navigation_outlined, size: 20),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'ACCEPT & START DELIVERY TRIP',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, letterSpacing: 0.4),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(

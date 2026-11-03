@@ -100,14 +100,19 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
 
     // 2. Verified Demo / Seed Accounts
     if (clean == 'client.novacale@novaxpress.ng' ||
-        clean == 'merchant@novacare.com') {
-      if (password != 'ClientPass123!' && password != 'Password123!') {
+        clean == 'merchant@novacare.com' ||
+        clean == 'novacare@novaxpress.net' ||
+        clean == 'client-novacare' ||
+        clean == 'cli-s1-212') {
+      if (password != 'ClientPass123!' &&
+          password != 'Password123!' &&
+          password != 'novacare@novaxpress.net') {
         throw AppAuthException(
             'Invalid email or password. Please check your credentials.');
       }
       _currentUser = const UserModel(
         id: '00000000-0000-4000-8000-791731264594',
-        email: 'merchant@novacare.com',
+        email: 'novacare@novaxpress.net',
         firstName: 'Dr. Chuka',
         lastName: 'Okafor',
         phone: '08034455667',

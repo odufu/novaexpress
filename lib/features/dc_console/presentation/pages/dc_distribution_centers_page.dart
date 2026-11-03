@@ -1418,12 +1418,27 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     bool isHub = existingDc?.isHub ?? false;
     bool isActive = existingDc?.isActive ?? true;
 
-    List<String> availableLgas = LocationLookupService.getLgasForState(selectedState);
+    List<String> selectedCoveredStates = existingDc != null && existingDc.effectiveCoveredStates.isNotEmpty
+        ? List<String>.from(existingDc.effectiveCoveredStates)
+        : [selectedState];
+    if (!selectedCoveredStates.contains(selectedState)) {
+      selectedCoveredStates.insert(0, selectedState);
+    }
+
+    List<String> getAllAvailableLgas() {
+      final all = <String>[];
+      for (final st in selectedCoveredStates) {
+        all.addAll(LocationLookupService.getLgasForState(st));
+      }
+      return all;
+    }
+
+    List<String> availableLgas = getAllAvailableLgas();
     if (cityCtrl.text.isEmpty && availableLgas.isNotEmpty) {
       cityCtrl.text = availableLgas.first;
     }
     List<String> selectedLgas = existingDc != null && existingDc.operatingZones.isNotEmpty
-        ? List<String>.from(existingDc.operatingZones)
+        ? List<String>.from(existingDc.operatingZones.where((z) => !z.startsWith('STATE:')))
         : (availableLgas.isNotEmpty ? List<String>.from(availableLgas) : ['Abuja Municipal (AMAC)']);
 
     String lgaSearchQuery = '';
@@ -1510,8 +1525,10 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                               if (val != null) {
                                 setState(() {
                                   selectedState = val;
-                                  availableLgas = LocationLookupService.getLgasForState(val);
-                                  selectedLgas = List.from(availableLgas);
+                                  if (!selectedCoveredStates.contains(val)) {
+                                    selectedCoveredStates.insert(0, val);
+                                  }
+                                  availableLgas = getAllAvailableLgas();
                                   cityCtrl.text = availableLgas.isNotEmpty ? availableLgas.first : val;
                                 });
                               }
@@ -1564,6 +1581,91 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Multi-State Regional Coverage Chips
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.hub_rounded, size: 15, color: Color(0xFF2563EB)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Covered States (Multi-State Delivery Coverage) *',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              ...selectedCoveredStates.map((st) {
+                                final isPrimary = st == selectedState;
+                                return Chip(
+                                  backgroundColor: isPrimary ? const Color(0xFF2563EB) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                  label: Text(
+                                    isPrimary ? '$st (HQ)' : st,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: isPrimary ? Colors.white : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                                    ),
+                                  ),
+                                  deleteIcon: isPrimary ? null : const Icon(Icons.close_rounded, size: 14),
+                                  onDeleted: isPrimary ? null : () {
+                                    setState(() {
+                                      selectedCoveredStates.remove(st);
+                                      availableLgas = getAllAvailableLgas();
+                                      final stLgas = LocationLookupService.getLgasForState(st);
+                                      selectedLgas.removeWhere((l) => stLgas.contains(l));
+                                    });
+                                  },
+                                );
+                              }),
+                              ActionChip(
+                                avatar: const Icon(Icons.add_rounded, size: 15, color: Color(0xFF2563EB)),
+                                label: const Text('+ Add State', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                                onPressed: () async {
+                                  final unselectedStates = LocationLookupService.getAllStates()
+                                      .where((s) => !selectedCoveredStates.contains(s))
+                                      .toList();
+                                  if (unselectedStates.isEmpty) return;
+                                  final picked = await showDialog<String>(
+                                    context: ctx,
+                                    builder: (dCtx) => SimpleDialog(
+                                      title: const Text('Add Covered State'),
+                                      children: unselectedStates.map((s) {
+                                        return SimpleDialogOption(
+                                          onPressed: () => Navigator.pop(dCtx, s),
+                                          child: Text(s),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  );
+                                  if (picked != null) {
+                                    setState(() {
+                                      selectedCoveredStates.add(picked);
+                                      availableLgas = getAllAvailableLgas();
+                                      selectedLgas.addAll(LocationLookupService.getLgasForState(picked));
+                                    });
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1934,6 +2036,12 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
 
                   final capacity = int.tryParse(capacityCtrl.text.replaceAll(',', '')) ?? 25000;
                   final zones = List<String>.from(selectedLgas);
+                  for (final st in selectedCoveredStates) {
+                    final tag = 'STATE:$st';
+                    if (!zones.contains(tag)) {
+                      zones.add(tag);
+                    }
+                  }
 
                   try {
                     final savedDc = await showAppLoadingDialog<DistributionCenter>(
@@ -1947,6 +2055,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                             name: name,
                             code: code,
                             state: selectedState,
+                            coveredStates: selectedCoveredStates,
                             city: city,
                             address: address,
                             contactPhone: phoneCtrl.text.trim(),

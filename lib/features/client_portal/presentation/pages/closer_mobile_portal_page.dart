@@ -1431,11 +1431,14 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
 
     final filtered = baseOrders.where((o) {
       if (statusFilter != 'all') {
-        if (statusFilter == 'new_leads' && !(o.status.toLowerCase() == 'new' || o.status.toLowerCase() == 'unconfirmed' || o.status.toLowerCase() == 'contacting')) return false;
+        if (statusFilter == 'assigned' && o.status.toLowerCase() != 'assigned') return false;
+        if (statusFilter == 'ready' && o.status.toLowerCase() != 'ready') return false;
+        if (statusFilter == 'rescheduled' && o.status.toLowerCase() != 'rescheduled') return false;
+        if (statusFilter == 'new_leads' && !(o.status.toLowerCase() == 'new' || o.status.toLowerCase() == 'unconfirmed' || o.status.toLowerCase() == 'contacting' || o.status.toLowerCase() == 'assigned')) return false;
         if (statusFilter == 'in_transit' && !o.isAssignedInTransit) return false;
         if (statusFilter == 'delivered' && !o.isDelivered) return false;
         if (statusFilter == 'pending' && (o.isDelivered || o.isFailed || o.isAssignedInTransit || o.status.toLowerCase() == 'new')) return false;
-        if (statusFilter == 'failed' && !o.isFailed) return false;
+        if (statusFilter == 'failed' && !o.isFailed && !o.isCallBack) return false;
       }
       if (searchQuery.isNotEmpty) {
         final matchesNum = o.orderNumber.toLowerCase().contains(searchQuery);
@@ -1531,15 +1534,17 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                     children: [
                       _buildFilterChip('all', 'All (${baseOrders.length})', statusFilter, isDark),
                       const SizedBox(width: 8),
-                      _buildFilterChip('new_leads', 'New Leads (${baseOrders.where((o) => o.status.toLowerCase() == 'new' || o.status.toLowerCase() == 'unconfirmed' || o.status.toLowerCase() == 'contacting').length})', statusFilter, isDark),
+                      _buildFilterChip('assigned', 'Assigned (${baseOrders.where((o) => o.status.toLowerCase() == 'assigned').length})', statusFilter, isDark),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('ready', 'Ready (${baseOrders.where((o) => o.status.toLowerCase() == 'ready').length})', statusFilter, isDark),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('rescheduled', 'Rescheduled (${baseOrders.where((o) => o.status.toLowerCase() == 'rescheduled').length})', statusFilter, isDark),
                       const SizedBox(width: 8),
                       _buildFilterChip('in_transit', 'In Transit (${baseOrders.where((o) => o.isAssignedInTransit).length})', statusFilter, isDark),
                       const SizedBox(width: 8),
                       _buildFilterChip('delivered', 'Delivered (${baseOrders.where((o) => o.isDelivered).length})', statusFilter, isDark),
                       const SizedBox(width: 8),
-                      _buildFilterChip('pending', 'Pending Dispatch', statusFilter, isDark),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('failed', 'Failed/Callback', statusFilter, isDark),
+                      _buildFilterChip('failed', 'Issues/Callback (${baseOrders.where((o) => o.isFailed || o.isCallBack).length})', statusFilter, isDark),
                     ],
                   ),
                 ),
@@ -1704,7 +1709,8 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
 
     final isNewLead = order.status.toLowerCase() == 'new' ||
         order.status.toLowerCase() == 'unconfirmed' ||
-        order.status.toLowerCase() == 'contacting';
+        order.status.toLowerCase() == 'contacting' ||
+        order.status.toLowerCase() == 'assigned';
 
     if (order.isDelivered) {
       statusColor = const Color(0xFF10B981);
@@ -1712,12 +1718,21 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     } else if (order.isAssignedInTransit) {
       statusColor = const Color(0xFF3B82F6);
       statusLabel = 'IN TRANSIT';
+    } else if (order.isRescheduled) {
+      statusColor = const Color(0xFFEA580C);
+      statusLabel = 'RESCHEDULED';
+    } else if (order.isReady) {
+      statusColor = const Color(0xFF0D9488);
+      statusLabel = 'READY (AT DC)';
+    } else if (order.isAssignedToCloser) {
+      statusColor = const Color(0xFF8B5CF6);
+      statusLabel = 'ASSIGNED';
     } else if (order.isFailed) {
       statusColor = const Color(0xFFEF4444);
       statusLabel = 'FAILED / RETURN';
     } else if (isNewLead) {
       statusColor = const Color(0xFFF97316);
-      statusLabel = 'NEW LEAD (UNCONFIRMED)';
+      statusLabel = 'NEW LEAD';
     } else {
       statusColor = const Color(0xFFF59E0B);
       statusLabel = 'PENDING DISPATCH';
@@ -1976,13 +1991,13 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                   ),
                   const SizedBox(width: 6),
 
-                  // 2. Confirm & Auto-Dispatch Button
+                  // 2. Confirm Ready Button
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => ClientConfirmOrderModal.show(context, order),
                       icon: const Icon(Icons.verified_rounded, size: 14, color: Colors.white),
                       label: Text(
-                        'Confirm & Dispatch',
+                        'Confirm Ready',
                         style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
@@ -1991,6 +2006,58 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         elevation: 0,
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // 3. Reschedule Action Button
+                  IconButton(
+                    tooltip: 'Reschedule Order',
+                    onPressed: () {
+                      RescheduleCallbackModal.show(
+                        context: context,
+                        orderId: order.id,
+                        customerName: order.customerName,
+                        onRescheduleConfirmed: (dt, note) async {
+                          final updated = order.copyWith(
+                            status: 'rescheduled',
+                            rescheduledDeliveryDate: dt,
+                            deliveryNotes: '${order.deliveryNotes ?? ""}\n[RESCHEDULED] $note',
+                          );
+                          await ref.read(ordersProvider.notifier).updateOrder(updated);
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.event_repeat_rounded, size: 16, color: Color(0xFFEA580C)),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA580C).withValues(alpha: 0.12),
+                      padding: const EdgeInsets.all(9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // 4. Not Picking Action Button
+                  IconButton(
+                    tooltip: 'Customer Not Picking',
+                    onPressed: () async {
+                      await ref.read(ordersProvider.notifier).updateOrderStatus(
+                        order.id,
+                        'not_picking',
+                        notes: 'Closer called customer - not picking calls.',
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          backgroundColor: Color(0xFFD97706),
+                          content: Text('Status marked: Customer Not Picking! 📵'),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.phone_missed_rounded, size: 16, color: Color(0xFFD97706)),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706).withValues(alpha: 0.12),
+                      padding: const EdgeInsets.all(9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                   const SizedBox(width: 6),

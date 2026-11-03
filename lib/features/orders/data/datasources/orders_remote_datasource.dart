@@ -671,7 +671,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         final updatePayload = {
           'delivery_agent_id': validRiderUuid,
           'assigned_agent_id': validRiderUuid,
-          'status': 'in_transit',
+          'status': 'dispatch_assigned',
           'updated_at': DateTime.now().toIso8601String(),
         };
 
@@ -745,7 +745,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       final updatePayload = {
         'delivery_agent_id': null,
         'assigned_agent_id': null,
-        'status': 'pending_dispatch',
+        'status': 'ready',
         'updated_at': DateTime.now().toIso8601String(),
       };
 

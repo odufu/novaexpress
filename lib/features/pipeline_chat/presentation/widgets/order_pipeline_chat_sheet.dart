@@ -3029,42 +3029,57 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                   onPressed: () => _showQuickEmojiPicker(context, isDark),
                 ),
 
-                // Pure borderless text input
+                // Pure borderless text input (Strict border elimination matching real WhatsApp)
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: TextField(
-                      controller: _msgController,
-                      focusNode: _msgFocusNode,
-                      minLines: 1,
-                      maxLines: 5,
-                      textCapitalization: TextCapitalization.sentences,
-                      cursorColor: const Color(0xFF00A884),
-                      cursorWidth: 2,
-                      cursorRadius: const Radius.circular(2),
-                      style: GoogleFonts.inter(
-                        fontSize: 14.5,
-                        height: 1.35,
-                        color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
-                      ),
-                      decoration: InputDecoration(
-                        hintText: _stagedAttachment != null
-                            ? 'Add a caption...'
-                            : 'Message',
-                        hintStyle: GoogleFonts.inter(
-                          fontSize: 14.5,
-                          color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        inputDecorationTheme: const InputDecorationTheme(
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          filled: false,
+                          fillColor: Colors.transparent,
+                          contentPadding: EdgeInsets.zero,
                         ),
-                        isDense: true,
-                        filled: false,
-                        fillColor: Colors.transparent,
-                        contentPadding: EdgeInsets.zero,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        disabledBorder: InputBorder.none,
-                        errorBorder: InputBorder.none,
-                        focusedErrorBorder: InputBorder.none,
+                      ),
+                      child: TextField(
+                        controller: _msgController,
+                        focusNode: _msgFocusNode,
+                        minLines: 1,
+                        maxLines: 5,
+                        textCapitalization: TextCapitalization.sentences,
+                        cursorColor: const Color(0xFF00A884),
+                        cursorWidth: 2,
+                        cursorRadius: const Radius.circular(2),
+                        style: GoogleFonts.inter(
+                          fontSize: 14.5,
+                          height: 1.35,
+                          color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: _stagedAttachment != null
+                              ? 'Add a caption...'
+                              : 'Message',
+                          hintStyle: GoogleFonts.inter(
+                            fontSize: 14.5,
+                            color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                          ),
+                          isDense: true,
+                          filled: false,
+                          fillColor: Colors.transparent,
+                          contentPadding: EdgeInsets.zero,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                        ),
                       ),
                     ),
                   ),

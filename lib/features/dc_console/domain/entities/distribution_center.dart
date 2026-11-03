@@ -27,6 +27,7 @@ class DistributionCenter {
   final bool isActive;
   final String? parentDcId;
   final List<String> operatingZones;
+  final List<String> coveredStates;
   final int storageCapacityUnits;
   final int totalAssignedRiders;
   final int activeInventoryBatches;
@@ -49,6 +50,7 @@ class DistributionCenter {
     this.isActive = true,
     this.parentDcId,
     this.operatingZones = const [],
+    this.coveredStates = const [],
     this.storageCapacityUnits = 25000,
     this.totalAssignedRiders = 0,
     this.activeInventoryBatches = 0,
@@ -94,27 +96,47 @@ class DistributionCenter {
   List<String> get coveredLgas => operatingZones;
   String get displayCapacity => '${storageCapacityUnits.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} Units';
 
+  List<String> get effectiveCoveredStates {
+    if (coveredStates.isNotEmpty) return coveredStates;
+    final zonesStates = operatingZones
+        .where((z) => z.startsWith('STATE:'))
+        .map((z) => z.substring('STATE:'.length).trim())
+        .toList();
+    if (zonesStates.isNotEmpty) return zonesStates;
+    return state.trim().isNotEmpty ? [state.trim()] : ['Abuja FCT'];
+  }
+
+  bool coversState(String stateName) {
+    if (stateName.trim().isEmpty) return true;
+    final normTarget = LocationLookupService.normalizeStateName(stateName).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    return effectiveCoveredStates.any((s) {
+      final normS = LocationLookupService.normalizeStateName(s).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      return normS == normTarget || normS.contains(normTarget) || normTarget.contains(normS);
+    });
+  }
+
   bool coversLga(String rawLga) {
-    if (operatingZones.isEmpty) return true;
+    final lgasOnly = operatingZones.where((z) => !z.startsWith('STATE:')).toList();
+    if (lgasOnly.isEmpty) return true;
     final target = rawLga.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     if (target.isEmpty) return true;
-    return operatingZones.any((zone) {
+    return lgasOnly.any((zone) {
       final z = zone.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
       return z == target || target.contains(z) || z.contains(target);
     });
   }
 
   bool coversLocation({required String stateName, required String lgaName}) {
-    // Canonical State normalization
-    final normSelf = LocationLookupService.normalizeStateName(state).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final normTarget = LocationLookupService.normalizeStateName(stateName).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    // 1. Must cover the state
+    if (!coversState(stateName)) return false;
 
-    final stateMatches = normSelf == normTarget ||
-        normSelf.contains(normTarget) ||
-        normTarget.contains(normSelf);
-
-    if (!stateMatches) return false;
+    // 2. If LGA not specified, state match is sufficient
     if (lgaName.trim().isEmpty) return true;
+
+    // 3. Check if specific LGAs are restricted
+    final lgasOnly = operatingZones.where((z) => !z.startsWith('STATE:')).toList();
+    if (lgasOnly.isEmpty) return true; // Covers all LGAs in state
+
     return coversLga(lgaName);
   }
 
@@ -134,6 +156,7 @@ class DistributionCenter {
     bool? isActive,
     String? parentDcId,
     List<String>? operatingZones,
+    List<String>? coveredStates,
     int? storageCapacityUnits,
     int? totalAssignedRiders,
     int? activeInventoryBatches,
@@ -156,6 +179,7 @@ class DistributionCenter {
       isActive: isActive ?? this.isActive,
       parentDcId: parentDcId ?? this.parentDcId,
       operatingZones: operatingZones ?? this.operatingZones,
+      coveredStates: coveredStates ?? this.coveredStates,
       storageCapacityUnits: storageCapacityUnits ?? this.storageCapacityUnits,
       totalAssignedRiders: totalAssignedRiders ?? this.totalAssignedRiders,
       activeInventoryBatches: activeInventoryBatches ?? this.activeInventoryBatches,
@@ -165,6 +189,25 @@ class DistributionCenter {
   }
 
   factory DistributionCenter.fromJson(Map<String, dynamic> json) {
+    List<String> parseCoveredStates(dynamic raw) {
+      if (raw == null) return [];
+      if (raw is List) {
+        return raw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+      }
+      if (raw is String) {
+        if (raw.startsWith('[') && raw.endsWith(']')) {
+          try {
+            final decoded = jsonDecode(raw);
+            if (decoded is List) {
+              return decoded.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+            }
+          } catch (_) {}
+        }
+        return raw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+      return [];
+    }
+
     List<String> parseZones(dynamic raw) {
       if (raw == null) return [];
       if (raw is List) {
@@ -221,6 +264,7 @@ class DistributionCenter {
       isActive: json['is_active'] != false && json['isActive'] != false,
       parentDcId: json['parent_dc_id']?.toString() ?? json['parentDcId']?.toString(),
       operatingZones: parseZones(json['operating_zones'] ?? json['operatingZones'] ?? json['zones'] ?? json['covered_lgas']),
+      coveredStates: parseCoveredStates(json['covered_states'] ?? json['coveredStates']),
       storageCapacityUnits: (json['storage_capacity_units'] as num?)?.toInt() ?? (json['storageCapacityUnits'] as num?)?.toInt() ?? 25000,
       totalAssignedRiders: (json['total_assigned_riders'] as num?)?.toInt() ?? (json['totalAssignedRiders'] as num?)?.toInt() ?? 0,
       activeInventoryBatches: (json['active_inventory_batches'] as num?)?.toInt() ?? (json['activeInventoryBatches'] as num?)?.toInt() ?? 0,
@@ -247,6 +291,7 @@ class DistributionCenter {
       'is_active': isActive,
       'parent_dc_id': parentDcId,
       'operating_zones': operatingZones,
+      'covered_states': effectiveCoveredStates,
       'storage_capacity_units': storageCapacityUnits,
       'total_assigned_riders': totalAssignedRiders,
       'active_inventory_batches': activeInventoryBatches,

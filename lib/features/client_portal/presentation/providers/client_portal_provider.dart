@@ -2860,28 +2860,45 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       final String assignedDcName = routingResult.distributionCenter?.name ??
           (allDcs.where((dc) => dc.id == assignedDcId).firstOrNull?.name ?? 'Central Command Distribution Center');
 
-      String? assignedDriverId;
-      String? assignedDriverName;
-      String? assignedDriverPhone;
-      String? assignedDriverCode;
-      String initialStatus;
-      String assignmentStatus;
+      // Closer Round-Robin Even Distribution & Attribution Engine
+      // 1. If creator is a Closer, closer strictly owns the order
+      // 2. Otherwise, evenly distribute across active Closers attached to this product
+      String? effectiveCloserId = closerId;
+      String? effectiveCloserName = closerName;
+      String? effectiveCloserCode = closerCode;
+      String? effectiveCloserAvatarUrl = closerAvatarUrl;
 
-      if (autoAssignRider && routingResult.status == RoutingStatus.assignedToRider && routingResult.driver != null) {
-        initialStatus = 'assigned';
-        assignmentStatus = 'auto_assigned';
-        assignedDriverId = routingResult.driver?.id;
-        assignedDriverName = routingResult.driver?.name;
-        assignedDriverPhone = routingResult.driver?.phone;
-        assignedDriverCode = routingResult.driver?.driverCode;
-      } else {
-        initialStatus = 'pending_dispatch';
-        assignmentStatus = 'pending_rider_assignment';
-        assignedDriverId = null;
-        assignedDriverName = null;
-        assignedDriverPhone = null;
-        assignedDriverCode = null;
+      final isCreatorCloser = authUser?.isCloser == true || (authUser?.role.toLowerCase() == 'closer');
+      if (isCreatorCloser) {
+        effectiveCloserId = authUser?.closerId ?? authUser?.id;
+        effectiveCloserName = authUser?.fullName;
+        effectiveCloserCode = authUser?.closerCode ?? 'CLS-01';
+        effectiveCloserAvatarUrl = authUser?.avatarUrl;
+      } else if (effectiveCloserId == null || effectiveCloserId.isEmpty) {
+        final activeClosers = state.closers.where((c) => c.isActive).toList();
+        var eligibleClosers = activeClosers.where((c) => c.assignedProductIds.contains(productId)).toList();
+        if (eligibleClosers.isEmpty) {
+          eligibleClosers = activeClosers;
+        }
+
+        if (eligibleClosers.isNotEmpty) {
+          // Count active assigned orders per closer to balance round-robin distribution evenly
+          final assignedCounts = <String, int>{};
+          for (final c in eligibleClosers) {
+            assignedCounts[c.id] = state.orders.where((o) => o.closerId == c.id && (o.status == 'assigned' || o.status == 'pending')).length;
+          }
+          eligibleClosers.sort((a, b) => (assignedCounts[a.id] ?? 0).compareTo(assignedCounts[b.id] ?? 0));
+          final chosen = eligibleClosers.first;
+          effectiveCloserId = chosen.id;
+          effectiveCloserName = chosen.fullName;
+          effectiveCloserCode = chosen.closerCode;
+          effectiveCloserAvatarUrl = chosen.avatarUrl;
+        }
       }
+
+      // Initial Status upon order creation is strictly 'assigned' to closer (Riders are NEVER auto-assigned)
+      const String initialStatus = 'assigned';
+      final String assignmentStatus = effectiveCloserId != null ? 'assigned_to_closer' : 'pending_closer';
 
       final newOrder = OrderEntity(
         id: orderId,
@@ -2905,21 +2922,22 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         productName: productName,
         packageDealId: packageId,
         packageDealName: packageName,
-        deliveryAgentId: assignedDriverId,
-        deliveryAgentName: assignedDriverName,
-        deliveryAgentCode: assignedDriverCode,
-        deliveryAgentPhone: assignedDriverPhone,
+        deliveryAgentId: null,
+        deliveryAgentName: null,
+        deliveryAgentCode: null,
+        deliveryAgentPhone: null,
         distributionCenterId: assignedDcId,
         distributionCenterName: assignedDcName,
         fulfillmentType: 'client_package',
         clientName: effectiveClientName,
         clientId: effectiveClientId,
-        closerId: closerId,
-        closerName: closerName,
-        closerCode: closerCode,
-        closerAvatarUrl: closerAvatarUrl,
+        closerId: effectiveCloserId,
+        closerName: effectiveCloserName,
+        closerCode: effectiveCloserCode,
+        closerAvatarUrl: effectiveCloserAvatarUrl,
         leadId: leadId,
         deliveryNotes: notes,
+        assignedAt: DateTime.now(),
         createdAt: DateTime.now(),
       );
 
@@ -3633,6 +3651,49 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     _invoicesRealtimeChannel?.unsubscribe();
     _marketingRealtimeChannel?.unsubscribe();
     super.dispose();
+  }
+
+  /// Auto-reassign orders inactive for > 24 hours to another qualified closer offering that product
+  Future<int> autoReassignInactiveCloserOrders() async {
+    final now = DateTime.now();
+    int reassignedCount = 0;
+
+    final staleOrders = state.orders.where((o) {
+      if (o.status.toLowerCase() != 'assigned' || o.closerId == null) return false;
+      final refDate = o.assignedAt ?? o.createdAt;
+      return now.difference(refDate).inHours >= 24;
+    }).toList();
+
+    for (final order in staleOrders) {
+      final activeClosers = state.closers.where((c) => c.isActive && c.id != order.closerId).toList();
+      var eligibleClosers = activeClosers.where((c) => order.productId != null && c.assignedProductIds.contains(order.productId)).toList();
+      if (eligibleClosers.isEmpty) {
+        eligibleClosers = activeClosers;
+      }
+
+      if (eligibleClosers.isNotEmpty) {
+        eligibleClosers.sort((a, b) {
+          final countA = state.orders.where((o) => o.closerId == a.id && o.status == 'assigned').length;
+          final countB = state.orders.where((o) => o.closerId == b.id && o.status == 'assigned').length;
+          return countA.compareTo(countB);
+        });
+
+        final targetCloser = eligibleClosers.first;
+        final prevCloser = order.closerName != null && order.closerName!.isNotEmpty ? order.closerName! : 'Previous Agent';
+        final existingNotes = order.deliveryNotes != null && order.deliveryNotes!.isNotEmpty ? '\ | ' : '';
+        final updatedOrder = order.copyWith(
+          closerId: targetCloser.id,
+          closerName: targetCloser.fullName,
+          closerCode: targetCloser.closerCode,
+          closerAvatarUrl: targetCloser.avatarUrl,
+          assignedAt: now,
+          deliveryNotes: '\[24H AUTO-REASSIGN] Stale order > 24h reassigned from \ to \.',
+        );
+        await _ref.read(ordersProvider.notifier).updateOrder(updatedOrder);
+        reassignedCount++;
+      }
+    }
+    return reassignedCount;
   }
 }
 

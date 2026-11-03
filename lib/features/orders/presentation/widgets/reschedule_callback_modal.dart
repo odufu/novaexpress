@@ -33,8 +33,10 @@ class RescheduleCallbackState {
 class RescheduleCallbackNotifier extends StateNotifier<RescheduleCallbackState> {
   RescheduleCallbackNotifier()
       : super(RescheduleCallbackState(
-          selectedDate: DateTime.now().add(const Duration(days: 1)),
-          selectedTime: const TimeOfDay(hour: 14, minute: 0),
+          selectedDate: DateTime.now(),
+          selectedTime: const TimeOfDay(hour: 12, minute: 0),
+          datePreset: 'today',
+          timePreset: 'noon',
         ));
 
   void setDatePreset(String preset, DateTime date) {
@@ -203,6 +205,19 @@ class _RescheduleCallbackModalState extends ConsumerState<RescheduleCallbackModa
             children: [
               Expanded(
                 child: _buildDatePresetChip(
+                  label: 'Today',
+                  isSelected: callbackState.datePreset == 'today',
+                  onTap: () {
+                    ref.read(rescheduleCallbackProvider.notifier).setDatePreset(
+                          'today',
+                          DateTime.now(),
+                        );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildDatePresetChip(
                   label: 'Tomorrow',
                   isSelected: callbackState.datePreset == 'tomorrow',
                   onTap: () {
@@ -229,7 +244,7 @@ class _RescheduleCallbackModalState extends ConsumerState<RescheduleCallbackModa
               const SizedBox(width: 8),
               Expanded(
                 child: _buildDatePresetChip(
-                  label: 'Custom Date',
+                  label: 'Pick Date...',
                   isSelected: callbackState.datePreset == 'custom',
                   onTap: () => _pickCustomDate(callbackState.selectedDate),
                 ),
@@ -253,6 +268,19 @@ class _RescheduleCallbackModalState extends ConsumerState<RescheduleCallbackModa
             children: [
               Expanded(
                 child: _buildTimePresetChip(
+                  label: 'Noon (12 PM)',
+                  isSelected: callbackState.timePreset == 'noon',
+                  onTap: () {
+                    ref.read(rescheduleCallbackProvider.notifier).setTimePreset(
+                          'noon',
+                          const TimeOfDay(hour: 12, minute: 0),
+                        );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildTimePresetChip(
                   label: 'Morning (10 AM)',
                   isSelected: callbackState.timePreset == 'morning',
                   onTap: () {
@@ -266,25 +294,12 @@ class _RescheduleCallbackModalState extends ConsumerState<RescheduleCallbackModa
               const SizedBox(width: 8),
               Expanded(
                 child: _buildTimePresetChip(
-                  label: 'Afternoon (2 PM)',
+                  label: 'Afternoon (3 PM)',
                   isSelected: callbackState.timePreset == 'afternoon',
                   onTap: () {
                     ref.read(rescheduleCallbackProvider.notifier).setTimePreset(
                           'afternoon',
-                          const TimeOfDay(hour: 14, minute: 0),
-                        );
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildTimePresetChip(
-                  label: 'Evening (5 PM)',
-                  isSelected: callbackState.timePreset == 'evening',
-                  onTap: () {
-                    ref.read(rescheduleCallbackProvider.notifier).setTimePreset(
-                          'evening',
-                          const TimeOfDay(hour: 17, minute: 0),
+                          const TimeOfDay(hour: 15, minute: 0),
                         );
                   },
                 ),
@@ -294,7 +309,7 @@ class _RescheduleCallbackModalState extends ConsumerState<RescheduleCallbackModa
                 child: _buildTimePresetChip(
                   label: callbackState.timePreset == 'custom'
                       ? callbackState.selectedTime.format(context)
-                      : 'Pick Time',
+                      : 'Pick Time...',
                   isSelected: callbackState.timePreset == 'custom',
                   onTap: () => _pickCustomTime(callbackState.selectedTime),
                 ),

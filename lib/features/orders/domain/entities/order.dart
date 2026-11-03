@@ -65,6 +65,8 @@ class OrderEntity {
   final String? leadId;
   final String? marketerId;
   final String? formId;
+  final DateTime? rescheduledDeliveryDate;
+  final DateTime? reminderSnoozedUntil;
   final DateTime createdAt;
 
   const OrderEntity({
@@ -134,6 +136,8 @@ class OrderEntity {
     this.leadId,
     this.marketerId,
     this.formId,
+    this.rescheduledDeliveryDate,
+    this.reminderSnoozedUntil,
     required this.createdAt,
   });
 
@@ -201,6 +205,35 @@ class OrderEntity {
   bool get isCashPod => isPod;
   bool get isClientPackage => fulfillmentType == 'client_package';
   bool get isDistributedInventory => fulfillmentType == 'distributed_inventory';
+  // Pipeline Lifecycle Status Getters
+  bool get isAssignedToCloser => status.toLowerCase() == 'assigned';
+  bool get isReady => status.toLowerCase() == 'ready';
+  bool get isDispatchAssigned => status.toLowerCase() == 'dispatch_assigned';
+  bool get isOrderAccepted => status.toLowerCase() == 'order_accepted' || status.toLowerCase() == 'accepted';
+  bool get isDeliveryInProgress => status.toLowerCase() == 'delivery_in_progress' || status.toLowerCase() == 'in_transit';
+  bool get isRescheduled => status.toLowerCase() == 'rescheduled';
+  bool get isNotPicking => status.toLowerCase() == 'not_picking';
+  bool get isCallBack => status.toLowerCase() == 'call_back';
+  bool get isNotReady => status.toLowerCase() == 'not_ready';
+  bool get isRejected => status.toLowerCase() == 'rejected';
+  bool get isNotReachable => status.toLowerCase() == 'not_reachable';
+  bool get isDuplicate => status.toLowerCase() == 'duplicate';
+  bool get isNoStock => status.toLowerCase() == 'no_stock';
+
+  /// True if a call back order has been waiting for action for > 4 hours
+  bool get isCallBackPendingOver4Hours {
+    if (!isCallBack) return false;
+    final refDate = assignedAt ?? createdAt;
+    return DateTime.now().difference(refDate).inHours >= 4;
+  }
+
+  /// True if an assigned order has not been acted upon by closer for > 24 hours
+  bool get isCloserPendingOver24Hours {
+    if (!isAssignedToCloser) return false;
+    final refDate = assignedAt ?? createdAt;
+    return DateTime.now().difference(refDate).inHours >= 24;
+  }
+
   bool get isDelivered => status.toLowerCase() == 'delivered' || status.toLowerCase() == 'completed';
   bool get isFailed => status.toLowerCase() == 'failed' || status.toLowerCase() == 'failed_attempt' || status.toLowerCase() == 'call_back' || status.toLowerCase() == 'cancelled';
   bool get isCancelled => status.toLowerCase() == 'cancelled';
@@ -426,18 +459,45 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
 
   String get statusDisplay {
     switch (status.toLowerCase()) {
+      case 'assigned':
+        return 'Assigned';
+      case 'ready':
+        return 'Ready';
+      case 'dispatch_assigned':
+        return 'Dispatch Assigned';
+      case 'order_accepted':
+      case 'accepted':
+        return 'Order Accepted';
+      case 'delivery_in_progress':
       case 'in_transit':
         return 'In Transit';
-      case 'accepted':
-        return 'Accepted';
-      case 'delivered':
-        return 'Delivered';
-      case 'failed':
-        return 'Failed';
+      case 'rescheduled':
+        return 'Rescheduled';
+      case 'not_picking':
+        return 'Not Picking';
       case 'call_back':
         return 'Call Back';
+      case 'not_ready':
+        return 'Not Ready';
+      case 'rejected':
+        return 'Rejected';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'not_reachable':
+        return 'Not Reachable';
+      case 'duplicate':
+        return 'Duplicate';
+      case 'no_stock':
+        return 'No Stock';
+      case 'delivered':
+      case 'completed':
+        return 'Delivered';
+      case 'failed':
+      case 'failed_attempt':
+        return 'Failed';
       case 'new':
       case 'pending':
+      case 'pending_dispatch':
         return 'Pending';
       default:
         return status.replaceAll('_', ' ').toUpperCase();
@@ -524,6 +584,8 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? leadId,
     String? marketerId,
     String? formId,
+    DateTime? rescheduledDeliveryDate,
+    DateTime? reminderSnoozedUntil,
     DateTime? createdAt,
   }) {
     return OrderEntity(
@@ -593,6 +655,8 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       leadId: leadId ?? this.leadId,
       marketerId: marketerId ?? this.marketerId,
       formId: formId ?? this.formId,
+      rescheduledDeliveryDate: rescheduledDeliveryDate ?? this.rescheduledDeliveryDate,
+      reminderSnoozedUntil: reminderSnoozedUntil ?? this.reminderSnoozedUntil,
       createdAt: createdAt ?? this.createdAt,
     );
   }

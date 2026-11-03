@@ -68,6 +68,8 @@ class OrderModel extends OrderEntity {
     super.leadId,
     super.marketerId,
     super.formId,
+    super.rescheduledDeliveryDate,
+    super.reminderSnoozedUntil,
     required super.createdAt,
   });
 
@@ -219,6 +221,20 @@ class OrderModel extends OrderEntity {
       }
     }
 
+    DateTime? reschedDate;
+    if (json['rescheduled_delivery_date'] != null) {
+      reschedDate = DateTime.tryParse(json['rescheduled_delivery_date'].toString());
+    } else if (json['scheduled_delivery_date'] != null) {
+      reschedDate = DateTime.tryParse(json['scheduled_delivery_date'].toString());
+    } else if (json['scheduled_callback_at'] != null) {
+      reschedDate = DateTime.tryParse(json['scheduled_callback_at'].toString());
+    }
+
+    DateTime? reminderSnooze;
+    if (json['reminder_snoozed_until'] != null) {
+      reminderSnooze = DateTime.tryParse(json['reminder_snoozed_until'].toString());
+    }
+
     return OrderModel(
       id: json['id'] ?? '',
       orderNumber: json['order_number'] ?? '',
@@ -286,6 +302,8 @@ class OrderModel extends OrderEntity {
       leadId: json['lead_id']?.toString(),
       marketerId: json['marketer_id']?.toString(),
       formId: json['form_id']?.toString(),
+      rescheduledDeliveryDate: reschedDate,
+      reminderSnoozedUntil: reminderSnooze,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -357,6 +375,8 @@ class OrderModel extends OrderEntity {
       closerCode: entity.closerCode,
       closerAvatarUrl: entity.closerAvatarUrl,
       leadId: entity.leadId,
+      rescheduledDeliveryDate: entity.rescheduledDeliveryDate,
+      reminderSnoozedUntil: entity.reminderSnoozedUntil,
       createdAt: entity.createdAt,
     );
   }
@@ -382,6 +402,8 @@ class OrderModel extends OrderEntity {
       'base_price': basePrice,
       'upsell_amount': upsellAmount,
       'total_amount': totalAmount,
+      'rescheduled_delivery_date': rescheduledDeliveryDate?.toIso8601String(),
+      'reminder_snoozed_until': reminderSnoozedUntil?.toIso8601String(),
       'payment_type': paymentType,
       'payment_status': paymentStatus,
       'fulfillment_type': fulfillmentType,
