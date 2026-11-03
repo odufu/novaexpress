@@ -106,15 +106,15 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
             'Invalid email or password. Please check your credentials.');
       }
       _currentUser = const UserModel(
-        id: '00000000-0000-4000-8000-789382731303',
+        id: '00000000-0000-4000-8000-791731264594',
         email: 'merchant@novacare.com',
         firstName: 'Dr. Chuka',
         lastName: 'Okafor',
         phone: '08034455667',
         role: 'client',
-        clientId: '00000000-0000-4000-8000-789382731303',
-        clientCompanyName: 'Novacare Health & Wellness Ltd',
-        deliveryAgentCode: 'CLI-NOVACARE-01',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        deliveryAgentCode: 'CLI-S1-212',
         operatingState: 'Federal Capital Territory',
         operatingCity: 'Abuja',
       );
@@ -162,8 +162,8 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         role: 'closer',
         closerId: '44444444-4444-4444-8444-444444444444',
         closerCode: 'CLS-NOVA-001',
-        clientId: '00000000-0000-4000-8000-789382731303',
-        clientCompanyName: 'Novacare Health & Wellness Ltd',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
         operatingState: 'Federal Capital Territory',
         operatingCity: 'Abuja',
         avatarUrl:
@@ -186,8 +186,8 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         role: 'closer',
         closerId: '55555555-5555-4555-8555-555555555555',
         closerCode: 'CLS-NOVA-002',
-        clientId: '00000000-0000-4000-8000-789382731303',
-        clientCompanyName: 'Novacare Health & Wellness Ltd',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
         operatingState: 'Federal Capital Territory',
         operatingCity: 'Abuja',
         avatarUrl:
@@ -369,8 +369,8 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         role: 'merchant_accountant',
         accountantId: 'acc-77777777-7777-4777-8777-777777777777',
         accountantCode: 'ACC-NOVA-001',
-        clientId: '00000000-0000-4000-8000-789382731303',
-        clientCompanyName: 'Novacare Health & Wellness Ltd',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
         operatingState: 'Federal Capital Territory',
         operatingCity: 'Abuja',
       );
@@ -2796,7 +2796,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         merged['first_name'] ??= userRes?['first_name'] ?? 'Samuel';
         merged['last_name'] ??= userRes?['last_name'] ?? 'Accountant';
         merged['accountant_code'] ??= userRes?['accountant_code'] ?? 'ACC-NOVA-001';
-        merged['client_company_name'] ??= 'Novacare Health & Wellness Ltd';
+        merged['client_company_name'] ??= 'NOVACARE LIMITED';
 
         // Auto-heal / synchronize to public.users table so it is permanently persisted
         try {
@@ -2807,7 +2807,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             'first_name': merged['first_name'],
             'last_name': merged['last_name'],
             'role': 'merchant_accountant',
-            'client_id': merged['client_id'] ?? '00000000-0000-4000-8000-789382731303',
+            'client_id': merged['client_id'] ?? '00000000-0000-4000-8000-791731264594',
             'is_active': true,
           });
           debugPrint(

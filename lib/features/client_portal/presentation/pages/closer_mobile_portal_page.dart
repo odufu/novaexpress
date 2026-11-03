@@ -2151,10 +2151,10 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
 
     final effectiveClientId = state.clientProfile.id.isNotEmpty
         ? state.clientProfile.id
-        : (authState.user?.clientId ?? '00000000-0000-4000-8000-789382731303');
+        : (authState.user?.clientId ?? '00000000-0000-4000-8000-791731264594');
     final effectiveCompanyName = state.clientProfile.companyName.isNotEmpty
         ? state.clientProfile.companyName
-        : (authState.user?.clientCompanyName ?? 'Novacare Health & Wellness Ltd');
+        : (authState.user?.clientCompanyName ?? 'NOVACARE LIMITED');
 
     final catalogMerchantProducts = catalogState.products.where((p) {
       return ClientPortalNotifier.isProductForClient(

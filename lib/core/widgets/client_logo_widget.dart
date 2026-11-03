@@ -69,7 +69,7 @@ class ClientLogoWidget extends StatelessWidget {
 
   String get _initials {
     final clean = companyName.trim();
-    if (clean.isEmpty) return 'EC';
+    if (clean.isEmpty) return 'NL';
     final parts = clean.split(RegExp(r'\s+'));
     if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();

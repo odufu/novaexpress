@@ -92,7 +92,7 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
           ? profile.id
           : (ref.read(authProvider).user?.clientId ?? '');
       if (clientId.isEmpty) {
-        clientId = '00000000-0000-4000-8000-789382731303';
+        clientId = '00000000-0000-4000-8000-791731264594';
       }
 
       if (widget.existingSupplier != null) {

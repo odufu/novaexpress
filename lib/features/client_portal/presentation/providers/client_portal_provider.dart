@@ -985,18 +985,19 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         super(
           ClientPortalState(
             clientProfile: const ClientProfile(
-              id: '',
-              companyName: '',
-              contactPerson: '',
-              email: '',
-              phone: '',
-              address: '',
-              city: '',
-              state: '',
-              code: '',
-              tier: 'standard',
-              closerLimit: 0,
-              isEnterprise: false,
+              id: '00000000-0000-4000-8000-791731264594',
+              companyName: 'NOVACARE LIMITED',
+              contactPerson: 'JOEL ODUFU',
+              email: 'novacare@novaxpress.ng',
+              phone: '08076565456',
+              address: 'Abuja Regional DC',
+              city: 'Abuja',
+              state: 'FCT - Abuja',
+              code: 'CLI-S1-212',
+              tier: 'enterprise',
+              closerLimit: 250,
+              isEnterprise: true,
+              logoUrl: 'https://oygtaeriljuelhshfvkv.supabase.co/storage/v1/object/public/avatars/client_logos/logo_00000000-0000-4000-8000-791731264594_1791977232075.webp',
             ),
           ),
         ) {
@@ -1021,8 +1022,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       var companyName = state.clientProfile.companyName.isNotEmpty ? state.clientProfile.companyName : (_ref.read(authProvider).user?.clientCompanyName ?? '');
       final user = _ref.read(authProvider).user;
       if (clientId.isEmpty && (user?.email.contains('novacare') == true || user?.clientCompanyName?.contains('Novacare') == true)) {
-        clientId = '00000000-0000-4000-8000-789382731303';
-        if (companyName.isEmpty) companyName = 'Novacare Health & Wellness Ltd';
+        clientId = '00000000-0000-4000-8000-791731264594';
+        if (companyName.isEmpty) companyName = 'NOVACARE LIMITED';
       }
 
       final clientProducts = next.products.where((p) {
@@ -1325,8 +1326,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
       // Fallback if still empty: Default to Novacare
       if (clientId.isEmpty) {
-        clientId = '00000000-0000-4000-8000-789382731303';
-        if (companyName.isEmpty) companyName = 'Novacare Health & Wellness Ltd';
+        clientId = '00000000-0000-4000-8000-791731264594';
+        if (companyName.isEmpty) companyName = 'NOVACARE LIMITED';
       }
 
       // 1. Fetch live products and packages strictly scoped for this client
@@ -2798,12 +2799,12 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           ? state.clientProfile.id
           : (authUser?.clientId?.isNotEmpty == true
               ? authUser!.clientId!
-              : '00000000-0000-4000-8000-789382731303');
+              : '00000000-0000-4000-8000-791731264594');
       final effectiveClientName = state.clientProfile.companyName.isNotEmpty
           ? state.clientProfile.companyName
           : (authUser?.clientCompanyName?.isNotEmpty == true
               ? authUser!.clientCompanyName!
-              : 'Novacare Health & Wellness Ltd');
+              : 'NOVACARE LIMITED');
 
       final effectivePaidQty = paidQuantity ?? (packageId != null ? quantity : 1);
       final effectiveFreeQty = freeQuantity ?? 0;

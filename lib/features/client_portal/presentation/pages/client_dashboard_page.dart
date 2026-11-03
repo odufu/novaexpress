@@ -446,10 +446,10 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage>
   ) {
     final companyName = state.clientProfile.companyName.isNotEmpty
         ? state.clientProfile.companyName
-        : 'Novacare Limited';
+        : 'NOVACARE LIMITED';
     final clientCode = state.clientProfile.code.isNotEmpty
         ? state.clientProfile.code
-        : 'NOVACARE-LTD';
+        : 'CLI-S1-212';
 
     final isFiltered = _selectedDatePreset != '30d' || _selectedProductId != null;
 

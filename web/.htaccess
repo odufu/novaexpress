@@ -70,12 +70,12 @@
     ExpiresByType image/svg+xml "access plus 1 month"
 </IfModule>
 
-# Never cache index.html so users always get fresh updates and bootstrap code
-<Files "index.html">
+# Never cache index.html, service worker, or bootstrap files so users always get fresh updates immediately
+<FilesMatch "^(index\.html|404\.html|flutter_service_worker\.js|flutter_bootstrap\.js|version\.json)$">
     <IfModule mod_headers.c>
         Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
         Header set Pragma "no-cache"
         Header set Expires 0
     </IfModule>
-</Files>
+</FilesMatch>
 
