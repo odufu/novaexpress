@@ -22,6 +22,8 @@ import '../widgets/client_edit_order_modal.dart';
 import '../widgets/request_upg_modal.dart';
 import '../widgets/closer_create_package_modal.dart';
 import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
+import '../../../orders/presentation/widgets/reschedule_callback_modal.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
