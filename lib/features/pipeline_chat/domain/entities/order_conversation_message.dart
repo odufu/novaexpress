@@ -42,6 +42,8 @@ class OrderConversationMessageEntity {
   final bool readByRider;
 
   final DateTime createdAt;
+  final String sendState; // 'sent', 'pending', 'failed'
+  final String? clientMessageId;
 
   const OrderConversationMessageEntity({
     required this.id,
@@ -58,7 +60,13 @@ class OrderConversationMessageEntity {
     this.readByDc = false,
     this.readByRider = false,
     required this.createdAt,
+    this.sendState = 'sent',
+    this.clientMessageId,
   });
+
+  bool get isPending => sendState == 'pending';
+  bool get isFailed => sendState == 'failed';
+  bool get isSent => sendState == 'sent';
 
   bool get isSystem => senderRole == ChatSenderRole.system;
 
@@ -71,9 +79,12 @@ class OrderConversationMessageEntity {
   bool get isVoiceNote =>
       messageType == ChatMessageType.voiceNote ||
       metadata['type'] == 'voice_note' ||
-      metadata['audio_url'] != null;
+      metadata['audio_url'] != null ||
+      (metadata['local_data_uri'] != null && metadata['type'] == 'voice_note');
 
-  String? get voiceNoteUrl => metadata['audio_url']?.toString();
+  String? get voiceNoteUrl =>
+      metadata['audio_url']?.toString() ??
+      metadata['local_data_uri']?.toString();
 
   int get voiceNoteDuration =>
       (metadata['duration_seconds'] as num?)?.toInt() ??
@@ -95,13 +106,53 @@ class OrderConversationMessageEntity {
               metadata['file_name']?.toString().toLowerCase().endsWith('.webp') == true));
 
   String? get fileUrl =>
-      metadata['file_url']?.toString() ?? metadata['image_url']?.toString();
+      metadata['file_url']?.toString() ??
+      metadata['image_url']?.toString() ??
+      metadata['local_data_uri']?.toString();
 
   String? get fileName => metadata['file_name']?.toString();
 
   int? get fileSize => (metadata['file_size'] as num?)?.toInt();
 
   String? get fileMimeType => metadata['mime_type']?.toString();
+
+  OrderConversationMessageEntity copyWith({
+    String? id,
+    String? conversationId,
+    String? orderId,
+    String? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
+    ChatSenderRole? senderRole,
+    ChatMessageType? messageType,
+    String? messageBody,
+    Map<String, dynamic>? metadata,
+    bool? readByClient,
+    bool? readByDc,
+    bool? readByRider,
+    DateTime? createdAt,
+    String? sendState,
+    String? clientMessageId,
+  }) {
+    return OrderConversationMessageEntity(
+      id: id ?? this.id,
+      conversationId: conversationId ?? this.conversationId,
+      orderId: orderId ?? this.orderId,
+      senderId: senderId ?? this.senderId,
+      senderName: senderName ?? this.senderName,
+      senderAvatarUrl: senderAvatarUrl ?? this.senderAvatarUrl,
+      senderRole: senderRole ?? this.senderRole,
+      messageType: messageType ?? this.messageType,
+      messageBody: messageBody ?? this.messageBody,
+      metadata: metadata ?? this.metadata,
+      readByClient: readByClient ?? this.readByClient,
+      readByDc: readByDc ?? this.readByDc,
+      readByRider: readByRider ?? this.readByRider,
+      createdAt: createdAt ?? this.createdAt,
+      sendState: sendState ?? this.sendState,
+      clientMessageId: clientMessageId ?? this.clientMessageId,
+    );
+  }
 }
 
 typedef OrderConversationMessage = OrderConversationMessageEntity;

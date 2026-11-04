@@ -38,6 +38,7 @@ abstract class PipelineChatRemoteDataSource {
     String? senderAvatarUrl,
     ChatMessageType messageType = ChatMessageType.text,
     Map<String, dynamic>? metadata,
+    String? clientMessageId,
   });
   Future<Map<String, dynamic>> transferOrderProductAndOwnership({
     required String orderId,
@@ -414,6 +415,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
     String? senderAvatarUrl,
     ChatMessageType messageType = ChatMessageType.text,
     Map<String, dynamic>? metadata,
+    String? clientMessageId,
   }) async {
     final db = _getAdminClient();
     String rStr = 'system';
@@ -469,6 +471,11 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
         break;
     }
 
+    final mergedMetadata = Map<String, dynamic>.from(metadata ?? {});
+    if (clientMessageId != null && clientMessageId.isNotEmpty) {
+      mergedMetadata['client_message_id'] = clientMessageId;
+    }
+
     final payload = {
       'conversation_id': conversationId,
       'order_id': orderId,
@@ -478,7 +485,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
       'sender_role': rStr,
       'message_type': tStr,
       'message_body': messageBody.trim(),
-      'metadata': metadata ?? {},
+      'metadata': mergedMetadata,
       'created_at': DateTime.now().toIso8601String(),
     };
 
@@ -491,7 +498,11 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
     // Note: trg_on_order_message_inserted automatically updates order_conversations preview
     // and increments unread counters for recipients!
 
-    return OrderConversationMessageModel.fromJson(res);
+    final model = OrderConversationMessageModel.fromJson(res);
+    if (clientMessageId != null && clientMessageId.isNotEmpty) {
+      return model.copyWith(clientMessageId: clientMessageId, sendState: 'sent');
+    }
+    return model;
   }
 
   @override

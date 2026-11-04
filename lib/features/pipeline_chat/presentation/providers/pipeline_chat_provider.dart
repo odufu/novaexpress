@@ -1,17 +1,21 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../domain/entities/order_conversation.dart';
 import '../../domain/entities/order_conversation_message.dart';
+import '../../data/models/order_conversation_message_model.dart';
 import '../../data/services/chat_storage_service.dart';
 import '../../data/datasources/pipeline_chat_remote_datasource.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../../core/services/audio_service.dart';
 import '../../../../core/services/local_storage_service.dart';
+import '../../../../core/providers/network_provider.dart';
 
 final pipelineChatDataSourceProvider = Provider<PipelineChatRemoteDataSource>((ref) {
   return PipelineChatRemoteDataSourceImpl();
@@ -24,6 +28,7 @@ class PipelineChatState {
   final bool isLoading;
   final bool isSending;
   final String? errorMessage;
+  final int pendingOutboxCount;
 
   const PipelineChatState({
     this.activeConversation,
@@ -32,6 +37,7 @@ class PipelineChatState {
     this.isLoading = false,
     this.isSending = false,
     this.errorMessage,
+    this.pendingOutboxCount = 0,
   });
 
   int getUnreadCountForRole(String role) {
@@ -64,6 +70,7 @@ class PipelineChatState {
     bool? isLoading,
     bool? isSending,
     String? errorMessage,
+    int? pendingOutboxCount,
   }) {
     return PipelineChatState(
       activeConversation: activeConversation ?? this.activeConversation,
@@ -72,6 +79,7 @@ class PipelineChatState {
       isLoading: isLoading ?? this.isLoading,
       isSending: isSending ?? this.isSending,
       errorMessage: errorMessage,
+      pendingOutboxCount: pendingOutboxCount ?? this.pendingOutboxCount,
     );
   }
 }
@@ -82,6 +90,8 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
   StreamSubscription<List<OrderConversationMessageEntity>>? _streamSub;
   RealtimeChannel? _globalChatMessagesChannel;
   RealtimeChannel? _conversationsChannel;
+  Timer? _outboxFlushTimer;
+  bool _isFlushingOutbox = false;
 
   PipelineChatNotifier(this._dataSource, this._ref)
       : super(const PipelineChatState()) {
@@ -93,6 +103,23 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         loadScopedConversations(silent: true);
       }
     });
+
+    // Listen for network connectivity to auto-flush outbox queue upon reconnecting
+    _ref.listen<NetworkState>(networkProvider, (previous, next) {
+      if (next.isOnline && (previous?.isOnline == false || previous == null)) {
+        debugPrint('[PIPELINE_CHAT] 🌐 Internet connectivity restored. Initiating automatic outbox sync...');
+        flushOutbox();
+      }
+    });
+
+    // Periodic background sync timer (every 15s) when online
+    if (!const bool.fromEnvironment('flutter.test')) {
+      _outboxFlushTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+        if (mounted && _ref.read(networkProvider).isOnline) {
+          flushOutbox();
+        }
+      });
+    }
 
     // Initial load if already authenticated
     final user = _ref.read(authProvider).user;
@@ -152,6 +179,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
 
   @override
   void dispose() {
+    _outboxFlushTimer?.cancel();
     _streamSub?.cancel();
     _globalChatMessagesChannel?.unsubscribe();
     _conversationsChannel?.unsubscribe();
@@ -245,34 +273,144 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     }
   }
 
-  /// Open or load an order conversation by its Order ID
+  static ChatSenderRole _parseSenderRole(String? roleStr) {
+    final rStr = roleStr?.toLowerCase() ?? '';
+    if (rStr == 'client') return ChatSenderRole.client;
+    if (rStr == 'closer' || rStr == 'client_closer') return ChatSenderRole.closer;
+    if (rStr == 'marketer' || rStr == 'digital_marketer') return ChatSenderRole.marketer;
+    if (rStr == 'dc_manager' || rStr == 'dc') return ChatSenderRole.dcManager;
+    if (rStr == 'delivery_agent' || rStr == 'rider') return ChatSenderRole.deliveryAgent;
+    return ChatSenderRole.system;
+  }
+
+  static String _roleToString(ChatSenderRole role) {
+    switch (role) {
+      case ChatSenderRole.client: return 'client';
+      case ChatSenderRole.closer: return 'closer';
+      case ChatSenderRole.marketer: return 'marketer';
+      case ChatSenderRole.dcManager: return 'dc_manager';
+      case ChatSenderRole.deliveryAgent: return 'delivery_agent';
+      case ChatSenderRole.system: return 'system';
+    }
+  }
+
+  static ChatMessageType _parseMessageType(String? tStr, Map<String, dynamic> meta) {
+    final str = tStr?.toLowerCase() ?? '';
+    switch (str) {
+      case 'status_change': return ChatMessageType.statusChange;
+      case 'rider_assigned': return ChatMessageType.riderAssigned;
+      case 'product_changed': return ChatMessageType.productChanged;
+      case 'ownership_transferred': return ChatMessageType.ownershipTransferred;
+      case 'delivery_completed': return ChatMessageType.deliveryCompleted;
+      case 'delivery_failed': return ChatMessageType.deliveryFailed;
+      case 'rescheduled': return ChatMessageType.rescheduled;
+      case 'voice_note': return ChatMessageType.voiceNote;
+      case 'file_attachment': return ChatMessageType.fileAttachment;
+      case 'image': return ChatMessageType.image;
+      default:
+        if (meta['type'] == 'voice_note' || meta['audio_url'] != null) return ChatMessageType.voiceNote;
+        if (meta['type'] == 'image') return ChatMessageType.image;
+        if (meta['type'] == 'file_attachment') return ChatMessageType.fileAttachment;
+        return ChatMessageType.text;
+    }
+  }
+
+  OrderConversationMessageModel _outboxItemToMessage(Map<String, dynamic> item) {
+    final meta = item['metadata'] is Map
+        ? Map<String, dynamic>.from(item['metadata'] as Map)
+        : <String, dynamic>{};
+    return OrderConversationMessageModel(
+      id: item['client_message_id']?.toString() ?? 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      clientMessageId: item['client_message_id']?.toString(),
+      conversationId: item['conversation_id']?.toString() ?? '',
+      orderId: item['order_id']?.toString() ?? '',
+      senderId: item['sender_id']?.toString(),
+      senderName: item['sender_name']?.toString() ?? 'User',
+      senderAvatarUrl: item['sender_avatar_url']?.toString(),
+      senderRole: _parseSenderRole(item['sender_role']?.toString()),
+      messageType: _parseMessageType(item['message_type']?.toString(), meta),
+      messageBody: item['message_body']?.toString() ?? '',
+      metadata: meta,
+      createdAt: item['created_at'] != null
+          ? DateTime.tryParse(item['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      sendState: item['send_state']?.toString() ?? 'pending',
+    );
+  }
+
+  List<OrderConversationMessageEntity> _mergeServerAndPendingMessages(
+    List<OrderConversationMessageEntity> serverMsgs,
+    List<OrderConversationMessageEntity> pendingMsgs,
+  ) {
+    final result = List<OrderConversationMessageEntity>.from(serverMsgs);
+    for (final pending in pendingMsgs) {
+      final alreadyPresent = serverMsgs.any((s) =>
+          (s.clientMessageId != null && s.clientMessageId == pending.clientMessageId) ||
+          (s.metadata['client_message_id'] != null && s.metadata['client_message_id'] == pending.clientMessageId) ||
+          s.id == pending.id);
+      if (!alreadyPresent) {
+        result.add(pending);
+      }
+    }
+    return result;
+  }
+
+  /// Open or load an order conversation by its Order ID (Offline-first with outbox support)
   Future<void> openOrderConversation(String orderId) async {
     _streamSub?.cancel();
     final localStorage = _ref.read(localStorageServiceProvider);
 
-    // If an existing conversation is already in recentConversations, load cached messages first
-    final existingConv = state.recentConversations.cast<OrderConversationEntity?>().firstWhere(
+    // 1. Check local in-memory recentConversations or localStorage cached conversations
+    OrderConversationEntity? existingConv = state.recentConversations.cast<OrderConversationEntity?>().firstWhere(
           (c) => c?.orderId == orderId,
           orElse: () => null,
         );
 
+    if (existingConv == null) {
+      try {
+        final cachedConvs = await localStorage.getCachedConversations();
+        existingConv = cachedConvs?.cast<OrderConversationEntity?>().firstWhere(
+              (c) => c?.orderId == orderId,
+              orElse: () => null,
+            );
+      } catch (_) {}
+    }
+
+    final convId = existingConv?.id ?? orderId;
+    final cachedMsgs = await localStorage.getCachedConversationMessages(convId) ?? [];
+    final outboxItems = await localStorage.getOutboxMessages(
+      conversationId: existingConv?.id,
+      orderId: orderId,
+    );
+    final pendingModels = outboxItems.map(_outboxItemToMessage).toList();
+    final initialCombined = _mergeServerAndPendingMessages(cachedMsgs, pendingModels);
+
     if (existingConv != null) {
-      final cachedMsgs = await localStorage.getCachedConversationMessages(existingConv.id);
-      if (cachedMsgs != null && cachedMsgs.isNotEmpty) {
-        state = state.copyWith(
-          activeConversation: existingConv,
-          messages: cachedMsgs,
-          isLoading: false,
-        );
-      } else {
-        state = state.copyWith(activeConversation: existingConv, isLoading: true, errorMessage: null);
-      }
+      state = state.copyWith(
+        activeConversation: existingConv,
+        messages: initialCombined,
+        pendingOutboxCount: outboxItems.length,
+        isLoading: false,
+      );
     } else {
-      state = state.copyWith(isLoading: true, errorMessage: null);
+      state = state.copyWith(
+        isLoading: initialCombined.isEmpty,
+        messages: initialCombined,
+        pendingOutboxCount: outboxItems.length,
+        errorMessage: null,
+      );
     }
 
     try {
-      final conv = await _dataSource.getConversationByOrderId(orderId);
+      OrderConversationEntity? conv;
+      try {
+        conv = await _dataSource.getConversationByOrderId(orderId);
+      } catch (netErr) {
+        debugPrint('[PIPELINE_CHAT] ℹ️ Network fetch for conversation $orderId failed (offline mode): $netErr');
+        conv = existingConv;
+      }
+      conv ??= existingConv;
+
       if (conv == null) {
         state = state.copyWith(
           isLoading: false,
@@ -287,7 +425,10 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         final closerId = authUser?.closerId ?? authUser?.id;
         final closerName = authUser?.fullName.trim().toLowerCase();
         final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == authUser?.id);
-        final matchName = closerName != null && closerName.isNotEmpty && conv.closerName != null && conv.closerName!.trim().toLowerCase() == closerName;
+        final matchName = closerName != null &&
+            closerName.isNotEmpty &&
+            conv.closerName != null &&
+            conv.closerName!.trim().toLowerCase() == closerName;
 
         if (!matchId && !matchName) {
           debugPrint('[PIPELINE_CHAT] ⛔ Access Denied: Closer ${authUser?.email} attempted to open conversation for order ${conv.orderNumber} belonging to "${conv.closerName ?? "Unassigned"}"');
@@ -320,14 +461,25 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         }
       }
 
-      final initialMsgs = await _dataSource.fetchMessages(conv.id);
+      List<OrderConversationMessageEntity> remoteMsgs = [];
+      try {
+        remoteMsgs = await _dataSource.fetchMessages(conv.id);
+      } catch (fetchErr) {
+        debugPrint('[PIPELINE_CHAT] ℹ️ Fetch messages failed (using offline cached messages): $fetchErr');
+        remoteMsgs = cachedMsgs;
+      }
+
+      final liveOutbox = await localStorage.getOutboxMessages(conversationId: conv.id);
+      final livePending = liveOutbox.map(_outboxItemToMessage).toList();
+      final finalMerged = _mergeServerAndPendingMessages(remoteMsgs, livePending);
 
       state = state.copyWith(
         activeConversation: conv,
-        messages: initialMsgs,
+        messages: finalMerged,
+        pendingOutboxCount: liveOutbox.length,
         isLoading: false,
       );
-      unawaited(localStorage.cacheConversationMessages(conv.id, initialMsgs));
+      unawaited(localStorage.cacheConversationMessages(conv.id, finalMerged));
 
       // Auto-mark as read for current user role
       if (authUser != null) {
@@ -336,13 +488,17 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
 
       // Start realtime stream
       _streamSub = _dataSource.streamMessages(conv.id).listen(
-        (updatedMsgs) {
+        (updatedMsgs) async {
           // DEFENSIVE SHIELD: If realtime stream emits an empty snapshot while we already have loaded messages,
           // do NOT wipe them out.
           if (updatedMsgs.isEmpty && state.messages.isNotEmpty) {
             debugPrint('[PIPELINE_CHAT] ℹ️ Stream emitted empty list while ${state.messages.length} messages are loaded. Preserving messages.');
             return;
           }
+
+          final latestOutbox = await localStorage.getOutboxMessages(conversationId: conv!.id);
+          final pending = latestOutbox.map(_outboxItemToMessage).toList();
+          final streamMerged = _mergeServerAndPendingMessages(updatedMsgs, pending);
 
           final previousMsgs = state.messages;
           if (previousMsgs.isNotEmpty && updatedMsgs.length > previousMsgs.length) {
@@ -353,14 +509,17 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
               AudioService().playIncomingMessage();
             }
           }
-          state = state.copyWith(messages: updatedMsgs);
-          unawaited(localStorage.cacheConversationMessages(conv.id, updatedMsgs));
+          state = state.copyWith(messages: streamMerged, pendingOutboxCount: latestOutbox.length);
+          unawaited(localStorage.cacheConversationMessages(conv.id, streamMerged));
         },
         onError: (err) {
           // Keep current messages if stream drops
           debugPrint('[PIPELINE_CHAT] ⚠️ Messages stream notice: $err');
         },
       );
+
+      // Trigger automatic outbox flush if online
+      unawaited(flushOutbox(conv.id));
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
@@ -396,12 +555,11 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     } catch (_) {}
   }
 
-  /// Send a text message in the active conversation
+  /// Send a text message in the active conversation (Optimistic + Offline-First Outbox)
   Future<bool> sendTextMessage(String body, {Map<String, dynamic>? metadata}) async {
     final conv = state.activeConversation;
     if (conv == null || body.trim().isEmpty) return false;
 
-    state = state.copyWith(isSending: true);
     try {
       final authState = _ref.read(authProvider);
       final user = authState.user;
@@ -410,50 +568,67 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         final closerId = user?.closerId ?? user?.id;
         final closerName = user?.fullName.trim().toLowerCase();
         final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == user?.id);
-        final matchName = closerName != null && closerName.isNotEmpty && conv.closerName != null && conv.closerName!.trim().toLowerCase() == closerName;
+        final matchName = closerName != null &&
+            closerName.isNotEmpty &&
+            conv.closerName != null &&
+            conv.closerName!.trim().toLowerCase() == closerName;
         if (!matchId && !matchName) {
-          state = state.copyWith(isSending: false, errorMessage: 'Access Restricted: You cannot post in conversations for other orders.');
+          state = state.copyWith(
+              isSending: false,
+              errorMessage: 'Access Restricted: You cannot post in conversations for other orders.');
           return false;
         }
       }
 
-      String senderName = 'User';
-      String? senderId = user?.id;
-      String? senderAvatar = user?.avatarUrl;
-      ChatSenderRole role = ChatSenderRole.system;
+      final sender = _resolveSender(user);
+      final clientMsgId = 'cmsg_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999)}';
 
-      if (user != null) {
-        senderName = user.fullName.trim().isNotEmpty
-            ? user.fullName
-            : (user.email.split('@').first);
-
-        final rStr = user.role.toLowerCase();
-        if (user.isCloser || rStr.contains('closer')) {
-          role = ChatSenderRole.closer;
-        } else if (rStr.contains('marketer')) {
-          role = ChatSenderRole.marketer;
-        } else if (rStr.contains('client')) {
-          role = ChatSenderRole.client;
-        } else if (rStr.contains('dc') || rStr.contains('admin') || rStr.contains('manager') || rStr.contains('operations') || rStr.contains('dispatcher') || user.isDcOperations || user.isDcManager) {
-          role = ChatSenderRole.dcManager;
-        } else if (rStr.contains('agent') || rStr.contains('rider')) {
-          role = ChatSenderRole.deliveryAgent;
-        }
-      }
-
-      await _dataSource.sendMessage(
+      final optimisticMsg = OrderConversationMessageModel(
+        id: clientMsgId,
+        clientMessageId: clientMsgId,
         conversationId: conv.id,
         orderId: conv.orderId,
-        senderId: senderId,
-        senderName: senderName,
-        senderAvatarUrl: senderAvatar,
-        senderRole: role,
+        senderId: sender.senderId,
+        senderName: sender.senderName,
+        senderAvatarUrl: sender.senderAvatar,
+        senderRole: sender.role,
+        messageType: ChatMessageType.text,
         messageBody: body.trim(),
-        metadata: metadata,
+        metadata: Map<String, dynamic>.from(metadata ?? {}),
+        sendState: 'pending',
+        createdAt: DateTime.now(),
       );
 
-      state = state.copyWith(isSending: false);
+      final updatedMessages = [...state.messages, optimisticMsg];
+      state = state.copyWith(
+        messages: updatedMessages,
+        pendingOutboxCount: state.pendingOutboxCount + 1,
+      );
+
+      final outboxItem = {
+        'client_message_id': clientMsgId,
+        'conversation_id': conv.id,
+        'order_id': conv.orderId,
+        'sender_id': sender.senderId,
+        'sender_name': sender.senderName,
+        'sender_avatar_url': sender.senderAvatar,
+        'sender_role': _roleToString(sender.role),
+        'message_type': 'text',
+        'message_body': body.trim(),
+        'metadata': metadata ?? {},
+        'created_at': DateTime.now().toIso8601String(),
+        'send_state': 'pending',
+        'retry_count': 0,
+      };
+
+      final localStorage = _ref.read(localStorageServiceProvider);
+      await localStorage.saveOutboxMessage(outboxItem);
+      await localStorage.cacheConversationMessages(conv.id, updatedMessages);
+
       AudioService().playMessageSent();
+
+      // Trigger async background dispatch
+      unawaited(_dispatchOutboxItem(outboxItem));
       return true;
     } catch (e) {
       state = state.copyWith(isSending: false, errorMessage: e.toString());
@@ -494,7 +669,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     return (senderId: senderId, senderName: senderName, senderAvatar: senderAvatar, role: role);
   }
 
-  /// Send a voice note in active conversation (optimized for speed)
+  /// Send a voice note in active conversation (Optimistic + Offline-First Outbox)
   Future<bool> sendVoiceNote({
     required Uint8List audioBytes,
     required Duration duration,
@@ -504,7 +679,6 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     final conv = state.activeConversation;
     if (conv == null || audioBytes.isEmpty) return false;
 
-    state = state.copyWith(isSending: true);
     try {
       final authState = _ref.read(authProvider);
       final user = authState.user;
@@ -526,14 +700,9 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       }
 
       final sender = _resolveSender(user);
-
-      // 1. Upload audio bytes directly to Supabase Storage
-      final audioUrl = await ChatStorageService.uploadVoiceNote(
-        bytes: audioBytes,
-        conversationId: conv.id,
-        ext: fileExtension,
-        mimeType: mimeType,
-      );
+      final clientMsgId = 'cmsg_vn_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999)}';
+      final base64Media = base64Encode(audioBytes);
+      final localDataUri = 'data:$mimeType;base64,$base64Media';
 
       final seconds = duration.inSeconds;
       final minutes = duration.inMinutes;
@@ -541,7 +710,19 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       final durationStr = '${minutes.toString().padLeft(1, '0')}:${remainingSec.toString().padLeft(2, '0')}';
       final messageBody = '🎤 Voice note ($durationStr)';
 
-      await _dataSource.sendMessage(
+      final meta = {
+        'type': 'voice_note',
+        'local_data_uri': localDataUri,
+        'audio_url': localDataUri,
+        'duration_seconds': seconds,
+        'file_size': audioBytes.length,
+        'mime_type': mimeType,
+        'ext': fileExtension,
+      };
+
+      final optimisticMsg = OrderConversationMessageModel(
+        id: clientMsgId,
+        clientMessageId: clientMsgId,
         conversationId: conv.id,
         orderId: conv.orderId,
         senderId: sender.senderId,
@@ -550,17 +731,42 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         senderRole: sender.role,
         messageType: ChatMessageType.voiceNote,
         messageBody: messageBody,
-        metadata: {
-          'type': 'voice_note',
-          'audio_url': audioUrl,
-          'duration_seconds': seconds,
-          'file_size': audioBytes.length,
-          'mime_type': mimeType,
-        },
+        metadata: meta,
+        sendState: 'pending',
+        createdAt: DateTime.now(),
       );
 
-      state = state.copyWith(isSending: false);
+      final updatedMessages = [...state.messages, optimisticMsg];
+      state = state.copyWith(
+        messages: updatedMessages,
+        pendingOutboxCount: state.pendingOutboxCount + 1,
+      );
+
+      final outboxItem = {
+        'client_message_id': clientMsgId,
+        'conversation_id': conv.id,
+        'order_id': conv.orderId,
+        'sender_id': sender.senderId,
+        'sender_name': sender.senderName,
+        'sender_avatar_url': sender.senderAvatar,
+        'sender_role': _roleToString(sender.role),
+        'message_type': 'voice_note',
+        'message_body': messageBody,
+        'metadata': meta,
+        'base64_media': base64Media,
+        'created_at': DateTime.now().toIso8601String(),
+        'send_state': 'pending',
+        'retry_count': 0,
+      };
+
+      final localStorage = _ref.read(localStorageServiceProvider);
+      await localStorage.saveOutboxMessage(outboxItem);
+      await localStorage.cacheConversationMessages(conv.id, updatedMessages);
+
       AudioService().playMessageSent();
+
+      // Trigger async background dispatch
+      unawaited(_dispatchOutboxItem(outboxItem));
       return true;
     } catch (e) {
       state = state.copyWith(isSending: false, errorMessage: e.toString());
@@ -568,7 +774,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     }
   }
 
-  /// Send a document or image file attachment
+  /// Send a document or image file attachment (Optimistic + Offline-First Outbox)
   Future<bool> sendFileAttachment({
     required Uint8List fileBytes,
     required String fileName,
@@ -580,7 +786,6 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     final conv = state.activeConversation;
     if (conv == null || fileBytes.isEmpty) return false;
 
-    state = state.copyWith(isSending: true);
     try {
       final authState = _ref.read(authProvider);
       final user = authState.user;
@@ -602,27 +807,31 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       }
 
       final sender = _resolveSender(user);
-
-      // 1. Upload file to Supabase Storage
-      final fileUrl = isImage
-          ? await ChatStorageService.uploadImage(
-              bytes: fileBytes,
-              conversationId: conv.id,
-              ext: fileName.split('.').last,
-            )
-          : await ChatStorageService.uploadFileAttachment(
-              bytes: fileBytes,
-              conversationId: conv.id,
-              originalFileName: fileName,
-              mimeType: mimeType,
-            );
+      final clientMsgId = 'cmsg_file_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999)}';
+      final base64Media = base64Encode(fileBytes);
+      final effectiveMime = mimeType ?? (isImage ? 'image/jpeg' : 'application/octet-stream');
+      final localDataUri = 'data:$effectiveMime;base64,$base64Media';
 
       final defaultBody = isImage ? '📷 $fileName' : '📎 $fileName';
       final messageBody = (caption != null && caption.trim().isNotEmpty)
           ? caption.trim()
           : defaultBody;
 
-      await _dataSource.sendMessage(
+      final meta = {
+        'type': isImage ? 'image' : 'file_attachment',
+        'local_data_uri': localDataUri,
+        'file_url': localDataUri,
+        if (isImage) 'image_url': localDataUri,
+        'file_name': fileName,
+        'file_size': fileBytes.length,
+        'mime_type': effectiveMime,
+        if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
+        if (metadata != null) ...metadata,
+      };
+
+      final optimisticMsg = OrderConversationMessageModel(
+        id: clientMsgId,
+        clientMessageId: clientMsgId,
         conversationId: conv.id,
         orderId: conv.orderId,
         senderId: sender.senderId,
@@ -631,24 +840,216 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         senderRole: sender.role,
         messageType: isImage ? ChatMessageType.image : ChatMessageType.fileAttachment,
         messageBody: messageBody,
-        metadata: {
-          'type': isImage ? 'image' : 'file_attachment',
-          'file_url': fileUrl,
-          if (isImage) 'image_url': fileUrl,
-          'file_name': fileName,
-          'file_size': fileBytes.length,
-          if (mimeType != null) 'mime_type': mimeType,
-          if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
-          if (metadata != null) ...metadata,
-        },
+        metadata: meta,
+        sendState: 'pending',
+        createdAt: DateTime.now(),
       );
 
-      state = state.copyWith(isSending: false);
+      final updatedMessages = [...state.messages, optimisticMsg];
+      state = state.copyWith(
+        messages: updatedMessages,
+        pendingOutboxCount: state.pendingOutboxCount + 1,
+      );
+
+      final outboxItem = {
+        'client_message_id': clientMsgId,
+        'conversation_id': conv.id,
+        'order_id': conv.orderId,
+        'sender_id': sender.senderId,
+        'sender_name': sender.senderName,
+        'sender_avatar_url': sender.senderAvatar,
+        'sender_role': _roleToString(sender.role),
+        'message_type': isImage ? 'image' : 'file_attachment',
+        'message_body': messageBody,
+        'metadata': meta,
+        'base64_media': base64Media,
+        'created_at': DateTime.now().toIso8601String(),
+        'send_state': 'pending',
+        'retry_count': 0,
+      };
+
+      final localStorage = _ref.read(localStorageServiceProvider);
+      await localStorage.saveOutboxMessage(outboxItem);
+      await localStorage.cacheConversationMessages(conv.id, updatedMessages);
+
       AudioService().playMessageSent();
+
+      // Trigger async background dispatch
+      unawaited(_dispatchOutboxItem(outboxItem));
       return true;
     } catch (e) {
       state = state.copyWith(isSending: false, errorMessage: e.toString());
       return false;
+    }
+  }
+
+  /// Dispatch an individual outbox item to Supabase Storage & Remote DB
+  Future<bool> _dispatchOutboxItem(Map<String, dynamic> item) async {
+    final clientMsgId = item['client_message_id']?.toString() ?? '';
+    final convId = item['conversation_id']?.toString() ?? '';
+    final orderId = item['order_id']?.toString() ?? '';
+    final localStorage = _ref.read(localStorageServiceProvider);
+
+    final net = _ref.read(networkProvider);
+    if (net.isOffline) {
+      debugPrint('[PIPELINE_CHAT] 📴 Offline: Keeping outbox message $clientMsgId in queue.');
+      return false;
+    }
+
+    try {
+      final base64Media = item['base64_media']?.toString();
+      final meta = item['metadata'] is Map
+          ? Map<String, dynamic>.from(item['metadata'] as Map)
+          : <String, dynamic>{};
+      final msgTypeStr = item['message_type']?.toString() ?? 'text';
+
+      if (base64Media != null && base64Media.isNotEmpty) {
+        final bytes = base64Decode(base64Media);
+        if (msgTypeStr == 'voice_note') {
+          final audioUrl = await ChatStorageService.uploadVoiceNote(
+            bytes: bytes,
+            conversationId: convId,
+            ext: meta['ext']?.toString() ?? 'webm',
+            mimeType: meta['mime_type']?.toString() ?? 'audio/webm',
+          );
+          meta['audio_url'] = audioUrl;
+        } else if (msgTypeStr == 'image') {
+          final imgUrl = await ChatStorageService.uploadImage(
+            bytes: bytes,
+            conversationId: convId,
+            ext: meta['file_name']?.toString().split('.').last ?? 'jpg',
+          );
+          meta['image_url'] = imgUrl;
+          meta['file_url'] = imgUrl;
+        } else if (msgTypeStr == 'file_attachment') {
+          final fileUrl = await ChatStorageService.uploadFileAttachment(
+            bytes: bytes,
+            conversationId: convId,
+            originalFileName: meta['file_name']?.toString() ?? 'attachment',
+            mimeType: meta['mime_type']?.toString(),
+          );
+          meta['file_url'] = fileUrl;
+        }
+      }
+
+      final serverMsg = await _dataSource.sendMessage(
+        conversationId: convId,
+        orderId: orderId,
+        senderId: item['sender_id']?.toString(),
+        senderName: item['sender_name']?.toString() ?? 'User',
+        senderAvatarUrl: item['sender_avatar_url']?.toString(),
+        senderRole: _parseSenderRole(item['sender_role']?.toString()),
+        messageType: _parseMessageType(msgTypeStr, meta),
+        messageBody: item['message_body']?.toString() ?? '',
+        metadata: meta,
+        clientMessageId: clientMsgId,
+      );
+
+      // Remove dispatched item from local outbox queue
+      await localStorage.removeOutboxMessage(clientMsgId);
+
+      // Reconcile and merge into live state
+      if (mounted && state.activeConversation?.id == convId) {
+        final updated = state.messages.map((m) {
+          if (m.clientMessageId == clientMsgId || m.id == clientMsgId) {
+            return serverMsg.copyWith(
+              clientMessageId: clientMsgId,
+              sendState: 'sent',
+              metadata: {
+                ...serverMsg.metadata,
+                if (m.metadata['local_data_uri'] != null)
+                  'local_data_uri': m.metadata['local_data_uri'],
+              },
+            );
+          }
+          return m;
+        }).toList();
+
+        final remaining = await localStorage.getOutboxMessages(conversationId: convId);
+        state = state.copyWith(
+          messages: updated,
+          pendingOutboxCount: remaining.length,
+        );
+        unawaited(localStorage.cacheConversationMessages(convId, updated));
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('[PIPELINE_CHAT] ⚠️ Outbox dispatch failure for $clientMsgId: $e');
+      final retryCount = (item['retry_count'] as num?)?.toInt() ?? 0;
+      final updatedItem = Map<String, dynamic>.from(item)
+        ..['retry_count'] = retryCount + 1
+        ..['last_error'] = e.toString()
+        ..['send_state'] = (retryCount >= 4) ? 'failed' : 'pending';
+
+      await localStorage.saveOutboxMessage(updatedItem);
+
+      if (mounted && state.activeConversation?.id == convId && retryCount >= 4) {
+        final updated = state.messages.map((m) {
+          if (m.clientMessageId == clientMsgId || m.id == clientMsgId) {
+            return m.copyWith(sendState: 'failed');
+          }
+          return m;
+        }).toList();
+        state = state.copyWith(messages: updated);
+      }
+      return false;
+    }
+  }
+
+  /// Flush pending outbox messages in FIFO order (called on reconnect, timer, or manual trigger)
+  Future<void> flushOutbox([String? conversationId]) async {
+    if (_isFlushingOutbox) return;
+    _isFlushingOutbox = true;
+    try {
+      final localStorage = _ref.read(localStorageServiceProvider);
+      final targetConvId = conversationId ?? state.activeConversation?.id;
+      final items = await localStorage.getOutboxMessages(conversationId: targetConvId);
+
+      if (items.isEmpty) {
+        if (mounted) state = state.copyWith(pendingOutboxCount: 0);
+        return;
+      }
+
+      if (mounted) state = state.copyWith(pendingOutboxCount: items.length);
+
+      for (final item in items) {
+        final ok = await _dispatchOutboxItem(item);
+        if (!ok) {
+          // Pause flushing on network disconnection / failure
+          break;
+        }
+      }
+
+      final remaining = await localStorage.getOutboxMessages(conversationId: targetConvId);
+      if (mounted) state = state.copyWith(pendingOutboxCount: remaining.length);
+    } finally {
+      _isFlushingOutbox = false;
+    }
+  }
+
+  /// Retry an individual failed or pending outbox message
+  Future<void> retryOutboxMessage(String clientMessageId) async {
+    final localStorage = _ref.read(localStorageServiceProvider);
+    final items = await localStorage.getOutboxMessages();
+    final item = items.firstWhere(
+      (m) => m['client_message_id']?.toString() == clientMessageId,
+      orElse: () => {},
+    );
+    if (item.isNotEmpty) {
+      item['send_state'] = 'pending';
+      item['retry_count'] = 0;
+      await localStorage.saveOutboxMessage(item);
+      if (mounted) {
+        final updated = state.messages.map((m) {
+          if (m.clientMessageId == clientMessageId || m.id == clientMessageId) {
+            return m.copyWith(sendState: 'pending');
+          }
+          return m;
+        }).toList();
+        state = state.copyWith(messages: updated);
+      }
+      await _dispatchOutboxItem(item);
     }
   }
 

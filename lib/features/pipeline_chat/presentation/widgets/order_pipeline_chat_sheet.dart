@@ -1566,11 +1566,36 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                                   ),
                                 ),
                                 const SizedBox(width: 3),
-                                const Icon(
-                                  Icons.done_all_rounded,
-                                  size: 15,
-                                  color: Color(0xFF53BDEB), // WhatsApp double blue checkmarks
-                                ),
+                                if (msg.isPending) ...[
+                                  Tooltip(
+                                    message: 'Waiting to send • Will sync when online',
+                                    child: Icon(
+                                      Icons.access_time_rounded,
+                                      size: 13,
+                                      color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                                    ),
+                                  ),
+                                ] else if (msg.isFailed) ...[
+                                  Tooltip(
+                                    message: 'Failed to send • Tap to retry',
+                                    child: InkWell(
+                                      onTap: () => ref.read(pipelineChatProvider.notifier).retryOutboxMessage(msg.clientMessageId ?? msg.id),
+                                      child: const Icon(
+                                        Icons.error_outline_rounded,
+                                        size: 14,
+                                        color: Color(0xFFEF4444),
+                                      ),
+                                    ),
+                                  ),
+                                ] else ...[
+                                  Icon(
+                                    Icons.done_all_rounded,
+                                    size: 15,
+                                    color: (msg.readByClient || msg.readByDc || msg.readByRider)
+                                        ? const Color(0xFF53BDEB) // WhatsApp double blue checkmarks
+                                        : (isDark ? const Color(0xFF8696A0) : const Color(0xFF667781)),
+                                  ),
+                                ],
                               ],
                             ),
                           ],
@@ -2002,6 +2027,73 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         });
       }
     });
+  }
+
+
+  Widget _buildOutboxSyncBanner(bool isDark, int count) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFF00A884),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$count ${count == 1 ? "message" : "messages"} queued • Auto-syncing when online',
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () {
+              ref.read(pipelineChatProvider.notifier).flushOutbox(widget.orderId);
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.sync_rounded,
+                    size: 14,
+                    color: isDark ? const Color(0xFF00A884) : const Color(0xFF008069),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    'Sync',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFF00A884) : const Color(0xFF008069),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildReplyingToBanner(bool isDark) {
@@ -2762,6 +2854,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     bool isSending,
     OrderConversationEntity? conv,
   ) {
+    final chatState = ref.watch(pipelineChatProvider);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final hasText = _msgController.text.trim().isNotEmpty;
@@ -2785,6 +2878,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           // WhatsApp Replying To Banner
           if (_replyingToMessage != null)
             _buildReplyingToBanner(isDark),
+
+          // Outbox Sync Banner
+          if (chatState.pendingOutboxCount > 0)
+            _buildOutboxSyncBanner(isDark, chatState.pendingOutboxCount),
 
           // Attachment preview if staged
           if (_stagedAttachment != null)

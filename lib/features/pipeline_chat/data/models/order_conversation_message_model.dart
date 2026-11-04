@@ -16,6 +16,8 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
     super.readByDc,
     super.readByRider,
     required super.createdAt,
+    super.sendState = 'sent',
+    super.clientMessageId,
   });
 
   factory OrderConversationMessageModel.fromJson(Map<String, dynamic> json) {
@@ -85,6 +87,14 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
     final avatar = json['sender_avatar_url']?.toString() ??
         (meta['avatar_url']?.toString());
 
+    final sState = json['send_state']?.toString() ??
+        json['sendState']?.toString() ??
+        'sent';
+
+    final cMsgId = json['client_message_id']?.toString() ??
+        json['clientMessageId']?.toString() ??
+        meta['client_message_id']?.toString();
+
     return OrderConversationMessageModel(
       id: json['id']?.toString() ?? '',
       conversationId: json['conversation_id']?.toString() ?? '',
@@ -102,6 +112,8 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
+      sendState: sState,
+      clientMessageId: cMsgId,
     );
   }
 
@@ -121,6 +133,47 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
       readByDc: entity.readByDc,
       readByRider: entity.readByRider,
       createdAt: entity.createdAt,
+      sendState: entity.sendState,
+      clientMessageId: entity.clientMessageId,
+    );
+  }
+
+  @override
+  OrderConversationMessageModel copyWith({
+    String? id,
+    String? conversationId,
+    String? orderId,
+    String? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
+    ChatSenderRole? senderRole,
+    ChatMessageType? messageType,
+    String? messageBody,
+    Map<String, dynamic>? metadata,
+    bool? readByClient,
+    bool? readByDc,
+    bool? readByRider,
+    DateTime? createdAt,
+    String? sendState,
+    String? clientMessageId,
+  }) {
+    return OrderConversationMessageModel(
+      id: id ?? this.id,
+      conversationId: conversationId ?? this.conversationId,
+      orderId: orderId ?? this.orderId,
+      senderId: senderId ?? this.senderId,
+      senderName: senderName ?? this.senderName,
+      senderAvatarUrl: senderAvatarUrl ?? this.senderAvatarUrl,
+      senderRole: senderRole ?? this.senderRole,
+      messageType: messageType ?? this.messageType,
+      messageBody: messageBody ?? this.messageBody,
+      metadata: metadata ?? this.metadata,
+      readByClient: readByClient ?? this.readByClient,
+      readByDc: readByDc ?? this.readByDc,
+      readByRider: readByRider ?? this.readByRider,
+      createdAt: createdAt ?? this.createdAt,
+      sendState: sendState ?? this.sendState,
+      clientMessageId: clientMessageId ?? this.clientMessageId,
     );
   }
 
@@ -191,6 +244,8 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
       'read_by_dc': readByDc,
       'read_by_rider': readByRider,
       'created_at': createdAt.toIso8601String(),
+      'send_state': sendState,
+      'client_message_id': clientMessageId,
     };
   }
 }

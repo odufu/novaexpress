@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -46,28 +47,46 @@ class ImageViewerModal extends StatelessWidget {
             maxScale: 4.0,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: progress.expectedTotalBytes != null
-                          ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                          : null,
-                      color: const Color(0xFF0284C7),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stack) {
-                  return Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
+              child: imageUrl.startsWith('data:image') || imageUrl.contains('base64,')
+                  ? Builder(builder: (ctx) {
+                      try {
+                        final commaIdx = imageUrl.indexOf(',');
+                        final rawBase64 = commaIdx != -1 ? imageUrl.substring(commaIdx + 1) : imageUrl;
+                        final bytes = base64Decode(rawBase64);
+                        return Image.memory(
+                          bytes,
+                          fit: BoxFit.contain,
+                        );
+                      } catch (_) {
+                        return Container(
+                          padding: const EdgeInsets.all(24),
+                          color: const Color(0xFF1E293B),
+                          child: const Icon(Icons.broken_image_rounded, size: 48, color: Color(0xFF94A3B8)),
+                        );
+                      }
+                    })
+                  : Image.network(
+                      imageUrl,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value: progress.expectedTotalBytes != null
+                                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                : null,
+                            color: const Color(0xFF0284C7),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stack) {
+                        return Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.broken_image_rounded, size: 48, color: Color(0xFFEF4444)),

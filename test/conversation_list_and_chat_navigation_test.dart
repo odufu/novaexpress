@@ -58,6 +58,7 @@ class FakePipelineChatRemoteDataSource implements PipelineChatRemoteDataSource {
     String? senderAvatarUrl,
     ChatMessageType messageType = ChatMessageType.text,
     Map<String, dynamic>? metadata,
+    String? clientMessageId,
   }) async {
     return OrderConversationMessageEntity(
       id: 'msg-1',

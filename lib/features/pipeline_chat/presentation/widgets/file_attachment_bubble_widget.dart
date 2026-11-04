@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -65,36 +66,58 @@ class FileAttachmentBubbleWidget extends StatelessWidget {
                     maxHeight: 220,
                   ),
                   color: isDark ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
-                  child: Image.network(
-                    msg.fileUrl!,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return SizedBox(
-                        height: 150,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value: progress.expectedTotalBytes != null
-                                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                : null,
-                            strokeWidth: 2,
-                            color: isMyMessage ? Colors.white : const Color(0xFF0284C7),
-                          ),
+                  child: msg.fileUrl!.startsWith('data:image') || msg.fileUrl!.contains('base64,')
+                      ? Builder(builder: (ctx) {
+                          try {
+                            final commaIdx = msg.fileUrl!.indexOf(',');
+                            final rawBase64 = commaIdx != -1 ? msg.fileUrl!.substring(commaIdx + 1) : msg.fileUrl!;
+                            final bytes = base64Decode(rawBase64);
+                            return Image.memory(
+                              bytes,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                            );
+                          } catch (_) {
+                            return Container(
+                              height: 120,
+                              width: 200,
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              child: const Center(
+                                child: Icon(Icons.broken_image_rounded, size: 36, color: Color(0xFF94A3B8)),
+                              ),
+                            );
+                          }
+                        })
+                      : Image.network(
+                          msg.fileUrl!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return SizedBox(
+                              height: 150,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  value: progress.expectedTotalBytes != null
+                                      ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                      : null,
+                                  strokeWidth: 2,
+                                  color: isMyMessage ? Colors.white : const Color(0xFF0284C7),
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stack) {
+                            return Container(
+                              height: 120,
+                              width: 200,
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              child: const Center(
+                                child: Icon(Icons.broken_image_rounded, size: 36, color: Color(0xFF94A3B8)),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                    errorBuilder: (context, error, stack) {
-                      return Container(
-                        height: 120,
-                        width: 200,
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                        child: const Center(
-                          child: Icon(Icons.broken_image_rounded, size: 36, color: Color(0xFF94A3B8)),
-                        ),
-                      );
-                    },
-                  ),
                 ),
               ),
 

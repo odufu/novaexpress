@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -114,7 +115,18 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
         if (_playerState == PlayerState.paused) {
           await _player.resume();
         } else {
-          await _player.play(UrlSource(widget.audioUrl));
+          Source source;
+          if (widget.audioUrl.startsWith('data:audio') || widget.audioUrl.contains('base64,')) {
+            final commaIdx = widget.audioUrl.indexOf(',');
+            final rawBase64 = commaIdx != -1 ? widget.audioUrl.substring(commaIdx + 1) : widget.audioUrl;
+            final bytes = base64Decode(rawBase64);
+            source = BytesSource(bytes);
+          } else if (widget.audioUrl.startsWith('http://') || widget.audioUrl.startsWith('https://')) {
+            source = UrlSource(widget.audioUrl);
+          } else {
+            source = DeviceFileSource(widget.audioUrl);
+          }
+          await _player.play(source);
           await _player.setPlaybackRate(_playbackSpeed);
         }
       } catch (e) {

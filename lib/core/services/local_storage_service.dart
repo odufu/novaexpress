@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,6 +91,12 @@ abstract class LocalStorageService {
   Future<void> cacheConversationMessages(String conversationId, List<OrderConversationMessage> messages);
   Future<List<OrderConversationMessage>?> getCachedConversationMessages(String conversationId);
 
+  // Chat Outbox Queue (Offline Sending & Persistent Retry)
+  Future<void> saveOutboxMessage(Map<String, dynamic> outboxMessage);
+  Future<List<Map<String, dynamic>>> getOutboxMessages({String? conversationId, String? orderId});
+  Future<void> removeOutboxMessage(String clientMessageId);
+  Future<void> clearOutboxMessages({String? conversationId});
+
   Future<void> cacheUserProfile(Map<String, dynamic> userJson);
   Future<Map<String, dynamic>?> getCachedUserProfile();
   Future<void> clearUserProfile();
@@ -118,6 +125,7 @@ class LocalStorageServiceImpl implements LocalStorageService {
   static const String _userProfileKey = 'novexps_cache_user_profile';
   static const String _conversationsKey = 'novexps_cache_conversations';
   static const String _chatMessagesPrefix = 'novexps_cache_chat_msgs_';
+  static const String _chatOutboxKey = 'novexps_chat_outbox_queue';
   static const String _notificationsPrefix = 'novexps_cache_notifications_';
   static const String _syncTimePrefix = 'novexps_sync_time_';
 
@@ -767,6 +775,100 @@ class LocalStorageServiceImpl implements LocalStorageService {
     }
     return messages.isNotEmpty ? messages : null;
   }
+
+  // --- Chat Outbox Queue (Offline Sending & Persistent Retry) ---
+
+  Completer<void>? _outboxLockCompleter;
+
+  Future<T> _synchronizedOutbox<T>(Future<T> Function() action) async {
+    while (_outboxLockCompleter != null) {
+      await _outboxLockCompleter!.future;
+    }
+    final completer = Completer<void>();
+    _outboxLockCompleter = completer;
+    try {
+      return await action();
+    } finally {
+      _outboxLockCompleter = null;
+      completer.complete();
+    }
+  }
+
+  @override
+  Future<void> saveOutboxMessage(Map<String, dynamic> outboxMessage) => _synchronizedOutbox(() async {
+    try {
+      final existing = await getJsonList(_chatOutboxKey) ?? [];
+      final cId = outboxMessage['client_message_id']?.toString();
+      final updated = List<Map<String, dynamic>>.from(existing);
+
+      if (cId != null && cId.isNotEmpty) {
+        final idx = updated.indexWhere((m) => m['client_message_id']?.toString() == cId);
+        if (idx != -1) {
+          updated[idx] = outboxMessage;
+        } else {
+          updated.add(outboxMessage);
+        }
+      } else {
+        updated.add(outboxMessage);
+      }
+
+      await saveJsonList(_chatOutboxKey, updated);
+      debugPrint('[LOCAL_STORAGE] 📬 Enqueued chat outbox message (${outboxMessage['client_message_id']}). Total outbox: ${updated.length}');
+    } catch (e) {
+      debugPrint('[LOCAL_STORAGE] ⚠️ Error saving chat outbox message: $e');
+    }
+  });
+
+  @override
+  Future<List<Map<String, dynamic>>> getOutboxMessages({String? conversationId, String? orderId}) => _synchronizedOutbox(() async {
+    try {
+      final list = await getJsonList(_chatOutboxKey);
+      if (list == null || list.isEmpty) return [];
+
+      var result = list;
+      if (conversationId != null && conversationId.isNotEmpty) {
+        result = result.where((m) => m['conversation_id']?.toString() == conversationId).toList();
+      }
+      if (orderId != null && orderId.isNotEmpty) {
+        result = result.where((m) => m['order_id']?.toString() == orderId).toList();
+      }
+      return result;
+    } catch (e) {
+      debugPrint('[LOCAL_STORAGE] ⚠️ Error retrieving chat outbox: $e');
+      return [];
+    }
+  });
+
+  @override
+  Future<void> removeOutboxMessage(String clientMessageId) => _synchronizedOutbox(() async {
+    try {
+      final existing = await getJsonList(_chatOutboxKey);
+      if (existing == null || existing.isEmpty) return;
+
+      final filtered = existing.where((m) => m['client_message_id']?.toString() != clientMessageId).toList();
+      await saveJsonList(_chatOutboxKey, filtered);
+      debugPrint('[LOCAL_STORAGE] ✅ Dispatched & removed outbox message ($clientMessageId). Remaining: ${filtered.length}');
+    } catch (e) {
+      debugPrint('[LOCAL_STORAGE] ⚠️ Error removing outbox message: $e');
+    }
+  });
+
+  @override
+  Future<void> clearOutboxMessages({String? conversationId}) => _synchronizedOutbox(() async {
+    try {
+      if (conversationId == null || conversationId.isEmpty) {
+        await remove(_chatOutboxKey);
+      } else {
+        final existing = await getJsonList(_chatOutboxKey);
+        if (existing != null) {
+          final filtered = existing.where((m) => m['conversation_id']?.toString() != conversationId).toList();
+          await saveJsonList(_chatOutboxKey, filtered);
+        }
+      }
+    } catch (e) {
+      debugPrint('[LOCAL_STORAGE] ⚠️ Error clearing outbox: $e');
+    }
+  });
 
   // --- User Profile ---
 
