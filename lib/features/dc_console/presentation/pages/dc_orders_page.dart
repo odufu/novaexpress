@@ -1422,7 +1422,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
           // Active Ringing Follow-Up Reminder Banner for DC Dispatch Ops
           ActiveFollowUpReminderBanner(
             role: 'dc_operations',
-            dcId: activeDcId,
+            dcId: activeDc.id,
             onViewAllRescheduled: () => setState(() => masterStatus = 'rescheduled'),
           ),
           const SizedBox(height: 10),
