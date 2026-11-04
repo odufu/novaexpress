@@ -178,7 +178,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
   /// Set to true to show Dev Pilot Fast-Login Dropdown during active development.
   /// Set to false for live production builds (app.novaxpressng.com).
-  static const bool _enableDevPilotAccountSelector = true;
+  static const bool _enableDevPilotAccountSelector = false;
 
   @override
   void dispose() {
