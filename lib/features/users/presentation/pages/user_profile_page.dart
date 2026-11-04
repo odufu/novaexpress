@@ -12,6 +12,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../widgets/change_password_modal.dart';
 import '../widgets/edit_profile_modal.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 
 class UserProfilePage extends ConsumerWidget {
   const UserProfilePage({super.key});
@@ -933,12 +934,33 @@ class UserProfilePage extends ConsumerWidget {
                     ),
                     const Divider(height: 1),
                     ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: AppColors.orange.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.music_note_rounded, color: AppColors.orange, size: 20),
+                      ),
+                      title: Text(
+                        'Notification Sounds & Chimes',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: theme.colorScheme.onSurface),
+                      ),
+                      subtitle: Text(
+                        'Select custom ringtones for reminders, orders & chat',
+                        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => NotificationSoundSettingsModal.show(context),
+                    ),
+                    ListTile(
                       leading: Icon(Icons.notifications_outlined, color: theme.colorScheme.onSurface),
                       title: Text('Notification Preferences', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: theme.colorScheme.onSurface)),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => context.push('/notifications'),
                     ),
                     const Divider(height: 1),
+
                     ListTile(
                       leading: Icon(Icons.help_outline_rounded, color: theme.colorScheme.onSurface),
                       title: Text('Help & Field Operations Support', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: theme.colorScheme.onSurface)),

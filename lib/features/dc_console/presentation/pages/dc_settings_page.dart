@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../../domain/entities/dc_finance_settings.dart';
 import '../providers/dc_console_provider.dart';
 
@@ -486,6 +487,19 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                             ),
                           ),
                           const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () => NotificationSoundSettingsModal.show(context),
+                  icon: const Icon(Icons.music_note_rounded, size: 15, color: Color(0xFFEA580C)),
+                  label: Text(
+                    'Sound Alerts',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFFEA580C)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: const BorderSide(color: Color(0xFFEA580C)),
+                  ),
+                ),
                           _buildActiveConfigBadge(),
                         ],
                       ),
@@ -519,6 +533,33 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                   ),
                 ),
                 const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () => NotificationSoundSettingsModal.show(context),
+                  icon: const Icon(Icons.music_note_rounded, size: 15, color: Color(0xFFEA580C)),
+                  label: Text(
+                    'Sound Alerts',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFFEA580C)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: const BorderSide(color: Color(0xFFEA580C)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () => NotificationSoundSettingsModal.show(context),
+                  icon: const Icon(Icons.music_note_rounded, size: 15, color: Color(0xFFEA580C)),
+                  label: Text(
+                    'Sound Alerts',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFFEA580C)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: const BorderSide(color: Color(0xFFEA580C)),
+                  ),
+                ),
                 ElevatedButton.icon(
                   onPressed: () => _saveSettings(isDark),
                   icon: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
@@ -1052,6 +1093,19 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                                 ),
                               ),
                               const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () => NotificationSoundSettingsModal.show(context),
+                  icon: const Icon(Icons.music_note_rounded, size: 15, color: Color(0xFFEA580C)),
+                  label: Text(
+                    'Sound Alerts',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFFEA580C)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: const BorderSide(color: Color(0xFFEA580C)),
+                  ),
+                ),
                               Expanded(
                                 child: _buildSimKpiCard(
                                   label: 'POS FEE',
@@ -1063,6 +1117,19 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                                 ),
                               ),
                               const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () => NotificationSoundSettingsModal.show(context),
+                  icon: const Icon(Icons.music_note_rounded, size: 15, color: Color(0xFFEA580C)),
+                  label: Text(
+                    'Sound Alerts',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFFEA580C)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: const BorderSide(color: Color(0xFFEA580C)),
+                  ),
+                ),
                               Expanded(
                                 child: _buildSimKpiCard(
                                   label: 'RIDER ALLOWANCE',
@@ -1072,6 +1139,19 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                                 ),
                               ),
                               const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () => NotificationSoundSettingsModal.show(context),
+                  icon: const Icon(Icons.music_note_rounded, size: 15, color: Color(0xFFEA580C)),
+                  label: Text(
+                    'Sound Alerts',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFFEA580C)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: const BorderSide(color: Color(0xFFEA580C)),
+                  ),
+                ),
                               Expanded(
                                 child: _buildSimKpiCard(
                                   label: 'NET TO VAULT',
@@ -1305,6 +1385,19 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
               children: [
                 const Icon(Icons.info_rounded, color: Color(0xFF2563EB), size: 18),
                 const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () => NotificationSoundSettingsModal.show(context),
+                  icon: const Icon(Icons.music_note_rounded, size: 15, color: Color(0xFFEA580C)),
+                  label: Text(
+                    'Sound Alerts',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFFEA580C)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: const BorderSide(color: Color(0xFFEA580C)),
+                  ),
+                ),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

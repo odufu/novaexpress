@@ -36,6 +36,7 @@ flutter:
   assets:
     - assets/
     - assets/audio/
+    - assets/audio/notifications/
     - assets/nigeria-state-and-lgas.json
     - assets/images/
     - assets/images/logo/

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/services/signature_storage_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../client_portal/presentation/providers/client_portal_provider.dart';
@@ -479,9 +480,19 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                     ),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.pop(context),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.music_note_rounded, color: AppColors.orange, size: 21),
+                      tooltip: 'Notification Sounds & Chimes',
+                      onPressed: () => NotificationSoundSettingsModal.show(context),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
               ],
             ),

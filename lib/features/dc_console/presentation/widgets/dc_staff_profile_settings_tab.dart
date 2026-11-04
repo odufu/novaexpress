@@ -7,6 +7,7 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../../domain/entities/distribution_center.dart';
 
 class DCStaffProfileSettingsTab extends ConsumerWidget {
@@ -264,6 +265,27 @@ class DCStaffProfileSettingsTab extends ConsumerWidget {
                     ref.read(themeProvider.notifier).toggleTheme();
                   },
                 ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.music_note_rounded, color: accentColor, size: 18),
+                ),
+                title: Text(
+                  'Notification Sounds & Chimes',
+                  style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  'Configure ringing alarms, order alerts & chat chimes',
+                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () => NotificationSoundSettingsModal.show(context),
               ),
               const Divider(height: 1),
               ListTile(

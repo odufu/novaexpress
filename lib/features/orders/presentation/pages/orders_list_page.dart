@@ -17,6 +17,7 @@ import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.da
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
 import '../widgets/active_follow_up_reminder_banner.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 
 final pdaOrdersSelectedTabProvider = StateProvider.autoDispose<String>((ref) => 'All');
 final pdaOrdersSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -274,6 +275,11 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                   ),
                 ),
             ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.music_note_rounded, color: Colors.white, size: 21),
+            tooltip: 'Notification Sounds & Chimes',
+            onPressed: () => NotificationSoundSettingsModal.show(context),
           ),
           GestureDetector(
             onTap: () => context.push('/profile'),

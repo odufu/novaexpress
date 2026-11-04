@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/app_notification.dart';
 import '../providers/notifications_provider.dart';
@@ -82,6 +83,11 @@ class NotificationsPage extends ConsumerWidget {
                 ),
               ),
             ),
+          IconButton(
+            icon: const Icon(Icons.volume_up_rounded, size: 21),
+            tooltip: 'Sound & Alert Preferences',
+            onPressed: () => NotificationSoundSettingsModal.show(context),
+          ),
           const SizedBox(width: 6),
         ],
       ),

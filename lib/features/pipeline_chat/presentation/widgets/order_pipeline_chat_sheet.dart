@@ -12,7 +12,6 @@ import '../../domain/entities/order_conversation.dart';
 import '../../domain/entities/order_conversation_message.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
-import '../../../../core/widgets/app_logo_widget.dart';
 import '../providers/pipeline_chat_provider.dart';
 import 'conversation_list_modal.dart';
 import 'chat_user_profile_card_modal.dart';
@@ -21,6 +20,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../../../core/services/voice_recorder/voice_recorder.dart';
 import 'voice_note_player_widget.dart';
 import 'file_attachment_bubble_widget.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 
 class ChatPickedAttachment {
   final Uint8List bytes;
@@ -1101,6 +1101,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                   _showOrderQuickDetailsModal(context, conv, isDark);
                 } else if (val == 'close') {
                   (widget.onClose ?? () => Navigator.of(context).pop())();
+                } else if (val == 'sounds') {
+                  NotificationSoundSettingsModal.show(context);
                 }
               },
               itemBuilder: (ctx) => [
@@ -1111,6 +1113,16 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                       Icon(Icons.info_outline_rounded, size: 18, color: isDark ? Colors.white : const Color(0xFF111B21)),
                       const SizedBox(width: 10),
                       Text('Order Details', style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF111B21))),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'sounds',
+                  child: Row(
+                    children: [
+                      Icon(Icons.music_note_rounded, size: 18, color: isDark ? Colors.white : const Color(0xFF111B21)),
+                      const SizedBox(width: 10),
+                      Text('Sound Preferences', style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF111B21))),
                     ],
                   ),
                 ),

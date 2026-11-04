@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/services/audio_service.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../client_portal/presentation/widgets/client_confirm_order_modal.dart';
 import '../../../dc_console/presentation/widgets/dc_assign_order_modal.dart';
@@ -119,6 +119,15 @@ class _ActiveFollowUpReminderBannerState
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.music_note_rounded, size: 20, color: Color(0xFFEA580C)),
+                  tooltip: 'Change Ringing Chime',
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    NotificationSoundSettingsModal.show(context);
+                  },
                 ),
               ],
             ),
@@ -312,6 +321,30 @@ class _ActiveFollowUpReminderBannerState
                     },
                   ),
                 ],
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => NotificationSoundSettingsModal.show(context),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEA580C).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFEA580C).withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.music_note_rounded, size: 12, color: Color(0xFFEA580C)),
+                        SizedBox(width: 3),
+                        Text(
+                          'Sound',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFEA580C)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -468,7 +501,6 @@ class _FollowUpStatusSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),

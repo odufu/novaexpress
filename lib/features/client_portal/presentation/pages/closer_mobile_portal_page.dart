@@ -11,6 +11,7 @@ import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/client_closer_payout.dart';
 import '../providers/client_portal_provider.dart';
@@ -2795,6 +2796,14 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                         activeColor: const Color(0xFFF37021),
                         onChanged: (_) => ref.read(themeProvider.notifier).toggleTheme(),
                       ),
+                    ),
+                    Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
+                    ListTile(
+                      leading: const Icon(Icons.music_note_rounded, color: Color(0xFF8B5CF6)),
+                      title: Text('Notification Sounds & Chimes', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      subtitle: Text('Ringing callbacks, order updates & chat chimes', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8))),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => NotificationSoundSettingsModal.show(context),
                     ),
                     Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
                     ListTile(

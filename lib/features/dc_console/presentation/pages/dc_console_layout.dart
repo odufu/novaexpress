@@ -10,6 +10,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../providers/dc_console_provider.dart';
 import '../../domain/entities/distribution_center.dart';
 import 'dc_clients_page.dart';
@@ -735,6 +736,15 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
             ),
             onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
             tooltip: 'Toggle Theme',
+          ),
+
+          // Sound Preferences Button
+          IconButton(
+            padding: EdgeInsets.all(isCompact ? 4 : 8),
+            constraints: isCompact ? const BoxConstraints(minWidth: 32, minHeight: 32) : null,
+            icon: Icon(Icons.music_note_rounded, size: isCompact ? 18 : 20, color: const Color(0xFF64748B)),
+            onPressed: () => NotificationSoundSettingsModal.show(context),
+            tooltip: 'Notification Sounds & Chimes',
           ),
 
           // Notifications Bell with Unread Badge

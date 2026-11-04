@@ -26,6 +26,7 @@ import 'merchant_settlements_mobile_page.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
+import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../notifications/domain/entities/app_notification.dart';
 
@@ -1044,6 +1045,11 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
               ),
           ],
 
+          IconButton(
+            icon: Icon(Icons.music_note_rounded, size: 20, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
+            tooltip: 'Notification Sounds & Chimes',
+            onPressed: () => NotificationSoundSettingsModal.show(context),
+          ),
           const SizedBox(width: 4),
 
           // User Profile Avatar
