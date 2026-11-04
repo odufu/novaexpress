@@ -1655,7 +1655,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
         // Active Ringing Follow-Up Reminder Banner for Closer
         ActiveFollowUpReminderBanner(
           role: 'closer',
-          closerId: user?.closerId ?? user?.id,
+          closerId: closer.id,
           onViewAllRescheduled: () => ref.read(closerOrderStatusFilterProvider.notifier).state = 'rescheduled',
         ),
         const SizedBox(height: 6),
