@@ -31,3 +31,7 @@ with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED, compressle
 zip_size_mb = os.path.getsize(zip_path) / (1024 * 1024)
 print(f"Successfully packaged {count} files ({total_bytes / (1024 * 1024):.2f} MB uncompressed) into {zip_path} ({zip_size_mb:.2f} MB compressed).")
 
+wasm_zip_path = os.path.abspath('novaxpress_app_wasm_cpanel.zip')
+shutil.copy2(zip_path, wasm_zip_path)
+print(f"Also synced to {wasm_zip_path} for Namecheap Stellar guide alignment.")
+
