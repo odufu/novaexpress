@@ -17,6 +17,7 @@ import '../widgets/dc_order_detail_modal.dart';
 import '../widgets/dc_csv_order_import_modal.dart';
 import '../widgets/dc_assign_order_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
+import '../../../orders/presentation/widgets/active_follow_up_reminder_banner.dart';
 import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 import '../../../client_portal/presentation/widgets/pangea_date_range_picker_modal.dart';
 
@@ -1417,6 +1418,14 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
           ),
           ),
           const SizedBox(height: 16),
+
+          // Active Ringing Follow-Up Reminder Banner for DC Dispatch Ops
+          ActiveFollowUpReminderBanner(
+            role: 'dc_operations',
+            dcId: activeDcId,
+            onViewAllRescheduled: () => setState(() => masterStatus = 'rescheduled'),
+          ),
+          const SizedBox(height: 10),
 
           // Quick Status Tab Ribbon (Most Recent sits above table by default)
           _buildQuickStatusTabStrip(

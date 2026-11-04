@@ -23,6 +23,7 @@ import '../widgets/request_upg_modal.dart';
 import '../widgets/closer_create_package_modal.dart';
 import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 import '../../../orders/presentation/widgets/reschedule_callback_modal.dart';
+import '../../../orders/presentation/widgets/active_follow_up_reminder_banner.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
@@ -1651,6 +1652,14 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
           ),
         ],
 
+        // Active Ringing Follow-Up Reminder Banner for Closer
+        ActiveFollowUpReminderBanner(
+          role: 'closer',
+          closerId: user?.closerId ?? user?.id,
+          onViewAllRescheduled: () => ref.read(closerOrderStatusFilterProvider.notifier).state = 'rescheduled',
+        ),
+        const SizedBox(height: 6),
+
         // Order List
         Expanded(
           child: filtered.isEmpty
@@ -1970,7 +1979,56 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
             ),
           ),
 
-          // Action Strip with One-Tap Calling & Chat Followup Buttons
+          // Follow-up reminder timing strip if rescheduled or has follow-up
+                  if (order.isRescheduled || order.hasScheduledFollowUp) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEA580C).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFEA580C).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.alarm_rounded, size: 14, color: Color(0xFFEA580C)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              order.rescheduledDeliveryDate != null
+                                  ? '📅 ${DateFormat('EEE, d MMM • h:mm a').format(order.rescheduledDeliveryDate!)} (${order.followUpTimingLabel})'
+                                  : order.followUpTimingLabel,
+                              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFEA580C)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              FollowUpStatusDialog.show(
+                                context: context,
+                                ref: ref,
+                                order: order,
+                                role: 'closer',
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEA580C),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: const Text('Action', style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  // Action Strip with One-Tap Calling & Chat Followup Buttons
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(

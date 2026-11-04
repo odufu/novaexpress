@@ -246,12 +246,25 @@ void main() {
       expect(order.rescheduledDeliveryDate!.hour, equals(12));
       expect(order.rescheduledDeliveryDate!.minute, equals(0));
 
-      // Snooze reminder by 5 minutes
-      final snoozed = order.copyWith(
+      expect(order.hasScheduledFollowUp, isTrue);
+
+      // Past or due reminder is due
+      final dueOrder = order.copyWith(rescheduledDeliveryDate: now.subtract(const Duration(minutes: 5)));
+      expect(dueOrder.isFollowUpReminderDue, isTrue);
+      expect(dueOrder.followUpTimingLabel.contains('Overdue'), isTrue);
+
+      // Future reminder is not due yet
+      final futureOrder = order.copyWith(rescheduledDeliveryDate: now.add(const Duration(hours: 2)));
+      expect(futureOrder.isFollowUpReminderDue, isFalse);
+      expect(futureOrder.followUpTimingLabel.contains('Due in'), isTrue);
+
+      // Snooze reminder by 5 minutes suppresses due status until snooze expires
+      final snoozed = dueOrder.copyWith(
         reminderSnoozedUntil: now.add(const Duration(minutes: 5)),
       );
       expect(snoozed.reminderSnoozedUntil, isNotNull);
-      expect(snoozed.reminderSnoozedUntil!.isAfter(now), isTrue);
+      expect(snoozed.isFollowUpReminderDue, isFalse); // Suppressed by active snooze!
+      expect(snoozed.followUpTimingLabel.contains('Snoozed'), isTrue);
     });
 
     test('Stage 10 & 11: Not Picking, Call Back over 4 hours urgency', () {

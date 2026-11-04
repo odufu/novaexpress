@@ -88,6 +88,20 @@ class AudioService {
     await _playSound('audio/doorbell.wav');
   }
 
+  /// Play follow-up reminder chime (doorbell.wav)
+  Future<void> playFollowUpReminderChime() async {
+    if (!_soundEnabled || _isTestEnvironment()) return;
+
+    final now = DateTime.now();
+    if (_lastIncomingOrderSound != null &&
+        now.difference(_lastIncomingOrderSound!).inMilliseconds < 2000) {
+      return;
+    }
+    _lastIncomingOrderSound = now;
+
+    await _playSound('audio/doorbell.wav');
+  }
+
   /// Play incoming message sound alert (popup.wav)
   Future<void> playIncomingMessage() async {
     if (!_soundEnabled || _isTestEnvironment()) return;

@@ -234,6 +234,69 @@ class OrderEntity {
     return DateTime.now().difference(refDate).inHours >= 24;
   }
 
+  /// True if an order has a scheduled follow up (rescheduled delivery or call back)
+  bool get hasScheduledFollowUp =>
+      (isRescheduled && rescheduledDeliveryDate != null) ||
+      (isCallBack && rescheduledDeliveryDate != null) ||
+      isCallBackPendingOver4Hours;
+
+  /// True if the scheduled reminder is currently ringing/due and NOT currently snoozed
+  bool get isFollowUpReminderDue {
+    if (isDelivered || isCancelled) return false;
+    if (!hasScheduledFollowUp && !isRescheduled && !isCallBack) return false;
+    final now = DateTime.now();
+
+    // Check if snooze is active
+    if (reminderSnoozedUntil != null && now.isBefore(reminderSnoozedUntil!)) {
+      return false; // Currently snoozed
+    }
+
+    if (rescheduledDeliveryDate != null) {
+      // Due if current time is equal to or past scheduled time, or within 1 minute
+      return now.isAfter(rescheduledDeliveryDate!) ||
+          now.difference(rescheduledDeliveryDate!).inMinutes.abs() <= 1;
+    }
+
+    // Call back pending over 4 hours is also due
+    if (isCallBackPendingOver4Hours) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Relative human-readable follow-up timing label
+  String get followUpTimingLabel {
+    if (rescheduledDeliveryDate == null) {
+      if (isCallBackPendingOver4Hours) return 'Callback Overdue (> 4h)';
+      return 'Pending Action';
+    }
+    final now = DateTime.now();
+    final target = rescheduledDeliveryDate!;
+    final diff = target.difference(now);
+
+    if (reminderSnoozedUntil != null && now.isBefore(reminderSnoozedUntil!)) {
+      final snoozeDiff = reminderSnoozedUntil!.difference(now);
+      return 'Snoozed (\m)';
+    }
+
+    if (diff.isNegative) {
+      final overdueMins = diff.inMinutes.abs();
+      if (overdueMins < 60) {
+        return 'Overdue by \m';
+      } else {
+        final overdueHours = diff.inHours.abs();
+        return 'Overdue by \h';
+      }
+    } else {
+      if (diff.inMinutes < 60) {
+        return 'Due in \m';
+      } else {
+        return 'Due in \h \m';
+      }
+    }
+  }
+
   bool get isDelivered => status.toLowerCase() == 'delivered' || status.toLowerCase() == 'completed';
   bool get isFailed => status.toLowerCase() == 'failed' || status.toLowerCase() == 'failed_attempt' || status.toLowerCase() == 'call_back' || status.toLowerCase() == 'cancelled';
   bool get isCancelled => status.toLowerCase() == 'cancelled';

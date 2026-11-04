@@ -16,6 +16,7 @@ import '../../../notifications/presentation/providers/notifications_provider.dar
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
+import '../widgets/active_follow_up_reminder_banner.dart';
 
 final pdaOrdersSelectedTabProvider = StateProvider.autoDispose<String>((ref) => 'All');
 final pdaOrdersSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -95,6 +96,7 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
     final deliveredCount = allOrders.where((o) => o.status == 'delivered').length;
     final failedCount = allOrders.where((o) => o.status == 'failed' || o.status == 'call_back' || o.status == 'cancelled').length;
     final returnsCount = allOrders.where((o) => o.status == 'returned' || o.status == 'failed' || o.status == 'call_back').length;
+    final rescheduledCount = allOrders.where((o) => o.status == 'rescheduled' || o.hasScheduledFollowUp).length;
 
     // Filter Logic matching PRD
     final filteredOrders = allOrders.where((o) {
@@ -104,6 +106,7 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
       if (selectedTab == 'Delivered' && o.status != 'delivered') return false;
       if (selectedTab == 'Failed' && (o.status != 'failed' && o.status != 'call_back' && o.status != 'cancelled')) return false;
       if (selectedTab == 'Returns' && (o.status != 'returned' && o.status != 'failed' && o.status != 'call_back')) return false;
+      if (selectedTab == 'Rescheduled' && !o.isRescheduled && !o.hasScheduledFollowUp) return false;
 
       // 2. Modal Sheet Filters
       if (filterPaymentType == 'POD' && !o.isPod) return false;
@@ -483,6 +486,15 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Active Ringing Follow-Up Reminder Banner for Rider
+                    ActiveFollowUpReminderBanner(
+                      role: 'rider',
+                      onViewAllRescheduled: () {
+                        ref.read(pdaOrdersSelectedTabProvider.notifier).state = 'Rescheduled';
+                      },
+                    ),
+                    const SizedBox(height: 8),
+
                     // Compact Filter Bar (Status Dropdown + Date Filter Button)
                     Row(
                       children: [
@@ -523,6 +535,7 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                                   _buildStatusDropdownItem('Pending', 'Pending ($assignedCount)', Icons.schedule_rounded, const Color(0xFF60A5FA)),
                                   _buildStatusDropdownItem('In Progress', 'In Progress ($inProgressCount)', Icons.directions_bike_rounded, const Color(0xFFFB923C)),
                                   _buildStatusDropdownItem('Delivered', 'Delivered ($deliveredCount)', Icons.done_all_rounded, const Color(0xFF4ADE80)),
+                                  _buildStatusDropdownItem('Rescheduled', 'Rescheduled ($rescheduledCount)', Icons.event_repeat_rounded, const Color(0xFFEA580C)),
                                   _buildStatusDropdownItem('Failed', 'Failed / Callback ($failedCount)', Icons.cancel_outlined, const Color(0xFFF87171)),
                                   _buildStatusDropdownItem('Returns', 'Returns ($returnsCount)', Icons.assignment_return_rounded, const Color(0xFFA78BFA)),
                                 ],
@@ -1202,6 +1215,34 @@ class _DeliveryOperationalCard extends ConsumerWidget {
         statusLabel = 'FAILED';
         statusIcon = Icons.cancel_outlined;
         break;
+      case 'rescheduled':
+        statusLeftColor = const Color(0xFFF97316); // Bright Orange
+        statusBg = const Color(0xFFFFF7ED);
+        statusTextColor = const Color(0xFFEA580C);
+        statusLabel = 'RESCHEDULED';
+        statusIcon = Icons.event_repeat_rounded;
+        break;
+      case 'dispatch_assigned':
+        statusLeftColor = const Color(0xFF6366F1); // Indigo
+        statusBg = const Color(0xFFEEF2FF);
+        statusTextColor = const Color(0xFF4F46E5);
+        statusLabel = 'ASSIGNED';
+        statusIcon = Icons.assignment_ind_rounded;
+        break;
+      case 'order_accepted':
+        statusLeftColor = const Color(0xFF10B981); // Emerald
+        statusBg = const Color(0xFFDCFCE7);
+        statusTextColor = const Color(0xFF15803D);
+        statusLabel = 'ACCEPTED';
+        statusIcon = Icons.task_alt_rounded;
+        break;
+      case 'not_picking':
+        statusLeftColor = const Color(0xFFEAB308); // Yellow
+        statusBg = const Color(0xFFFEFCE8);
+        statusTextColor = const Color(0xFFA16207);
+        statusLabel = 'NOT PICKING';
+        statusIcon = Icons.phone_missed_rounded;
+        break;
       case 'call_back':
         statusLeftColor = const Color(0xFF8B5CF6); // Purple
         statusBg = const Color(0xFFEDE9FE);
@@ -1447,6 +1488,53 @@ class _DeliveryOperationalCard extends ConsumerWidget {
                                 ],
                               ),
                               const SizedBox(height: 4),
+
+                              if (order.isRescheduled || order.hasScheduledFollowUp) ...[
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEA580C).withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFEA580C).withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.alarm_rounded, size: 12, color: Color(0xFFEA580C)),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          order.rescheduledDeliveryDate != null
+                                              ? '📅 ${DateFormat('EEE, d MMM • h:mm a').format(order.rescheduledDeliveryDate!)} (${order.followUpTimingLabel})'
+                                              : order.followUpTimingLabel,
+                                          style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFEA580C)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      InkWell(
+                                        onTap: () {
+                                          FollowUpStatusDialog.show(
+                                            context: context,
+                                            ref: ref,
+                                            order: order,
+                                            role: 'rider',
+                                          );
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEA580C),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text('Action', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                              ],
 
                               // Product Info
                               Row(

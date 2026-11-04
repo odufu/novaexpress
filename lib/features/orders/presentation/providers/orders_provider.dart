@@ -629,6 +629,47 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     }
   }
 
+  Future<bool> snoozeOrderReminder(String orderId, Duration duration) async {
+    final snoozeUntil = DateTime.now().add(duration);
+    final updatedList = state.orders.map((o) {
+      if (o.id == orderId || o.orderNumber == orderId) {
+        return OrderModel.fromEntity(
+          o.copyWith(reminderSnoozedUntil: snoozeUntil),
+        );
+      }
+      return o;
+    }).toList();
+
+    final sortedList = _sortOrdersByOperationalPriority(updatedList);
+    state = state.copyWith(orders: sortedList);
+    await _storageService.cacheOrders(sortedList, _getScopeKey());
+
+    try {
+      final dbClient = SupabaseConstants.supabaseServiceRoleKey.isNotEmpty
+          ? SupabaseClient(
+              SupabaseConstants.supabaseUrl,
+              SupabaseConstants.supabaseServiceRoleKey,
+              authOptions: const AuthClientOptions(autoRefreshToken: false),
+            )
+          : Supabase.instance.client;
+
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      if (uuidRegex.hasMatch(orderId)) {
+        await dbClient.from(SupabaseConstants.ordersTable).update({
+          'reminder_snoozed_until': snoozeUntil.toIso8601String(),
+        }).eq('id', orderId);
+      } else {
+        await dbClient.from(SupabaseConstants.ordersTable).update({
+          'reminder_snoozed_until': snoozeUntil.toIso8601String(),
+        }).eq('order_number', orderId);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[ORDERS_NOTIFIER] snoozeOrderReminder notice: ');
+      return true;
+    }
+  }
+
   Future<bool> assignOrderToRider({
     required String orderId,
     required String riderId,

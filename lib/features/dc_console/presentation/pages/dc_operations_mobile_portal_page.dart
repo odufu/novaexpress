@@ -20,6 +20,7 @@ import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_staff_profile_settings_tab.dart';
 import '../widgets/dc_audit_logs_tab_view.dart';
+import '../../../orders/presentation/widgets/active_follow_up_reminder_banner.dart';
 import 'dc_expenditures_page.dart';
 
 class DCOperationsMobilePortalPage extends ConsumerStatefulWidget {
@@ -113,11 +114,13 @@ class _DCOperationsMobilePortalPageState
           o.status.toLowerCase() == 'out_for_delivery').toList();
     } else if (_orderStatusFilter == 'delivered') {
       list = list.where((o) => o.status.toLowerCase() == 'delivered').toList();
+    } else if (_orderStatusFilter == 'rescheduled') {
+      list = list.where((o) => o.isRescheduled || o.hasScheduledFollowUp).toList();
     } else if (_orderStatusFilter == 'failed') {
       list = list.where((o) =>
           o.status.toLowerCase() == 'failed' ||
           o.status.toLowerCase() == 'cancelled' ||
-          o.status.toLowerCase() == 'rescheduled').toList();
+          o.status.toLowerCase() == 'call_back').toList();
     }
 
     // 3. Search query
@@ -1291,6 +1294,7 @@ class _DCOperationsMobilePortalPageState
     final deliveredCount = allDcOrders.where((o) => o.status.toLowerCase() == 'delivered').length;
     final failedCount = allDcOrders.where((o) =>
         o.status.toLowerCase() == 'failed' || o.status.toLowerCase() == 'cancelled').length;
+    final rescheduledCount = allDcOrders.where((o) => o.isRescheduled || o.hasScheduledFollowUp).length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 120),
@@ -1354,6 +1358,14 @@ class _DCOperationsMobilePortalPageState
 
         const SizedBox(height: 12),
 
+        // Active Ringing Follow-Up Reminder Banner for DC Dispatch Ops
+        ActiveFollowUpReminderBanner(
+          role: 'dc_operations',
+          dcId: officerDc.id,
+          onViewAllRescheduled: () => setState(() => _orderStatusFilter = 'rescheduled'),
+        ),
+        const SizedBox(height: 8),
+
         // 2. Consolidated Organic KPI & Status Filter Carousel
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1388,6 +1400,14 @@ class _DCOperationsMobilePortalPageState
                 count: deliveredCount,
                 filterKey: 'delivered',
                 color: const Color(0xFF10B981),
+                isDark: isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildOrganicFilterPill(
+                label: 'Rescheduled 📅',
+                count: rescheduledCount,
+                filterKey: 'rescheduled',
+                color: const Color(0xFFEA580C),
                 isDark: isDark,
               ),
               const SizedBox(width: 8),
@@ -1601,6 +1621,51 @@ class _DCOperationsMobilePortalPageState
                     ],
                   ),
 
+                      if (order.isRescheduled || order.hasScheduledFollowUp) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEA580C).withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFEA580C).withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.alarm_rounded, size: 14, color: Color(0xFFEA580C)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  order.rescheduledDeliveryDate != null
+                                      ? '📅 ${DateFormat('EEE, d MMM • h:mm a').format(order.rescheduledDeliveryDate!)} (${order.followUpTimingLabel})'
+                                      : order.followUpTimingLabel,
+                                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFEA580C)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () {
+                                  FollowUpStatusDialog.show(
+                                    context: context,
+                                    ref: ref,
+                                    order: order,
+                                    role: 'dc_operations',
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEA580C),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: const Text('Action', style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 10),
 
                       // Customer Info & Organic Quick Action Pills
