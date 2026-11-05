@@ -9,6 +9,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
 import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../../domain/entities/distribution_center.dart';
+import '../providers/dc_console_provider.dart';
 
 class DCStaffProfileSettingsTab extends ConsumerWidget {
   final String roleBadgeTitle;
@@ -229,6 +230,80 @@ class DCStaffProfileSettingsTab extends ConsumerWidget {
         ),
 
         const SizedBox(height: 16),
+
+        // Availability Card for Operations Officers
+        if (user?.isDcOrdersAdmin == true || user?.role == 'dc_operations' || user?.role == 'dispatcher') ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF151D36) : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final officers = ref.watch(dcConsoleProvider).operationsOfficers;
+                final myOfficer = officers.where((o) => o.id == user?.id || o.email == user?.email).firstOrNull;
+                final isAvailable = myOfficer?.isAvailable ?? user?.isAvailable ?? true;
+
+                return Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: (isAvailable ? const Color(0xFF0D9488) : const Color(0xFFF59E0B)).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        isAvailable ? Icons.assignment_turned_in_rounded : Icons.assignment_late_outlined,
+                        color: isAvailable ? const Color(0xFF0D9488) : const Color(0xFFD97706),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Shift Intake Availability',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isAvailable
+                                ? 'Available to receive auto-assigned DC orders'
+                                : 'Offline / Excluded from receiving orders',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: isAvailable ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: isAvailable,
+                      activeColor: const Color(0xFF0D9488),
+                      onChanged: (val) async {
+                        if (user != null) {
+                          await ref.read(dcConsoleProvider.notifier).toggleOperationsOfficerAvailability(user.id, val);
+                        }
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         // 3. Security, Preferences & Settings Card
         Container(

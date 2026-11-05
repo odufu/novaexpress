@@ -75,7 +75,11 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
     final customDateRange = ref.watch(pdaOrdersCustomDateRangeProvider);
     final customSingleDate = ref.watch(pdaOrdersCustomSingleDateProvider);
 
-    final allOrders = ordersState.orders;
+    final activeAgentId = user?.deliveryAgentId ?? user?.id ?? '';
+    final isRiderRole = user?.isRider == true;
+    final allOrders = isRiderRole
+        ? ordersState.orders.where((o) => (o.deliveryAgentId == activeAgentId || o.assignedAgentId == activeAgentId) && !o.isCancelled).toList()
+        : ordersState.orders;
 
     // Helper to format active date filter label matching Pangea standard
     String getDateFilterLabel() {

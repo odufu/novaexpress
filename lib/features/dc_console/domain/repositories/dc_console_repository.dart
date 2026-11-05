@@ -67,6 +67,7 @@ abstract class DCConsoleRepository {
 
   /// Toggles active status of an operations officer
   Future<void> toggleOperationsOfficerStatus(String officerId, bool isActive);
+  Future<void> toggleOperationsOfficerAvailability(String officerId, bool isAvailable);
 
   /// Deletes an operations officer
   Future<void> deleteOperationsOfficer(String officerId);

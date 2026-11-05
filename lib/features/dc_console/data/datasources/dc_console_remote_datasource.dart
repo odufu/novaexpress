@@ -53,6 +53,7 @@ abstract class DCConsoleRemoteDataSource {
     String role = 'dc_operations',
   });
   Future<void> toggleOperationsOfficerStatus(String officerId, bool isActive);
+  Future<void> toggleOperationsOfficerAvailability(String officerId, bool isAvailable);
   Future<void> deleteOperationsOfficer(String officerId);
   Future<DCFinanceSettings?> fetchFinanceSettings();
   Future<void> updateFinanceSettings(DCFinanceSettings settings);
@@ -593,6 +594,19 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       await adminDb.from('users').update({'is_active': isActive}).eq('id', officerId);
     } catch (e) {
       debugPrint('[DC_DATASOURCE] ⚠️ toggleOperationsOfficerStatus notice ($e)');
+    }
+  }
+
+  @override
+  Future<void> toggleOperationsOfficerAvailability(String officerId, bool isAvailable) async {
+    final adminDb = _getAdminClient();
+    try {
+      await adminDb.from('users').update({
+        'is_available': isAvailable,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', officerId);
+    } catch (e) {
+      debugPrint('[DC_DATASOURCE] ⚠️ toggleOperationsOfficerAvailability notice ($e)');
     }
   }
 

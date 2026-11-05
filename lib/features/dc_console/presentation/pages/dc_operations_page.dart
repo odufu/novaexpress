@@ -475,6 +475,31 @@ Scope: $scope
                   officer: officer,
                   isDark: isDark,
                   dcName: dcState.activeHubName,
+                  onToggleAvailability: (val) async {
+                    await dcNotifier.toggleOperationsOfficerAvailability(officer.id, val);
+                    final currentUser = ref.read(authProvider).user;
+                    final roleTitle = _getRoleTitle(officer.role);
+                    await AuditLoggingService.instance.logAction(
+                      actorId: currentUser?.id ?? currentUser?.authUserId,
+                      actorName: (currentUser != null && (currentUser.firstName.isNotEmpty || currentUser.lastName.isNotEmpty))
+                          ? '${currentUser.firstName} ${currentUser.lastName}'.trim()
+                          : (currentUser?.email ?? 'Distribution Center Supervisor'),
+                      actorEmail: currentUser?.email ?? 'dc.manager@novaxpress.ng',
+                      actorRole: currentUser?.role ?? 'dc_manager',
+                      action: val ? 'ENABLE_DISPATCH_AVAILABILITY' : 'DISABLE_DISPATCH_AVAILABILITY',
+                      resource: 'DISPATCH_ROSTER',
+                      details: '${val ? "Enabled" : "Disabled"} order auto-assignment availability for $roleTitle "${officer.name}" (${officer.staffCode}) at ${dcState.activeHubName}.',
+                      distributionCenterId: dcState.activeHubId,
+                      distributionCenterName: dcState.activeHubName,
+                      metadata: {
+                        'officer_id': officer.id,
+                        'officer_name': officer.name,
+                        'officer_code': officer.staffCode,
+                        'is_available': val,
+                        'role': officer.role,
+                      },
+                    );
+                  },
                   onToggleStatus: (val) async {
                     await dcNotifier.toggleOperationsOfficerStatus(officer.id, val);
                     final currentUser = ref.read(authProvider).user;
@@ -612,6 +637,7 @@ Scope: $scope
     required bool isDark,
     required String dcName,
     required ValueChanged<bool> onToggleStatus,
+    required ValueChanged<bool> onToggleAvailability,
     required VoidCallback onDelete,
   }) {
     return Container(
@@ -697,6 +723,40 @@ Scope: $scope
                           ),
                         ),
                         const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: officer.isAvailable
+                                ? const Color(0xFF0D9488).withValues(alpha: 0.12)
+                                : const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: officer.isAvailable
+                                  ? const Color(0xFF0D9488).withValues(alpha: 0.3)
+                                  : const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                officer.isAvailable ? Icons.check_circle_rounded : Icons.pause_circle_filled_rounded,
+                                size: 10,
+                                color: officer.isAvailable ? const Color(0xFF0D9488) : const Color(0xFFD97706),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                officer.isAvailable ? 'Available' : 'Unavailable',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: officer.isAvailable ? const Color(0xFF0D9488) : const Color(0xFFD97706),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
                         _buildRoleBadge(officer.role),
                       ],
                     ),
@@ -761,10 +821,33 @@ Scope: $scope
                 tooltip: 'Send Login Details via WhatsApp',
                 onPressed: () => _sendViaWhatsApp(officer, dcName),
               ),
-              // Active toggle
+              // Availability toggle (Auto-assignment)
+              Tooltip(
+                message: officer.isAvailable
+                    ? 'Available: Turn OFF to exclude from order auto-assignment'
+                    : 'Unavailable: Turn ON to receive auto-assigned orders',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      officer.isAvailable ? Icons.assignment_turned_in_rounded : Icons.assignment_late_outlined,
+                      size: 16,
+                      color: officer.isAvailable ? const Color(0xFF0D9488) : const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 2),
+                    Switch.adaptive(
+                      value: officer.isAvailable,
+                      activeColor: const Color(0xFF0D9488),
+                      onChanged: onToggleAvailability,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              // Active account toggle
               Switch.adaptive(
                 value: officer.isActive,
-                activeColor: const Color(0xFF0D9488),
+                activeColor: const Color(0xFF10B981),
                 onChanged: onToggleStatus,
               ),
               // Delete

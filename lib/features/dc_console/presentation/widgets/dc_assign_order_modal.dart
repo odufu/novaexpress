@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -139,6 +140,143 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
           backgroundColor: Color(0xFFDC2626),
         ),
       );
+    }
+  }
+
+
+  Future<void> _showDowngradeConfirmDialog(
+    BuildContext context,
+    DCFleetDriver driver,
+    int availableCustodyUnits,
+  ) async {
+    final originalQty = widget.order.quantity > 0 ? widget.order.quantity : 1;
+    final unitPrice = widget.order.totalAmount / originalQty;
+    final newTotal = (unitPrice * availableCustodyUnits).roundToDouble();
+    final newPackageDealName = widget.order.packageDealName != null && widget.order.packageDealName!.isNotEmpty
+        ? '${widget.order.packageDealName} ($availableCustodyUnits Units - Downgraded)'
+        : '${widget.order.productName} ($availableCustodyUnits Units - Downgraded)';
+    final downgradeNote = '[Order Downgraded from $originalQty to $availableCustodyUnits units to match Rider ${driver.name} vehicle stock]';
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.inventory_2_rounded, color: Color(0xFFD97706), size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Downgrade Order Quantity?',
+                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Rider ${driver.name} has only $availableCustodyUnits physical unit(s) of "${widget.order.productName}" in vehicle custody, while this order requested $originalQty unit(s).',
+              style: GoogleFonts.inter(fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Quantity Adjustment:', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                      Text('$originalQty → $availableCustodyUnits unit(s)', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFFD97706))),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Adjusted Price:', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                      Text(
+                        '₦${NumberFormat('#,##0').format(newTotal)}',
+                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Assigned Rider:', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                      Text('${driver.name} (${driver.driverCode})', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel / Keep Looking'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm Downgrade & Dispatch', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isSubmitting = true);
+      final updateSuccess = await ref.read(ordersProvider.notifier).updateOrderDetails(
+        orderId: widget.order.id,
+        updates: {
+          'quantity': availableCustodyUnits,
+          'paid_quantity': availableCustodyUnits,
+          'free_quantity': 0,
+          'total_amount': newTotal,
+          'package_deal_name': newPackageDealName,
+          'delivery_notes': (widget.order.deliveryNotes != null && widget.order.deliveryNotes!.isNotEmpty)
+              ? '${widget.order.deliveryNotes}\n$downgradeNote'
+              : downgradeNote,
+        },
+      );
+
+      if (updateSuccess && mounted) {
+        await _dispatchToRider(driver.id, driver.name, driver.driverCode);
+      } else if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update downgraded order details. Please try again.'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
     }
   }
 
@@ -740,29 +878,55 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: hasSufficientStock
-                                ? () => _dispatchToRider(driver.id, driver.name, driver.driverCode)
-                                : () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          '⚠️ Cannot dispatch: ${driver.name} has insufficient stock in vehicle custody ($availableCustodyUnits available vs ${widget.order.quantity} required).',
-                                        ),
-                                        backgroundColor: const Color(0xFFEF4444),
-                                      ),
-                                    );
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: hasSufficientStock ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          if (!isAvailable)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                              ),
+                              child: const Text('Off-Duty', style: TextStyle(color: Color(0xFFDC2626), fontSize: 11, fontWeight: FontWeight.bold)),
+                            )
+                          else if (hasSufficientStock)
+                            ElevatedButton(
+                              onPressed: () => _dispatchToRider(driver.id, driver.name, driver.driverCode),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2563EB),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text('Dispatch', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
+                            )
+                          else if (availableCustodyUnits > 0)
+                            // Partial stock: Allow order downgrade or re-assignment
+                            ElevatedButton.icon(
+                              onPressed: () => _showDowngradeConfirmDialog(context, driver, availableCustodyUnits),
+                              icon: const Icon(Icons.trending_down_rounded, size: 14, color: Colors.white),
+                              label: Text('Downgrade ($availableCustodyUnits)', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFD97706),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            )
+                          else
+                            ElevatedButton(
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('⚠️ Cannot dispatch: ${driver.name} has no stock in vehicle custody for "${widget.order.productName}".'),
+                                    backgroundColor: const Color(0xFFEF4444),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF94A3B8),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text('No Stock', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                             ),
-                            child: Text(
-                              hasSufficientStock ? 'Dispatch' : 'Low Stock',
-                              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
-                            ),
-                          ),
                         ],
                       ),
                     ),

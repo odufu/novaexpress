@@ -99,6 +99,7 @@ class UserEntity {
       !isDcOperations &&
       !isGeneralAccountant &&
       !isMerchantAccountant;
+  bool get isDeliveryAgent => isRider;
   bool get isPda => isRider && personnelType == 'pda';
   bool get isInHouseRider => isRider && personnelType == 'in_house_rider';
   bool get isSuperAdmin =>

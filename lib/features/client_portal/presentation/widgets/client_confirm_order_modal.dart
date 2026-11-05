@@ -260,16 +260,17 @@ class _ClientConfirmOrderModalState extends ConsumerState<ClientConfirmOrderModa
         Navigator.of(context).pop();
 
         if (_selectedAction == 'confirm') {
-          final dcName = result['distribution_center_name']?.toString() ?? 'Regional DC';
-          final riderName = result['delivery_agent_name']?.toString();
-          final riderCode = result['delivery_agent_code']?.toString() ?? 'PDA';
-          final isMain = result['is_main_dc'] == true;
+          final dcName = result['distribution_center_name']?.toString() ?? handlingDc?.name ?? 'Regional DC';
+          final isMain = result['is_main_dc'] == true || (handlingDc != null && (handlingDc.isMainDc || handlingDc.isGrandDc));
 
-          final message = riderName != null && riderName.isNotEmpty
-              ? '✅ Order #${widget.order.orderNumber} confirmed! Auto-assigned to Rider $riderName ($riderCode) at $dcName.'
-              : isMain
-                  ? '🚨 Order #${widget.order.orderNumber} confirmed! Out of regional coverage → Auto-routed to Main DC ($dcName).'
-                  : '✅ Order #${widget.order.orderNumber} confirmed! Routed to $dcName (handling $_selectedLga).';
+          // Trigger automatic even distribution to available Dispatch Ops at handling DC
+          if (handlingDc != null) {
+            ref.read(ordersProvider.notifier).distributeDcOrdersToAvailableOps(dcId: handlingDc.id);
+          }
+
+          final message = isMain
+              ? '🚨 Order #${widget.order.orderNumber} confirmed! Routed to Main DC ($dcName) for Dispatch Ops intake & verification.'
+              : '✅ Order #${widget.order.orderNumber} confirmed! Routed to $dcName for Dispatch Ops intake & verification.';
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -292,12 +293,21 @@ class _ClientConfirmOrderModalState extends ConsumerState<ClientConfirmOrderModa
             ),
           );
         } else if (_selectedAction == 'reschedule') {
+          // Strictly tag reschedule to Closer's account
+          ref.read(ordersProvider.notifier).updateOrder(widget.order.copyWith(
+            status: 'rescheduled',
+                        rescheduledDeliveryDate: _scheduledCallbackDate,
+            rescheduledByUserId: closerId,
+            rescheduledByRole: 'closer',
+            clearReminderSnooze: true,
+          ));
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               backgroundColor: const Color(0xFF3B82F6),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              content: Text('📅 Order #${widget.order.orderNumber} scheduled for call back / follow-up.'),
+              content: Text('📅 Order #${widget.order.orderNumber} scheduled for follow-up callback (Closer account isolated).'),
             ),
           );
         } else if (_selectedAction == 'cancel') {

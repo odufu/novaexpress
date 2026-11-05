@@ -1,3 +1,4 @@
+import '../../../orders/presentation/widgets/reschedule_callback_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,8 +34,9 @@ class DCOperationsMobilePortalPage extends ConsumerStatefulWidget {
 
 class _DCOperationsMobilePortalPageState
     extends ConsumerState<DCOperationsMobilePortalPage> {
-  int _activeTab = 0; // 0: Live Orders, 1: Riders & Fleet, 2: Activity Logs, 3: Station & Profile
+  int _activeTab = 0; // 0: Live Orders, 1: Riders & Fleet, 2: Pipeline Chat, 3: Station & Profile
   String _orderStatusFilter = 'all'; // 'all', 'pending', 'in_transit', 'delivered', 'failed'
+  bool _showOnlyMyQueue = false; // Toggle between 'My Assigned Queue' vs 'All Station Orders'
   final _orderSearchController = TextEditingController();
   final _riderSearchController = TextEditingController();
 
@@ -98,6 +100,18 @@ class _DCOperationsMobilePortalPageState
         allDcs: dcState.distributionCenters,
       );
     }).toList();
+
+    // 1b. Filter by Officer's Intake Queue if toggled
+    if (_showOnlyMyQueue) {
+      final user = ref.watch(authProvider).user;
+      if (user != null) {
+        final myId = user.id;
+        list = list.where((o) =>
+            o.logisticsRepId == myId ||
+            o.assignedDispatcherId == myId ||
+            o.rescheduledByUserId == myId).toList();
+      }
+    }
 
     // 2. Status filter
     if (_orderStatusFilter == 'pending') {
@@ -1200,7 +1214,7 @@ class _DCOperationsMobilePortalPageState
           ],
         ),
       ),
-      floatingActionButton: const PipelineChatFloatingActionButton(),
+      floatingActionButton: null,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF031632) : Colors.white,
@@ -1233,8 +1247,8 @@ class _DCOperationsMobilePortalPageState
                 label: 'Riders & Fleet',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.manage_history_rounded),
-                label: 'Activity Logs',
+                icon: Icon(Icons.forum_rounded),
+                label: 'Chat',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline_rounded),
@@ -1259,7 +1273,7 @@ class _DCOperationsMobilePortalPageState
       case 1:
         return _buildRidersFleetTab(officerDc, isDark);
       case 2:
-        return _buildActivityLogsTab(officerDc, isDark);
+        return const ConversationListModal();
       case 3:
         return _buildStationProfileTab(officerDc, isDark);
       default:
@@ -1296,9 +1310,116 @@ class _DCOperationsMobilePortalPageState
         o.status.toLowerCase() == 'failed' || o.status.toLowerCase() == 'cancelled').length;
     final rescheduledCount = allDcOrders.where((o) => o.isRescheduled || o.hasScheduledFollowUp).length;
 
+    final authUser = ref.watch(authProvider).user;
+    final myAssignedCount = allDcOrders.where((o) =>
+        o.logisticsRepId == authUser?.id ||
+        o.assignedDispatcherId == authUser?.id ||
+        o.rescheduledByUserId == authUser?.id).length;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 120),
       children: [
+        // 0. Segmented Queue Scope Toggle: My Intake Queue vs All Station Orders
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _showOnlyMyQueue = true),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _showOnlyMyQueue
+                          ? const Color(0xFF0D9488)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: _showOnlyMyQueue
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF0D9488).withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.assignment_ind_rounded,
+                          size: 15,
+                          color: _showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'My Intake Queue ($myAssignedCount)',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _showOnlyMyQueue = false),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: !_showOnlyMyQueue
+                          ? const Color(0xFF0D9488)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: !_showOnlyMyQueue
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF0D9488).withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.hub_rounded,
+                          size: 15,
+                          color: !_showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'All DC Orders (${allDcOrders.length})',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: !_showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // 1. Organic Free Search Bar (Borderless Pill)
         Container(
           decoration: BoxDecoration(
@@ -1543,6 +1664,261 @@ class _DCOperationsMobilePortalPageState
             ),
           ],
         ),
+      ),
+    );
+  }
+
+
+  Widget _buildCallOutcomeChip({
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleCallOutcome(OrderEntity order, String outcome, String defaultNote) async {
+    final success = await ref.read(ordersProvider.notifier).recordDispatchCallOutcome(
+      orderId: order.id,
+      outcome: outcome,
+      notes: defaultNote,
+    );
+    if (mounted && success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF334155),
+          behavior: SnackBarBehavior.floating,
+          content: Text('Order #${order.orderNumber} status updated to ${outcome.replaceAll('_', ' ')}.'),
+        ),
+      );
+    }
+  }
+
+  void _handleRescheduleCall(OrderEntity order) {
+    final user = ref.read(authProvider).user;
+    final userId = user?.id ?? '';
+    RescheduleCallbackModal.show(
+      context: context,
+      orderId: order.id,
+      customerName: order.customerName,
+      onRescheduleConfirmed: (scheduledTime, note) async {
+        final success = await ref.read(ordersProvider.notifier).recordDispatchCallOutcome(
+          orderId: order.id,
+          outcome: 'rescheduled',
+          notes: note,
+          rescheduledDate: scheduledTime,
+          rescheduledByUserId: userId,
+          rescheduledByRole: 'dc_operations',
+        );
+        if (mounted && success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFFEA580C),
+              behavior: SnackBarBehavior.floating,
+              content: Text(
+                '📅 Order #${order.orderNumber} rescheduled for ${DateFormat('EEE, d MMM - h:mm a').format(scheduledTime)} (Your account reminder set).',
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _handleDeclineOrder(OrderEntity order) async {
+    final reasonController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: const Text('Customer Declined Order', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Reason for declining / rejection:', style: TextStyle(fontSize: 12.5)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Customer cancelled / unavailable / changed mind',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm Decline', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final reason = reasonController.text.trim().isNotEmpty
+          ? reasonController.text.trim()
+          : 'Customer declined order upon dispatch verification call.';
+      await ref.read(ordersProvider.notifier).recordDispatchCallOutcome(
+        orderId: order.id,
+        outcome: 'declined',
+        notes: reason,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFDC2626),
+            content: Text('Order #${order.orderNumber} marked as declined.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildPreCallVerificationPanel(OrderEntity order, DistributionCenter officerDc, bool isDark) {
+    final user = ref.read(authProvider).user;
+    final isMyAssignedOrder = user != null &&
+        (order.logisticsRepId == user.id || order.assignedDispatcherId == user.id);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isMyAssignedOrder
+              ? const Color(0xFF3B82F6).withValues(alpha: 0.4)
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2563EB), size: 16),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Customer Pre-Call Verification',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      isMyAssignedOrder
+                          ? '📋 In your Intake Queue • Call customer to verify before rider assignment'
+                          : 'Call customer to verify before rider assignment',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: isMyAssignedOrder ? FontWeight.bold : FontWeight.normal,
+                        color: isMyAssignedOrder ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (order.customerPhone.isNotEmpty)
+                ElevatedButton.icon(
+                  onPressed: () => _makeCall(order.customerPhone),
+                  icon: const Icon(Icons.call_rounded, size: 13, color: Colors.white),
+                  label: const Text('Call', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Call Outcome Actions:',
+            style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _buildCallOutcomeChip(
+                label: '📵 Not Reachable',
+                color: const Color(0xFF64748B),
+                onTap: () => _handleCallOutcome(order, 'not_reachable', 'Customer phone unreachable during dispatch check.'),
+              ),
+              _buildCallOutcomeChip(
+                label: '🔇 Not Picking',
+                color: const Color(0xFFD97706),
+                onTap: () => _handleCallOutcome(order, 'not_picking', 'Customer not answering phone call during dispatch check.'),
+              ),
+              _buildCallOutcomeChip(
+                label: '📴 Switched Off',
+                color: const Color(0xFF9333EA),
+                onTap: () => _handleCallOutcome(order, 'switched_off', 'Customer phone switched off.'),
+              ),
+              _buildCallOutcomeChip(
+                label: '📅 Reschedule Call',
+                color: const Color(0xFFEA580C),
+                onTap: () => _handleRescheduleCall(order),
+              ),
+              _buildCallOutcomeChip(
+                label: '❌ Declined',
+                color: const Color(0xFFDC2626),
+                onTap: () => _handleDeclineOrder(order),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _showDispatchSheet(order, officerDc),
+              icon: const Icon(Icons.two_wheeler_rounded, size: 16, color: Colors.white),
+              label: const Text('Customer Confirmed → Dispatch to Rider', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1816,49 +2192,54 @@ class _DCOperationsMobilePortalPageState
 
                       const SizedBox(height: 10),
 
-                      // Rider Custody / Unassigned Status Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
-                        decoration: BoxDecoration(
-                          color: isAssigned
-                              ? const Color(0xFF3B82F6).withValues(alpha: 0.08)
-                              : const Color(0xFFF59E0B).withValues(alpha: 0.09),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isAssigned ? Icons.two_wheeler_rounded : Icons.pending_actions_rounded,
-                              size: 15,
-                              color: isAssigned ? const Color(0xFF3B82F6) : const Color(0xFFD97706),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                isAssigned
-                                    ? 'Assigned Rider: ${order.deliveryAgentName} (${order.deliveryAgentCode ?? ''})'
-                                    : 'Unassigned • Requires Dispatch to Available Rider',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: isAssigned ? const Color(0xFF2563EB) : const Color(0xFFD97706),
+                      // Pre-Call Verification Panel for unassigned orders vs Assigned Rider Status
+                      if (!isAssigned && !isDelivered) ...[
+                        _buildPreCallVerificationPanel(order, officerDc, isDark),
+                        const SizedBox(height: 10),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
+                          decoration: BoxDecoration(
+                            color: isAssigned
+                                ? const Color(0xFF3B82F6).withValues(alpha: 0.08)
+                                : const Color(0xFFF59E0B).withValues(alpha: 0.09),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isAssigned ? Icons.two_wheeler_rounded : Icons.pending_actions_rounded,
+                                size: 15,
+                                color: isAssigned ? const Color(0xFF3B82F6) : const Color(0xFFD97706),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  isAssigned
+                                      ? 'Assigned Rider: ${order.deliveryAgentName} (${order.deliveryAgentCode ?? ''})'
+                                      : 'Unassigned • Requires Verification & Rider Dispatch',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isAssigned ? const Color(0xFF2563EB) : const Color(0xFFD97706),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 12),
+                      ],
 
-                      const SizedBox(height: 12),
-
-                      // Action Buttons: Dispatch, Reroute, Pipeline Chat
+                      // Action Buttons: Reassign, Reroute, Pipeline Chat
                       Row(
                         children: [
-                          // Primary Dispatch Action
-                          Expanded(
-                            flex: 3,
-                            child: InkWell(
-                              onTap: isDelivered ? null : () => _showDispatchSheet(order, officerDc),
+                          if (isAssigned) ...[
+                            // Reassign Action
+                            Expanded(
+                              flex: 3,
+                              child: InkWell(
+                                onTap: isDelivered ? null : () => _showDispatchSheet(order, officerDc),
                               borderRadius: BorderRadius.circular(14),
                               child: Container(
                                 height: 38,
@@ -1902,8 +2283,8 @@ class _DCOperationsMobilePortalPageState
                               ),
                             ),
                           ),
-
                           const SizedBox(width: 8),
+                          ],
 
                           // Reroute DC Action
                           Expanded(

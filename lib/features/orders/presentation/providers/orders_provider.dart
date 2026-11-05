@@ -1,3 +1,4 @@
+import '../../../dc_console/domain/services/dc_order_distribution_service.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -209,7 +210,13 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
   List<OrderEntity> _filterOrdersForCurrentScope(List<OrderEntity> rawOrders, [String? targetDcId]) {
     if (_isRiderUser()) {
-      return rawOrders;
+      final activeAgentId = _getActiveAgentId();
+      if (activeAgentId.isEmpty) return [];
+      return rawOrders.where((order) {
+        final matchesAgent = order.deliveryAgentId == activeAgentId ||
+            order.assignedAgentId == activeAgentId;
+        return matchesAgent && !order.isCancelled;
+      }).toList();
     }
     final (currentDc, allDcs) = _resolveDcContext(targetDcId);
     return rawOrders.where((order) {
@@ -441,9 +448,219 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
       state = state.copyWith(isLoading: false, orders: orderEntities);
       await _storageService.cacheOrders(orderEntities, scopeKey);
+      // Auto-distribute unassigned incoming DC orders to available on-duty Dispatch Ops
+      await distributeDcOrdersToAvailableOps(dcId: targetDcId);
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, errorMessage: 'Failed to load DC orders: $e');
+    }
+  }
+
+
+  /// Evenly distributes any unassigned incoming orders for [dcId]
+  /// to available, on-duty Dispatch Operations officers.
+  Future<void> distributeDcOrdersToAvailableOps({String? dcId}) async {
+    if (_ref == null) return;
+    try {
+      final targetDc = _getActiveDcId(dcId);
+      final dcState = _ref.read(dcConsoleProvider);
+      final officers = dcState.operationsOfficers;
+      if (officers.isEmpty) return;
+
+      // Unassigned intake orders (no rider, no dispatcher assigned)
+      final unassignedOrders = state.orders.where((o) {
+        if (o.isDelivered || o.isCancelled) return false;
+        final hasRider = o.deliveryAgentId != null && o.deliveryAgentId!.isNotEmpty;
+        if (hasRider) return false;
+        final hasDispatcher = (o.logisticsRepId != null && o.logisticsRepId!.isNotEmpty) ||
+            (o.assignedDispatcherId != null && o.assignedDispatcherId!.isNotEmpty);
+        return !hasDispatcher;
+      }).toList();
+
+      if (unassignedOrders.isEmpty) return;
+
+      SupabaseClient? dbClient;
+      try {
+        dbClient = SupabaseClient(
+          SupabaseConstants.supabaseUrl,
+          SupabaseConstants.supabaseServiceRoleKey,
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        );
+      } catch (_) {}
+
+      final updatedOrders = [...state.orders];
+      bool anyAssigned = false;
+
+      for (final order in unassignedOrders) {
+        final assignedOfficer = DCOrderDistributionService.findNextAvailableDispatchOps(
+          dcId: targetDc,
+          officers: officers,
+          orders: updatedOrders,
+        );
+
+        if (assignedOfficer != null) {
+          anyAssigned = true;
+          final idx = updatedOrders.indexWhere((o) => o.id == order.id);
+          if (idx != -1) {
+            updatedOrders[idx] = updatedOrders[idx].copyWith(
+              logisticsRepId: assignedOfficer.id,
+              status: (updatedOrders[idx].status == 'new' || updatedOrders[idx].status == 'unconfirmed')
+                  ? 'pending_dispatch'
+                  : updatedOrders[idx].status,
+            );
+          }
+
+          if (dbClient != null) {
+            try {
+              await dbClient.from('orders').update({
+                'logistics_rep_id': assignedOfficer.id,
+                'status': 'pending_dispatch',
+                'updated_at': DateTime.now().toIso8601String(),
+              }).eq('id', order.id);
+
+              await dbClient.from('notifications').insert({
+                'user_id': assignedOfficer.id,
+                'category': 'order_intake',
+                'title': 'New Order in your Intake Queue! 📋',
+                'message': 'Order #${order.orderNumber} for ${order.customerName} assigned to you. Call customer to verify before dispatching.',
+                'action_route': '/dc-operations',
+                'is_read': false,
+                'created_at': DateTime.now().toIso8601String(),
+              });
+            } catch (e) {
+              debugPrint('[ORDERS_NOTIFIER] distribute order db notice: $e');
+            }
+          }
+        }
+      }
+
+      if (anyAssigned && mounted) {
+        state = state.copyWith(orders: updatedOrders);
+        await _storageService.cacheOrders(updatedOrders, _getScopeKey(targetDc));
+      }
+    } catch (e) {
+      debugPrint('[ORDERS_NOTIFIER] distributeDcOrdersToAvailableOps notice: $e');
+    }
+  }
+
+  /// Manually or programmatically assign an order to a specific Dispatch Ops officer
+  Future<bool> assignOrderToDispatchOps({
+    required String orderId,
+    required String officerId,
+    required String officerName,
+  }) async {
+    try {
+      SupabaseClient? dbClient;
+      try {
+        dbClient = SupabaseClient(
+          SupabaseConstants.supabaseUrl,
+          SupabaseConstants.supabaseServiceRoleKey,
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        );
+      } catch (_) {}
+
+      if (dbClient != null) {
+        await dbClient.from('orders').update({
+          'logistics_rep_id': officerId,
+          'status': 'pending_dispatch',
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', orderId);
+      }
+
+      final updatedOrders = state.orders.map<OrderEntity>((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return o.copyWith(
+            logisticsRepId: officerId,
+            status: 'pending_dispatch',
+          );
+        }
+        return o;
+      }).toList();
+
+      state = state.copyWith(orders: updatedOrders);
+      final dcId = _getActiveDcId();
+      await _storageService.cacheOrders(updatedOrders, _getScopeKey(dcId));
+      return true;
+    } catch (e) {
+      debugPrint('[ORDERS_NOTIFIER] assignOrderToDispatchOps error: $e');
+      return false;
+    }
+  }
+
+  /// Records the outcome of a customer call by Dispatch Ops
+  /// Outcomes: 'not_reachable', 'not_picking', 'switched_off', 'declined', 'rescheduled'
+  Future<bool> recordDispatchCallOutcome({
+    required String orderId,
+    required String outcome,
+    String? notes,
+    DateTime? rescheduledDate,
+    String? rescheduledByUserId,
+    String? rescheduledByRole,
+  }) async {
+    try {
+      SupabaseClient? dbClient;
+      try {
+        dbClient = SupabaseClient(
+          SupabaseConstants.supabaseUrl,
+          SupabaseConstants.supabaseServiceRoleKey,
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        );
+      } catch (_) {}
+
+      final timestamp = DateTime.now().toIso8601String();
+      final callLog = '[Dispatch Call - ${outcome.toUpperCase().replaceAll('_', ' ')}]: ${notes ?? 'Call attempted before rider assignment.'} ($timestamp)';
+
+      final updatePayload = <String, dynamic>{
+        'status': outcome,
+        'updated_at': timestamp,
+      };
+
+      if (notes != null && notes.isNotEmpty) {
+        updatePayload['reschedule_note'] = notes;
+      }
+      if (rescheduledDate != null) {
+        updatePayload['scheduled_callback_at'] = rescheduledDate.toIso8601String();
+        updatePayload['scheduled_delivery_date'] = rescheduledDate.toIso8601String();
+        updatePayload['reminder_snoozed_until'] = null;
+      }
+      if (rescheduledByUserId != null) {
+        updatePayload['rescheduled_by_user_id'] = rescheduledByUserId;
+      }
+      if (rescheduledByRole != null) {
+        updatePayload['rescheduled_by_role'] = rescheduledByRole;
+      }
+
+      if (dbClient != null) {
+        try {
+          await dbClient.from('orders').update(updatePayload).eq('id', orderId);
+        } catch (dbErr) {
+          debugPrint('[ORDERS_NOTIFIER] recordDispatchCallOutcome db notice: $dbErr');
+        }
+      }
+
+      final updatedOrders = state.orders.map<OrderEntity>((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          final existingNotes = o.deliveryNotes ?? '';
+          final combinedNotes = existingNotes.isEmpty ? callLog : '$existingNotes\n$callLog';
+          return o.copyWith(
+            status: outcome,
+            deliveryNotes: combinedNotes,
+            rescheduledDeliveryDate: rescheduledDate ?? o.rescheduledDeliveryDate,
+            rescheduledByUserId: rescheduledByUserId ?? o.rescheduledByUserId,
+            rescheduledByRole: rescheduledByRole ?? o.rescheduledByRole,
+            clearReminderSnooze: rescheduledDate != null,
+          );
+        }
+        return o;
+      }).toList();
+
+      state = state.copyWith(orders: updatedOrders);
+      final dcId = _getActiveDcId();
+      await _storageService.cacheOrders(updatedOrders, _getScopeKey(dcId));
+      return true;
+    } catch (e) {
+      debugPrint('[ORDERS_NOTIFIER] recordDispatchCallOutcome error: $e');
+      return false;
     }
   }
 
@@ -505,7 +722,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         return false;
       }
 
-      final updatedOrders = state.orders.map((o) {
+      final updatedOrders = state.orders.map<OrderEntity>((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
           return o.copyWith(
             customerName: updates['customer_name']?.toString() ?? o.customerName,
@@ -743,6 +960,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         }
       }
 
+      final isRiderUser = _isRiderUser();
+      final activeAgentId = _getActiveAgentId();
+
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
           return OrderModel.fromEntity(
@@ -759,6 +979,12 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
           );
         }
         return o;
+      }).where((o) {
+        // Drop reassigned order from previous rider's list immediately
+        if (isRiderUser && activeAgentId.isNotEmpty) {
+          return o.deliveryAgentId == activeAgentId || o.assignedAgentId == activeAgentId;
+        }
+        return true;
       }).toList();
 
       final sortedList = _sortOrdersByOperationalPriority(updatedList);

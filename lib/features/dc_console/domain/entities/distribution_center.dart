@@ -88,6 +88,7 @@ class DistributionCenter {
   }
 
   bool get isGrand => isGrandDc;
+  bool get isMainDc => isGrandDc || isHub;
   bool get isHubDc => isHub && !isGrandDc;
   bool get isGeneralDc => !isGrandDc && !isHub;
   bool get isPrimaryHub => isHub || isGrandDc;

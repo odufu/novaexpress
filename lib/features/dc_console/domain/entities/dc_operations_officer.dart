@@ -10,6 +10,7 @@ class DCOperationsOfficer {
   final String distributionCenterName;
   final String role;
   final bool isActive;
+  final bool isAvailable;
   final int totalDispatchedOrders;
   final String? avatarUrl;
   final String? rawPassword;
@@ -28,6 +29,7 @@ class DCOperationsOfficer {
     required this.distributionCenterName,
     this.role = 'dc_operations',
     this.isActive = true,
+    this.isAvailable = true,
     this.totalDispatchedOrders = 0,
     this.avatarUrl,
     this.rawPassword,
@@ -50,6 +52,7 @@ class DCOperationsOfficer {
     String? distributionCenterName,
     String? role,
     bool? isActive,
+    bool? isAvailable,
     int? totalDispatchedOrders,
     String? avatarUrl,
     String? rawPassword,
@@ -68,6 +71,7 @@ class DCOperationsOfficer {
       distributionCenterName: distributionCenterName ?? this.distributionCenterName,
       role: role ?? this.role,
       isActive: isActive ?? this.isActive,
+      isAvailable: isAvailable ?? this.isAvailable,
       totalDispatchedOrders: totalDispatchedOrders ?? this.totalDispatchedOrders,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       rawPassword: rawPassword ?? this.rawPassword,
@@ -89,6 +93,7 @@ class DCOperationsOfficer {
       distributionCenterName: json['distribution_center_name']?.toString() ?? '',
       role: json['role']?.toString() ?? 'dc_operations',
       isActive: json['is_active'] == true || json['is_active'] == null,
+      isAvailable: json['is_available'] == true || json['is_on_duty'] == true || (json['is_available'] == null && json['is_on_duty'] == null),
       totalDispatchedOrders: (json['dispatched_orders_count'] as num?)?.toInt() ?? 0,
       avatarUrl: json['avatar_url']?.toString(),
       rawPassword: json['raw_password']?.toString(),
@@ -111,6 +116,7 @@ class DCOperationsOfficer {
       'distribution_center_id': distributionCenterId,
       'distribution_center_name': distributionCenterName,
       'is_active': isActive,
+      'is_available': isAvailable,
       'role': role,
       'avatar_url': avatarUrl,
       'raw_password': rawPassword,

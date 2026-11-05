@@ -2054,6 +2054,26 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }
   }
 
+  Future<bool> toggleOperationsOfficerAvailability(String officerId, bool isAvailable) async {
+    final updatedList = state.operationsOfficers.map((o) {
+      if (o.id == officerId) return o.copyWith(isAvailable: isAvailable);
+      return o;
+    }).toList();
+    state = state.copyWith(operationsOfficers: updatedList);
+    await _storageService.cacheOperationsOfficers(updatedList);
+
+    if (isTestEnvironment) return true;
+
+    try {
+      await _repository.toggleOperationsOfficerAvailability(officerId, isAvailable);
+      debugPrint('[DC_CONSOLE_PROVIDER] 👷 Toggled Operations Officer "$officerId" availability to $isAvailable');
+      return true;
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ toggleOperationsOfficerAvailability notice: $e');
+      return false;
+    }
+  }
+
   Future<bool> deleteOperationsOfficer(String officerId) async {
     final updatedList = state.operationsOfficers.where((o) => o.id != officerId).toList();
     state = state.copyWith(operationsOfficers: updatedList);

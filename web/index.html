@@ -265,6 +265,54 @@
     };
   </script>
 
+    <!-- Background Web Push Notification and Alarm Hook -->
+  <script>
+    window.__requestWebNotificationPermission = function() {
+      if (typeof Notification !== 'undefined') {
+        return Notification.requestPermission();
+      }
+      return Promise.resolve('denied');
+    };
+
+    window.__showWebNotification = function(title, body, tag) {
+      try {
+        if (typeof Notification !== 'undefined') {
+          if (Notification.permission === 'granted') {
+            var notif = new Notification(title, {
+              body: body,
+              icon: 'icons/Icon-192.png',
+              badge: 'icons/Icon-192.png',
+              tag: tag || 'novaxpress-reminder',
+              requireInteraction: true
+            });
+            notif.onclick = function() {
+              window.focus();
+              this.close();
+            };
+          } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(function(perm) {
+              if (perm === 'granted') {
+                var notif = new Notification(title, {
+                  body: body,
+                  icon: 'icons/Icon-192.png',
+                  badge: 'icons/Icon-192.png',
+                  tag: tag || 'novaxpress-reminder',
+                  requireInteraction: true
+                });
+                notif.onclick = function() {
+                  window.focus();
+                  this.close();
+                };
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[WEB_NOTIF] Notification error:', e);
+      }
+    };
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 
   <script>

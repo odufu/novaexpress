@@ -123,6 +123,15 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
 
         final list = (response as List)
             .map((item) => OrderModel.fromJson(item as Map<String, dynamic>))
+            .where((order) {
+              // Strict Reassignment Filter: If order was reassigned to another rider in memory, exclude immediately
+              final inMemoryRider = _assignedRidersByOrderId[order.id];
+              if (inMemoryRider != null && inMemoryRider.isNotEmpty) {
+                return inMemoryRider == cleanId || inMemoryRider == targetAgentId;
+              }
+              final assignedId = order.deliveryAgentId ?? order.assignedAgentId;
+              return assignedId == cleanId || assignedId == targetAgentId;
+            })
             .toList();
 
         debugPrint('[ORDERS_DATASOURCE] 🚴 Loaded ${list.length} assigned orders specifically for rider ($cleanId -> $targetAgentId).');

@@ -68,6 +68,9 @@ class OrderModel extends OrderEntity {
     super.leadId,
     super.marketerId,
     super.formId,
+    super.logisticsRepId,
+    super.rescheduledByUserId,
+    super.rescheduledByRole,
     super.rescheduledDeliveryDate,
     super.reminderSnoozedUntil,
     required super.createdAt,
@@ -302,6 +305,9 @@ class OrderModel extends OrderEntity {
       leadId: json['lead_id']?.toString(),
       marketerId: json['marketer_id']?.toString(),
       formId: json['form_id']?.toString(),
+      logisticsRepId: json['logistics_rep_id']?.toString() ?? json['assigned_dispatcher_id']?.toString(),
+      rescheduledByUserId: json['rescheduled_by_user_id']?.toString(),
+      rescheduledByRole: json['rescheduled_by_role']?.toString(),
       rescheduledDeliveryDate: reschedDate,
       reminderSnoozedUntil: reminderSnooze,
       createdAt: json['created_at'] != null
@@ -375,6 +381,9 @@ class OrderModel extends OrderEntity {
       closerCode: entity.closerCode,
       closerAvatarUrl: entity.closerAvatarUrl,
       leadId: entity.leadId,
+      logisticsRepId: entity.logisticsRepId,
+      rescheduledByUserId: entity.rescheduledByUserId,
+      rescheduledByRole: entity.rescheduledByRole,
       rescheduledDeliveryDate: entity.rescheduledDeliveryDate,
       reminderSnoozedUntil: entity.reminderSnoozedUntil,
       createdAt: entity.createdAt,
@@ -450,6 +459,9 @@ class OrderModel extends OrderEntity {
       'lead_id': leadId,
       'marketer_id': marketerId,
       'form_id': formId,
+      'logistics_rep_id': logisticsRepId,
+      'rescheduled_by_user_id': rescheduledByUserId,
+      'rescheduled_by_role': rescheduledByRole,
     };
   }
 }

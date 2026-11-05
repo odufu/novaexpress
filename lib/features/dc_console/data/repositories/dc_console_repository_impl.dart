@@ -203,6 +203,14 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
   }
 
   @override
+  Future<void> toggleOperationsOfficerAvailability(String officerId, bool isAvailable) async {
+    await _remoteDataSource.toggleOperationsOfficerAvailability(officerId, isAvailable);
+    final cached = await _storageService.getCachedOperationsOfficers() ?? [];
+    final updated = cached.map((o) => o.id == officerId ? o.copyWith(isAvailable: isAvailable) : o).toList();
+    await _storageService.cacheOperationsOfficers(updated);
+  }
+
+  @override
   Future<void> deleteOperationsOfficer(String officerId) async {
     await _remoteDataSource.deleteOperationsOfficer(officerId);
     final cached = await _storageService.getCachedOperationsOfficers() ?? [];

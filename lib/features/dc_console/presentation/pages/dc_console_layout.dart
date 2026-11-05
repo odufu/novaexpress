@@ -22,6 +22,7 @@ import 'dc_orders_page.dart';
 import 'dc_riders_page.dart';
 import 'dc_settings_page.dart';
 import 'dc_stock_page.dart';
+import '../widgets/dc_audit_logs_tab_view.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
 
@@ -120,7 +121,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
 
                   // Active Tab Screen (Lazily Mounted for High Performance)
                   Expanded(
-                    child: _buildActiveTab(dcState.activeTabIndex),
+                    child: _buildActiveTab(dcState.activeTabIndex, dcState, isDark),
                   ),
                 ],
               ),
@@ -131,7 +132,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     );
   }
 
-  Widget _buildActiveTab(int activeIndex) {
+  Widget _buildActiveTab(int activeIndex, DCConsoleState state, bool isDark) {
     switch (activeIndex) {
       case 0:
         return const DCDashboardPage();
@@ -161,6 +162,11 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
         return const DCOperationsPage();
       case 13:
         return const DCFinancePage(initialSubtab: 2);
+      case 14:
+        final activeDc = state.distributionCenters.where(
+          (d) => d.id == state.activeHubId || d.code == state.activeHubCode,
+        ).firstOrNull;
+        return DCAuditLogsTabView(officerDc: activeDc, isDark: isDark);
       default:
         return const DCDashboardPage();
     }
@@ -269,6 +275,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 _buildNavItem(4, 'Finance', Icons.account_balance_wallet_rounded, (state.activeTabIndex == 4 || state.activeTabIndex == 2 || state.activeTabIndex == 13), isCollapsed, isDrawer, tooltip: 'Financial hub combining revenue, settlements, remittances & expenses'),
                 _buildNavItem(8, 'Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer, tooltip: 'Courier manifest, shift status & rider roster'),
                 _buildNavItem(12, 'Operations', Icons.support_agent_rounded, state.activeTabIndex == 12, isCollapsed, isDrawer, tooltip: 'Station supervisors, dispatchers & officers'),
+                _buildNavItem(14, 'Activity Logs', Icons.manage_history_rounded, state.activeTabIndex == 14, isCollapsed, isDrawer, tooltip: 'Audit trail of all station operations, actions & user attribution'),
                 if (isPrimaryDc)
                   _buildNavItem(9, 'DC & Hubs', Icons.apartment_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer, tooltip: 'Regional distribution centers & satellites'),
                 _buildNavItem(11, 'Merchants', Icons.storefront_rounded, state.activeTabIndex == 11, isCollapsed, isDrawer, tooltip: 'Merchant accounts, inventory & invoices'),

@@ -65,6 +65,9 @@ class OrderEntity {
   final String? leadId;
   final String? marketerId;
   final String? formId;
+  final String? logisticsRepId;
+  final String? rescheduledByUserId;
+  final String? rescheduledByRole;
   final DateTime? rescheduledDeliveryDate;
   final DateTime? reminderSnoozedUntil;
   final DateTime createdAt;
@@ -136,6 +139,9 @@ class OrderEntity {
     this.leadId,
     this.marketerId,
     this.formId,
+    this.logisticsRepId,
+    this.rescheduledByUserId,
+    this.rescheduledByRole,
     this.rescheduledDeliveryDate,
     this.reminderSnoozedUntil,
     required this.createdAt,
@@ -211,6 +217,9 @@ class OrderEntity {
   bool get isDispatchAssigned => status.toLowerCase() == 'dispatch_assigned';
   bool get isOrderAccepted => status.toLowerCase() == 'order_accepted' || status.toLowerCase() == 'accepted';
   bool get isDeliveryInProgress => status.toLowerCase() == 'delivery_in_progress' || status.toLowerCase() == 'in_transit';
+  String? get assignedDispatcherId => logisticsRepId;
+  bool get isSwitchedOff => status.toLowerCase() == 'switched_off';
+  bool get isDeclined => status.toLowerCase() == 'declined';
   bool get isRescheduled => status.toLowerCase() == 'rescheduled';
   bool get isNotPicking => status.toLowerCase() == 'not_picking';
   bool get isCallBack => status.toLowerCase() == 'call_back';
@@ -647,8 +656,12 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? leadId,
     String? marketerId,
     String? formId,
+    String? logisticsRepId,
+    String? rescheduledByUserId,
+    String? rescheduledByRole,
     DateTime? rescheduledDeliveryDate,
     DateTime? reminderSnoozedUntil,
+    bool clearReminderSnooze = false,
     DateTime? createdAt,
   }) {
     return OrderEntity(
@@ -718,8 +731,11 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       leadId: leadId ?? this.leadId,
       marketerId: marketerId ?? this.marketerId,
       formId: formId ?? this.formId,
+      logisticsRepId: logisticsRepId ?? this.logisticsRepId,
+      rescheduledByUserId: rescheduledByUserId ?? this.rescheduledByUserId,
+      rescheduledByRole: rescheduledByRole ?? this.rescheduledByRole,
       rescheduledDeliveryDate: rescheduledDeliveryDate ?? this.rescheduledDeliveryDate,
-      reminderSnoozedUntil: reminderSnoozedUntil ?? this.reminderSnoozedUntil,
+      reminderSnoozedUntil: clearReminderSnooze ? null : (reminderSnoozedUntil ?? this.reminderSnoozedUntil),
       createdAt: createdAt ?? this.createdAt,
     );
   }

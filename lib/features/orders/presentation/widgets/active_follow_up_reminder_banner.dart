@@ -1,3 +1,4 @@
+import '../../../../core/services/web_notification_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,6 +62,9 @@ class _ActiveFollowUpReminderBannerState
     _tickerTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
+
+    // Request web notification permissions for background reminders
+    WebNotificationService.instance.requestPermission();
   }
 
   @override
@@ -77,6 +81,12 @@ class _ActiveFollowUpReminderBannerState
         now.difference(_lastAlertSoundTime!).inSeconds >= 45) {
       _lastAlertSoundTime = now;
       AudioService().playFollowUpReminderChime();
+      final first = dueOrders.first;
+      WebNotificationService.instance.showNotification(
+        title: '⏰ Follow-up Due: #${first.orderNumber}',
+        body: 'Customer ${first.customerName} (${first.customerPhone}) is scheduled for follow-up right now.',
+        tag: 'order-${first.id}',
+      );
     }
   }
 
@@ -201,19 +211,26 @@ class _ActiveFollowUpReminderBannerState
       if (o.isDelivered || o.isCancelled) return false;
       if (!o.isFollowUpReminderDue) return false;
 
+      final currentUserId = authUser?.id ?? '';
+
+      // Account & Role Isolation: Reschedules set by one role/account are ONLY visible to that account!
       if (widget.role == 'rider') {
-        final currentRiderId =
-            widget.agentId ?? authUser?.deliveryAgentId ?? authUser?.id;
-        return o.deliveryAgentId != null && o.deliveryAgentId == currentRiderId;
+        if (o.rescheduledByRole != null && o.rescheduledByRole != 'rider') return false;
+        final currentRiderId = widget.agentId ?? authUser?.deliveryAgentId ?? currentUserId;
+        final matchesUser = (o.rescheduledByUserId != null && o.rescheduledByUserId == currentUserId) ||
+            (o.deliveryAgentId != null && o.deliveryAgentId == currentRiderId);
+        return matchesUser;
       } else if (widget.role == 'dc_operations') {
-        final currentDc =
-            widget.dcId ?? authUser?.distributionCenterId;
-        return o.distributionCenterId == currentDc ||
-            (currentDc != null && o.distributionCenterId == null);
+        if (o.rescheduledByRole != null && o.rescheduledByRole != 'dc_operations') return false;
+        final matchesUser = (o.rescheduledByUserId != null && o.rescheduledByUserId == currentUserId) ||
+            (o.logisticsRepId != null && o.logisticsRepId == currentUserId);
+        return matchesUser;
       } else if (widget.role == 'closer') {
-        final currentCloser =
-            widget.closerId ?? authUser?.closerId ?? authUser?.id;
-        return o.closerId != null && o.closerId == currentCloser;
+        if (o.rescheduledByRole != null && o.rescheduledByRole != 'closer') return false;
+        final currentCloserId = widget.closerId ?? authUser?.closerId ?? currentUserId;
+        final matchesUser = (o.rescheduledByUserId != null && o.rescheduledByUserId == currentUserId) ||
+            (o.closerId != null && o.closerId == currentCloserId);
+        return matchesUser;
       }
       return true;
     }).toList();
@@ -587,10 +604,14 @@ class _FollowUpStatusSheet extends ConsumerWidget {
                   orderId: order.id,
                   customerName: order.customerName,
                   onRescheduleConfirmed: (dt, note) async {
+                    final auth = ref.read(authProvider).user;
                     final updated = order.copyWith(
                       status: 'rescheduled',
-                      rescheduledDeliveryDate: dt,
-                      deliveryNotes: '${order.deliveryNotes ?? ""}\n[RESCHEDULED] $note',
+                                            rescheduledDeliveryDate: dt,
+                      rescheduledByUserId: auth?.id,
+                      rescheduledByRole: 'closer',
+                      clearReminderSnooze: true,
+                      deliveryNotes: '${order.deliveryNotes ?? ""}\n[CLOSER RESCHEDULED] $note',
                     );
                     await ref.read(ordersProvider.notifier).updateOrder(updated);
                   },
@@ -676,10 +697,14 @@ class _FollowUpStatusSheet extends ConsumerWidget {
                   orderId: order.id,
                   customerName: order.customerName,
                   onRescheduleConfirmed: (dt, note) async {
+                    final auth = ref.read(authProvider).user;
                     final updated = order.copyWith(
                       status: 'rescheduled',
-                      rescheduledDeliveryDate: dt,
-                      deliveryNotes: '${order.deliveryNotes ?? ""}\n[RESCHEDULED BY DC] $note',
+                                            rescheduledDeliveryDate: dt,
+                      rescheduledByUserId: auth?.id,
+                      rescheduledByRole: 'dc_operations',
+                      clearReminderSnooze: true,
+                      deliveryNotes: '${order.deliveryNotes ?? ""}\n[DISPATCH OPS RESCHEDULED] $note',
                     );
                     await ref.read(ordersProvider.notifier).updateOrder(updated);
                   },
@@ -733,9 +758,13 @@ class _FollowUpStatusSheet extends ConsumerWidget {
                   orderId: order.id,
                   customerName: order.customerName,
                   onRescheduleConfirmed: (dt, note) async {
+                    final auth = ref.read(authProvider).user;
                     final updated = order.copyWith(
                       status: 'rescheduled',
-                      rescheduledDeliveryDate: dt,
+                                            rescheduledDeliveryDate: dt,
+                      rescheduledByUserId: auth?.id,
+                      rescheduledByRole: 'rider',
+                      clearReminderSnooze: true,
                       deliveryNotes: '${order.deliveryNotes ?? ""}\n[RIDER RESCHEDULED] $note',
                     );
                     await ref.read(ordersProvider.notifier).updateOrder(updated);
