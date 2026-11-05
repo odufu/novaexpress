@@ -759,28 +759,17 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final chatBg = isDark ? const Color(0xFF0B141A) : const Color(0xFFEFEAE2);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.90,
-      decoration: BoxDecoration(
-        color: chatBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 20,
-            offset: Offset(0, -4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        child: Column(
-          children: [
-            // WhatsApp Header / App Bar
-            _buildHeader(context, conv, isDark),
+      width: double.infinity,
+      height: double.infinity,
+      color: chatBg,
+      child: Column(
+        children: [
+          // WhatsApp Header / App Bar
+          _buildHeader(context, conv, isDark),
 
-            // Pinned Order Info & Active Participants Bar (WhatsApp Group Context)
-            if (conv != null) _buildOrderInfoBanner(context, conv, isDark),
-            if (conv != null) _buildParticipantsBar(context, conv, isDark),
+          // Pinned Order Info & Active Participants Bar (WhatsApp Group Context)
+          if (conv != null) _buildOrderInfoBanner(context, conv, isDark),
+          if (conv != null) _buildParticipantsBar(context, conv, isDark),
 
             // Chat Messages Body with WhatsApp Doodle Wallpaper
             Expanded(
@@ -829,8 +818,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
               _buildInputFooter(context, isDark, chatState.isSending, conv),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildSkeletalChatMessages(bool isDark) {

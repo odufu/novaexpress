@@ -18,6 +18,10 @@ import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_staff_profile_settings_tab.dart';
+import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
+import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
 
 /// Accounting Model for Unreconciled Delivered Orders
 class PendingReconciliationOrder {
@@ -353,6 +357,11 @@ class _GeneralAccountantConsolePageState
         ),
         actions: [
           IconButton(
+            tooltip: 'Order Pipeline Chats',
+            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 21),
+            onPressed: () => ConversationListModal.show(context),
+          ),
+          IconButton(
             tooltip: 'Refresh National Ledger',
             icon: const Icon(Icons.refresh_rounded, size: 21),
             onPressed: _loadNationalData,
@@ -360,6 +369,8 @@ class _GeneralAccountantConsolePageState
           const SizedBox(width: 4),
         ],
       ),
+      floatingActionButton: const PipelineChatFloatingActionButton(),
+      floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF0F172A) : Colors.white,

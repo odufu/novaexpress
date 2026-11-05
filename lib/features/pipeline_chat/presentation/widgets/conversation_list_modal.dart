@@ -15,6 +15,8 @@ class ConversationListModal extends ConsumerStatefulWidget {
   final String? initialCustomerPhone;
   final String? initialMessage;
 
+  final bool isEmbeddedTab;
+
   const ConversationListModal({
     super.key,
     this.initialOrderId,
@@ -22,14 +24,14 @@ class ConversationListModal extends ConsumerStatefulWidget {
     this.initialCustomerName,
     this.initialCustomerPhone,
     this.initialMessage,
+    this.isEmbeddedTab = false,
   });
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const ConversationListModal(),
+    return Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ConversationListModal(),
+      ),
     );
   }
 
@@ -41,16 +43,15 @@ class ConversationListModal extends ConsumerStatefulWidget {
     String? customerPhone,
     String? initialMessage,
   }) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ConversationListModal(
-        initialOrderId: orderId,
-        initialOrderNumber: orderNumber,
-        initialCustomerName: customerName,
-        initialCustomerPhone: customerPhone,
-        initialMessage: initialMessage,
+    return Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ConversationListModal(
+          initialOrderId: orderId,
+          initialOrderNumber: orderNumber,
+          initialCustomerName: customerName,
+          initialCustomerPhone: customerPhone,
+          initialMessage: initialMessage,
+        ),
       ),
     );
   }
@@ -120,19 +121,25 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
   @override
   Widget build(BuildContext context) {
     final isChatView = _activeOrderId != null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF0F172A) : Colors.white;
 
-    return PopScope(
+    final content = PopScope(
       canPop: !isChatView,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && isChatView) {
-          setState(() {
-            _activeOrderId = null;
-            _activeOrderNumber = null;
-            _activeCustomerName = null;
-            _activeCustomerPhone = null;
-            _activeInitialMessage = null;
-          });
-          ref.read(pipelineChatProvider.notifier).loadScopedConversations();
+          if (widget.initialOrderId != null && !widget.isEmbeddedTab && Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          } else {
+            setState(() {
+              _activeOrderId = null;
+              _activeOrderNumber = null;
+              _activeCustomerName = null;
+              _activeCustomerPhone = null;
+              _activeInitialMessage = null;
+            });
+            ref.read(pipelineChatProvider.notifier).loadScopedConversations();
+          }
         }
       },
       child: isChatView
@@ -145,18 +152,40 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
               initialMessage: _activeInitialMessage,
               showBackButton: true,
               onBack: () {
-                setState(() {
-                  _activeOrderId = null;
-                  _activeOrderNumber = null;
-                  _activeCustomerName = null;
-                  _activeCustomerPhone = null;
-                  _activeInitialMessage = null;
-                });
-                ref.read(pipelineChatProvider.notifier).loadScopedConversations();
+                if (widget.initialOrderId != null && !widget.isEmbeddedTab && Navigator.canPop(context)) {
+                  Navigator.of(context).pop();
+                } else {
+                  setState(() {
+                    _activeOrderId = null;
+                    _activeOrderNumber = null;
+                    _activeCustomerName = null;
+                    _activeCustomerPhone = null;
+                    _activeInitialMessage = null;
+                  });
+                  ref.read(pipelineChatProvider.notifier).loadScopedConversations();
+                }
               },
               onClose: () => Navigator.of(context).pop(),
             )
           : _buildConversationListView(context),
+    );
+
+    if (widget.isEmbeddedTab) {
+      return Container(
+        color: bgColor,
+        width: double.infinity,
+        height: double.infinity,
+        child: content,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: content,
+      ),
     );
   }
 
@@ -195,122 +224,117 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
     final totalUnread = chatState.getUnreadCountForRole(userRole);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.88,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 25,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
+      width: double.infinity,
+      height: double.infinity,
+      color: isDark ? const Color(0xFF0F172A) : Colors.white,
       child: Column(
         children: [
-          // Drag handle
-          const SizedBox(height: 10),
-          Container(
-            width: 44,
-            height: 4,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Modal Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
+          // Screen Header
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+              child: Row(
+                children: [
+                  if (!widget.isEmbeddedTab && Navigator.canPop(context))
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back_rounded,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        size: 22,
+                      ),
+                      tooltip: 'Back',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.forum_rounded,
+                      color: Color(0xFF0D9488),
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.forum_rounded,
-                    color: Color(0xFF0D9488),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              'Order Pipeline Chats',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              ),
-                            ),
-                          ),
-                          if (totalUnread > 0) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEF4444),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
                               child: Text(
-                                '$totalUnread new',
+                                'Order Pipeline Chats',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
-                                  fontSize: 10,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                                 ),
                               ),
                             ),
+                            if (totalUnread > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$totalUnread new',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        isCloser ? 'Live coordination for your booked & assigned orders' : 'Live coordination between Merchant, DC & Rider',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: const Color(0xFF94A3B8),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 1),
+                        Text(
+                          isCloser ? 'Live coordination for your booked & assigned orders' : 'Live coordination between Merchant, DC & Rider',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  padding: const EdgeInsets.all(6),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => ref.read(pipelineChatProvider.notifier).loadScopedConversations(),
-                  icon: const Icon(Icons.refresh_rounded, size: 20, color: Color(0xFF94A3B8)),
-                  tooltip: 'Refresh Conversations',
-                ),
-                IconButton(
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  padding: const EdgeInsets.all(6),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
-                  tooltip: 'Close',
-                ),
-              ],
+                  IconButton(
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    padding: const EdgeInsets.all(6),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => ref.read(pipelineChatProvider.notifier).loadScopedConversations(),
+                    icon: const Icon(Icons.refresh_rounded, size: 20, color: Color(0xFF94A3B8)),
+                    tooltip: 'Refresh Conversations',
+                  ),
+                  if (!widget.isEmbeddedTab && Navigator.canPop(context))
+                    IconButton(
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      padding: const EdgeInsets.all(6),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                      tooltip: 'Close',
+                    ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
           // Search Bar
           Padding(

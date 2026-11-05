@@ -14,6 +14,8 @@ import '../../../client_portal/presentation/widgets/pangea_date_range_picker_mod
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
+import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
 import '../widgets/active_follow_up_reminder_banner.dart';
@@ -269,6 +271,41 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                     ),
                     child: Text(
                       '${notifState.unreadCount}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white),
+                tooltip: 'Order Pipeline Chats',
+                onPressed: () => ConversationListModal.show(context),
+              ),
+              if (ref.watch(pipelineChatProvider).getUnreadCountForRole('delivery_agent') > 0)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '${ref.watch(pipelineChatProvider).getUnreadCountForRole('delivery_agent')}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white,

@@ -16,6 +16,10 @@ import '../providers/dc_console_provider.dart';
 import '../widgets/dc_remittance_detail_modal.dart';
 import '../widgets/dc_staff_profile_settings_tab.dart';
 import '../widgets/dc_audit_logs_tab_view.dart';
+import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
+import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
 
 class DCFinanceOperationsPage extends ConsumerStatefulWidget {
   const DCFinanceOperationsPage({super.key});
@@ -701,6 +705,38 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
         ),
         actions: [
           Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline_rounded),
+                  color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                  tooltip: 'Order Pipeline Chats',
+                  onPressed: () => ConversationListModal.show(context),
+                ),
+                if (ref.watch(pipelineChatProvider).getUnreadCountForRole('dc_finance_admin') > 0)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(3.5),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                      child: Text(
+                        '${ref.watch(pipelineChatProvider).getUnreadCountForRole('dc_finance_admin')}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.only(right: 14),
             child: Center(
               child: InkWell(
@@ -732,6 +768,8 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
         pendingRemittances.length,
         allDrivers.where((d) => d.cashInCustody > 0).length,
       ),
+      floatingActionButton: const PipelineChatFloatingActionButton(),
+      floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
       body: Column(
         children: [
           // Personalized Finance Ops Dashboard & 2x2 Fixed KPI Grid (Only on Tabs 0, 1, 2)

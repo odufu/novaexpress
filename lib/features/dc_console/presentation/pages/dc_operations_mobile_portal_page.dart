@@ -1273,7 +1273,7 @@ class _DCOperationsMobilePortalPageState
       case 1:
         return _buildRidersFleetTab(officerDc, isDark);
       case 2:
-        return const ConversationListModal();
+        return const ConversationListModal(isEmbeddedTab: true);
       case 3:
         return _buildStationProfileTab(officerDc, isDark);
       default:
