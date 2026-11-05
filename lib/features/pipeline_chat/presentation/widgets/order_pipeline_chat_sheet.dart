@@ -127,6 +127,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   StreamSubscription? _recordingSub;
   ChatPickedAttachment? _stagedAttachment;
   OrderConversationMessageEntity? _replyingToMessage;
+  int _prevMessageCount = 0;
+  String? _prevLastMessageId;
 
   @override
   void initState() {
@@ -171,6 +173,14 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   void _onTextChanged() {
     final text = _msgController.text;
+    final conv = ref.read(pipelineChatProvider).activeConversation;
+    if (conv != null) {
+      ref.read(pipelineChatProvider.notifier).broadcastUserPresence(
+        conversationId: conv.id,
+        status: text.trim().isNotEmpty ? 'typing' : 'idle',
+      );
+    }
+
     final selection = _msgController.selection;
     if (selection.baseOffset < 0) {
       if (_showMentionSuggestions) {
@@ -370,14 +380,20 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     }
   }
 
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent + 80,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
-    }
+  void _scrollToBottom({bool animate = true}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final target = _scrollController.position.maxScrollExtent;
+      if (animate) {
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _scrollController.jumpTo(target);
+      }
+    });
   }
 
   Widget _buildMessageContent(
@@ -419,6 +435,14 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         _isRecordingVoice = true;
         _recordingDuration = Duration.zero;
       });
+
+      final conv = ref.read(pipelineChatProvider).activeConversation;
+      if (conv != null) {
+        ref.read(pipelineChatProvider.notifier).broadcastUserPresence(
+          conversationId: conv.id,
+          status: 'recording_voice_note',
+        );
+      }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -445,6 +469,14 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         _recordingDuration = Duration.zero;
       });
     }
+
+    final conv = ref.read(pipelineChatProvider).activeConversation;
+    if (conv != null) {
+      ref.read(pipelineChatProvider.notifier).broadcastUserPresence(
+        conversationId: conv.id,
+        status: 'idle',
+      );
+    }
   }
 
   Future<void> _sendVoiceRecording() async {
@@ -457,6 +489,14 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         _isRecordingVoice = false;
         _recordingDuration = Duration.zero;
       });
+    }
+
+    final conv = ref.read(pipelineChatProvider).activeConversation;
+    if (conv != null) {
+      ref.read(pipelineChatProvider.notifier).broadcastUserPresence(
+        conversationId: conv.id,
+        status: 'idle',
+      );
     }
 
     if (result != null && result.bytes.isNotEmpty) {
@@ -758,6 +798,23 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     // Signature WhatsApp Wallpaper Palette
     final chatBg = isDark ? const Color(0xFF0B141A) : const Color(0xFFEFEAE2);
 
+    // Defense: Retrieve order messages from state.messages (if active matches) or from per-order cache
+    final orderMessages = (conv?.orderId == widget.orderId && chatState.messages.isNotEmpty)
+        ? chatState.messages
+        : chatState.getMessagesForOrder(widget.orderId);
+
+    // Auto-scroll to bottom immediately whenever new incoming or outgoing messages are dropped
+    if (orderMessages.isNotEmpty) {
+      final lastId = orderMessages.last.id;
+      if (orderMessages.length != _prevMessageCount || lastId != _prevLastMessageId) {
+        final isFirst = _prevMessageCount == 0;
+        _prevMessageCount = orderMessages.length;
+        _prevLastMessageId = lastId;
+
+        _scrollToBottom(animate: !isFirst);
+      }
+    }
+
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -775,22 +832,22 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             Expanded(
               child: CustomPaint(
                 painter: WhatsAppWallpaperPainter(isDark: isDark),
-                child: chatState.isLoading
+                child: (orderMessages.isEmpty && chatState.isLoading)
                     ? _buildSkeletalChatMessages(isDark)
-                    : chatState.errorMessage != null && chatState.activeConversation == null
+                    : chatState.errorMessage != null && conv == null && orderMessages.isEmpty
                         ? _buildAccessRestrictedState(chatState.errorMessage!, isDark)
-                        : chatState.messages.isEmpty
+                        : orderMessages.isEmpty
                             ? _buildEmptyState(isDark)
                             : ListView.builder(
                                 controller: _scrollController,
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                itemCount: chatState.messages.length,
+                                itemCount: orderMessages.length,
                                 itemBuilder: (context, index) {
-                                  final msg = chatState.messages[index];
+                                  final msg = orderMessages[index];
                                   final bool showDateSeparator = (index == 0) ||
-                                      (msg.createdAt.year != chatState.messages[index - 1].createdAt.year ||
-                                          msg.createdAt.month != chatState.messages[index - 1].createdAt.month ||
-                                          msg.createdAt.day != chatState.messages[index - 1].createdAt.day);
+                                      (msg.createdAt.year != orderMessages[index - 1].createdAt.year ||
+                                          msg.createdAt.month != orderMessages[index - 1].createdAt.month ||
+                                          msg.createdAt.day != orderMessages[index - 1].createdAt.day);
 
                                   final messageWidget = _buildMessageItem(msg, isDark, conv);
 
@@ -971,6 +1028,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
     // Classic WhatsApp App Bar Colors: Deep Teal-Green in Light, Dark Teal-Slate in Dark
     final headerBg = isDark ? const Color(0xFF1F2C34) : const Color(0xFF008069);
+    final presence = ref.watch(pipelineChatProvider).activePresence;
+    final isPresenceActive = presence != null && presence.isActive;
 
     return Container(
       color: headerBg,
@@ -1048,17 +1107,46 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        Flexible(
-                          child: Text(
-                            ' • ${_getWhatsAppSubtitle(conv)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              color: Colors.white.withOpacity(0.85),
+                        if (isPresenceActive)
+                          Flexible(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(' • ', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                Icon(
+                                  presence.isRecording ? Icons.mic_rounded : Icons.edit_note_rounded,
+                                  size: 13,
+                                  color: presence.isRecording ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
+                                ),
+                                const SizedBox(width: 3),
+                                Flexible(
+                                  child: Text(
+                                    presence.displayLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontStyle: FontStyle.italic,
+                                      fontWeight: FontWeight.w600,
+                                      color: presence.isRecording ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Flexible(
+                            child: Text(
+                              ' • ${_getWhatsAppSubtitle(conv)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: Colors.white.withOpacity(0.85),
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -2871,6 +2959,50 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Live Presence Indicator (Typing or Voice Note Recording)
+          if (chatState.activePresence != null && chatState.activePresence!.isActive)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 6, left: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1F2C34).withValues(alpha: 0.96) : Colors.white.withValues(alpha: 0.96),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: chatState.activePresence!.isRecording
+                        ? const Color(0xFFEF4444).withValues(alpha: 0.4)
+                        : const Color(0xFF0D9488).withValues(alpha: 0.4),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (chatState.activePresence!.isRecording)
+                      const Icon(Icons.mic_rounded, size: 14, color: Color(0xFFEF4444))
+                    else
+                      const Icon(Icons.more_horiz_rounded, size: 14, color: Color(0xFF0D9488)),
+                    const SizedBox(width: 6),
+                    Text(
+                      chatState.activePresence!.displayLabel,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Mention suggestions overlay if active
           if (_showMentionSuggestions)
             _buildMentionSuggestionsOverlay(context, isDark, conv),

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../domain/entities/order_conversation.dart';
 import '../../domain/entities/order_conversation_message.dart';
+import '../../domain/entities/chat_presence_info.dart';
 import '../../data/models/order_conversation_message_model.dart';
 import '../../data/services/chat_storage_service.dart';
 import '../../data/datasources/pipeline_chat_remote_datasource.dart';
@@ -22,6 +23,8 @@ final pipelineChatDataSourceProvider = Provider<PipelineChatRemoteDataSource>((r
 });
 
 class PipelineChatState {
+  static const Object _unset = Object();
+
   final OrderConversationEntity? activeConversation;
   final List<OrderConversationMessageEntity> messages;
   final List<OrderConversationEntity> recentConversations;
@@ -29,6 +32,8 @@ class PipelineChatState {
   final bool isSending;
   final String? errorMessage;
   final int pendingOutboxCount;
+  final ChatPresenceInfo? activePresence;
+  final Map<String, List<OrderConversationMessageEntity>> messagesByOrderId;
 
   const PipelineChatState({
     this.activeConversation,
@@ -38,7 +43,18 @@ class PipelineChatState {
     this.isSending = false,
     this.errorMessage,
     this.pendingOutboxCount = 0,
+    this.activePresence,
+    this.messagesByOrderId = const {},
   });
+
+  List<OrderConversationMessageEntity> getMessagesForOrder(String orderId) {
+    if (activeConversation?.orderId == orderId && messages.isNotEmpty) {
+      return messages;
+    }
+    return messagesByOrderId[orderId] ??
+        (activeConversation?.id != null ? messagesByOrderId[activeConversation!.id] : null) ??
+        const [];
+  }
 
   int getUnreadCountForRole(String role) {
     final r = role.toLowerCase().trim();
@@ -71,6 +87,8 @@ class PipelineChatState {
     bool? isSending,
     String? errorMessage,
     int? pendingOutboxCount,
+    Object? activePresence = _unset,
+    Map<String, List<OrderConversationMessageEntity>>? messagesByOrderId,
   }) {
     return PipelineChatState(
       activeConversation: activeConversation ?? this.activeConversation,
@@ -80,6 +98,10 @@ class PipelineChatState {
       isSending: isSending ?? this.isSending,
       errorMessage: errorMessage,
       pendingOutboxCount: pendingOutboxCount ?? this.pendingOutboxCount,
+      activePresence: identical(activePresence, _unset)
+          ? this.activePresence
+          : (activePresence as ChatPresenceInfo?),
+      messagesByOrderId: messagesByOrderId ?? this.messagesByOrderId,
     );
   }
 }
@@ -90,8 +112,14 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
   StreamSubscription<List<OrderConversationMessageEntity>>? _streamSub;
   RealtimeChannel? _globalChatMessagesChannel;
   RealtimeChannel? _conversationsChannel;
+  RealtimeChannel? _conversationPresenceChannel;
+  ChatPresenceInfo? _activePresence;
+  Timer? _presenceExpireTimer;
+  DateTime? _lastTypingBroadcast;
   Timer? _outboxFlushTimer;
   bool _isFlushingOutbox = false;
+
+  ChatPresenceInfo? get activePresence => _activePresence;
 
   PipelineChatNotifier(this._dataSource, this._ref)
       : super(const PipelineChatState()) {
@@ -177,8 +205,106 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     }
   }
 
+  void _setupConversationPresenceChannel(String conversationId) {
+    _conversationPresenceChannel?.unsubscribe();
+    _activePresence = null;
+    _presenceExpireTimer?.cancel();
+    state = state.copyWith(activePresence: null);
+
+    try {
+      final binding = WidgetsBinding.instance.runtimeType.toString().toLowerCase();
+      if (binding.contains('test') || binding.contains('automated')) return;
+
+      final channelName = 'presence_chat_$conversationId';
+      _conversationPresenceChannel = Supabase.instance.client.channel(channelName);
+
+      _conversationPresenceChannel!
+          .onBroadcast(
+            event: 'user_presence',
+            callback: (payload) {
+              final authUser = _ref.read(authProvider).user;
+              final currentUserId = authUser?.id;
+              final senderId = payload['sender_id']?.toString();
+
+              if (senderId != null && senderId == currentUserId) return;
+
+              final status = payload['status']?.toString() ?? 'idle';
+              final senderName = payload['sender_name']?.toString() ?? 'Participant';
+              final senderRole = payload['sender_role']?.toString() ?? 'user';
+
+              if (status == 'idle') {
+                _presenceExpireTimer?.cancel();
+                _activePresence = null;
+                state = state.copyWith(activePresence: null);
+              } else {
+                final info = ChatPresenceInfo(
+                  senderId: senderId ?? '',
+                  senderName: senderName,
+                  senderRole: senderRole,
+                  status: status,
+                  timestamp: DateTime.now(),
+                );
+
+                _presenceExpireTimer?.cancel();
+                _activePresence = info;
+                state = state.copyWith(activePresence: info);
+
+                // Auto-expire after 4 seconds if no heartbeat received
+                _presenceExpireTimer = Timer(const Duration(seconds: 4), () {
+                  if (mounted && _activePresence?.senderId == senderId) {
+                    _activePresence = null;
+                    state = state.copyWith(activePresence: null);
+                  }
+                });
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('[PIPELINE_CHAT] Presence channel notice: $e');
+    }
+  }
+
+  void broadcastUserPresence({
+    required String conversationId,
+    required String status,
+  }) {
+    final authUser = _ref.read(authProvider).user;
+    if (authUser == null) return;
+
+    if (status == 'typing') {
+      final now = DateTime.now();
+      if (_lastTypingBroadcast != null &&
+          now.difference(_lastTypingBroadcast!).inMilliseconds < 1500) {
+        return;
+      }
+      _lastTypingBroadcast = now;
+    } else {
+      _lastTypingBroadcast = null;
+    }
+
+    try {
+      final channel = _conversationPresenceChannel ??
+          Supabase.instance.client.channel('presence_chat_$conversationId');
+
+      channel.sendBroadcastMessage(
+        event: 'user_presence',
+        payload: {
+          'sender_id': authUser.id,
+          'sender_name': authUser.fullName,
+          'sender_role': authUser.isCloser ? 'closer' : authUser.role,
+          'status': status,
+        },
+      );
+    } catch (e) {
+      debugPrint('[PIPELINE_CHAT] broadcastUserPresence notice: $e');
+    }
+  }
+
   @override
   void dispose() {
+    _presenceExpireTimer?.cancel();
+    _conversationPresenceChannel?.unsubscribe();
     _outboxFlushTimer?.cancel();
     _streamSub?.cancel();
     _globalChatMessagesChannel?.unsubscribe();
@@ -377,7 +503,20 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     }
 
     final convId = existingConv?.id ?? orderId;
-    final cachedMsgs = await localStorage.getCachedConversationMessages(convId) ?? [];
+
+    // 1. Check in-memory state.messagesByOrderId first for lightning-fast zero-latency display
+    List<OrderConversationMessageEntity> cachedMsgs = state.messagesByOrderId[orderId] ??
+        (existingConv != null ? state.messagesByOrderId[existingConv.id] : null) ??
+        [];
+
+    // 2. If not in memory, check localStorage for convId and orderId
+    if (cachedMsgs.isEmpty) {
+      cachedMsgs = (await localStorage.getCachedConversationMessages(convId)) ?? [];
+      if (cachedMsgs.isEmpty && orderId != convId) {
+        cachedMsgs = (await localStorage.getCachedConversationMessages(orderId)) ?? [];
+      }
+    }
+
     final outboxItems = await localStorage.getOutboxMessages(
       conversationId: existingConv?.id,
       orderId: orderId,
@@ -385,10 +524,17 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     final pendingModels = outboxItems.map(_outboxItemToMessage).toList();
     final initialCombined = _mergeServerAndPendingMessages(cachedMsgs, pendingModels);
 
+    final updatedMap = Map<String, List<OrderConversationMessageEntity>>.from(state.messagesByOrderId);
+    if (initialCombined.isNotEmpty) {
+      updatedMap[orderId] = initialCombined;
+      if (existingConv != null) updatedMap[existingConv.id] = initialCombined;
+    }
+
     if (existingConv != null) {
       state = state.copyWith(
         activeConversation: existingConv,
         messages: initialCombined,
+        messagesByOrderId: updatedMap,
         pendingOutboxCount: outboxItems.length,
         isLoading: false,
       );
@@ -396,6 +542,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       state = state.copyWith(
         isLoading: initialCombined.isEmpty,
         messages: initialCombined,
+        messagesByOrderId: updatedMap,
         pendingOutboxCount: outboxItems.length,
         errorMessage: null,
       );
@@ -473,13 +620,24 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       final livePending = liveOutbox.map(_outboxItemToMessage).toList();
       final finalMerged = _mergeServerAndPendingMessages(remoteMsgs, livePending);
 
+      final nextMap = Map<String, List<OrderConversationMessageEntity>>.from(state.messagesByOrderId);
+      nextMap[orderId] = finalMerged;
+      nextMap[conv.id] = finalMerged;
+
       state = state.copyWith(
         activeConversation: conv,
         messages: finalMerged,
+        messagesByOrderId: nextMap,
         pendingOutboxCount: liveOutbox.length,
         isLoading: false,
       );
       unawaited(localStorage.cacheConversationMessages(conv.id, finalMerged));
+      if (conv.orderId.isNotEmpty && conv.orderId != conv.id) {
+        unawaited(localStorage.cacheConversationMessages(conv.orderId, finalMerged));
+      }
+
+      // Auto-connect presence channel for this conversation
+      _setupConversationPresenceChannel(conv.id);
 
       // Auto-mark as read for current user role
       if (authUser != null) {
@@ -509,8 +667,20 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
               AudioService().playIncomingMessage();
             }
           }
-          state = state.copyWith(messages: streamMerged, pendingOutboxCount: latestOutbox.length);
+
+          final streamMap = Map<String, List<OrderConversationMessageEntity>>.from(state.messagesByOrderId);
+          streamMap[orderId] = streamMerged;
+          streamMap[conv.id] = streamMerged;
+
+          state = state.copyWith(
+            messages: streamMerged,
+            messagesByOrderId: streamMap,
+            pendingOutboxCount: latestOutbox.length,
+          );
           unawaited(localStorage.cacheConversationMessages(conv.id, streamMerged));
+          if (conv.orderId.isNotEmpty && conv.orderId != conv.id) {
+            unawaited(localStorage.cacheConversationMessages(conv.orderId, streamMerged));
+          }
         },
         onError: (err) {
           // Keep current messages if stream drops
@@ -600,10 +770,18 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       );
 
       final updatedMessages = [...state.messages, optimisticMsg];
+      final sendMap = Map<String, List<OrderConversationMessageEntity>>.from(state.messagesByOrderId);
+      sendMap[conv.orderId] = updatedMessages;
+      sendMap[conv.id] = updatedMessages;
+
       state = state.copyWith(
         messages: updatedMessages,
+        messagesByOrderId: sendMap,
         pendingOutboxCount: state.pendingOutboxCount + 1,
       );
+
+      // Cancel typing presence immediately upon sending
+      broadcastUserPresence(conversationId: conv.id, status: 'idle');
 
       final outboxItem = {
         'client_message_id': clientMsgId,
@@ -737,10 +915,18 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       );
 
       final updatedMessages = [...state.messages, optimisticMsg];
+      final sendMap = Map<String, List<OrderConversationMessageEntity>>.from(state.messagesByOrderId);
+      sendMap[conv.orderId] = updatedMessages;
+      sendMap[conv.id] = updatedMessages;
+
       state = state.copyWith(
         messages: updatedMessages,
+        messagesByOrderId: sendMap,
         pendingOutboxCount: state.pendingOutboxCount + 1,
       );
+
+      // Cancel typing presence immediately upon sending
+      broadcastUserPresence(conversationId: conv.id, status: 'idle');
 
       final outboxItem = {
         'client_message_id': clientMsgId,
@@ -846,10 +1032,18 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       );
 
       final updatedMessages = [...state.messages, optimisticMsg];
+      final sendMap = Map<String, List<OrderConversationMessageEntity>>.from(state.messagesByOrderId);
+      sendMap[conv.orderId] = updatedMessages;
+      sendMap[conv.id] = updatedMessages;
+
       state = state.copyWith(
         messages: updatedMessages,
+        messagesByOrderId: sendMap,
         pendingOutboxCount: state.pendingOutboxCount + 1,
       );
+
+      // Cancel typing presence immediately upon sending
+      broadcastUserPresence(conversationId: conv.id, status: 'idle');
 
       final outboxItem = {
         'client_message_id': clientMsgId,
