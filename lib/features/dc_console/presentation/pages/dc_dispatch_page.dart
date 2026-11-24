@@ -8,9 +8,30 @@ import '../../../orders/domain/services/order_routing_service.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_assign_order_modal.dart';
+import '../widgets/dc_order_detail_modal.dart';
+import '../widgets/mark_order_delivered_modal.dart';
+import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 
 class DCDispatchPage extends ConsumerWidget {
   const DCDispatchPage({super.key});
+
+  void _openSmartOrderPaste(BuildContext context, WidgetRef ref) async {
+    final created = await SmartOrderPasteModal.show(context);
+    if (created != null && context.mounted) {
+      ref.read(ordersProvider.notifier).loadOrders();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ WhatsApp Order #${created.orderNumber} created & ready for dispatch!'),
+          backgroundColor: const Color(0xFF00A884),
+          action: SnackBarAction(
+            label: 'ASSIGN NOW',
+            textColor: Colors.white,
+            onPressed: () => _showAssignModal(context, created),
+          ),
+        ),
+      );
+    }
+  }
 
   void _showAssignModal(BuildContext context, OrderEntity order) {
     showDialog(
@@ -159,6 +180,20 @@ class DCDispatchPage extends ConsumerWidget {
                 ],
               );
 
+              final pasteBtn = ElevatedButton.icon(
+                onPressed: () => _openSmartOrderPaste(context, ref),
+                icon: const Icon(Icons.content_paste_go_rounded, size: 16, color: Colors.white),
+                label: const Text(
+                  'Paste WhatsApp Order',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00A884),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+
               final actionBtn = ElevatedButton.icon(
                 onPressed: unassignedOrders.isEmpty
                     ? null
@@ -182,7 +217,14 @@ class DCDispatchPage extends ConsumerWidget {
                   children: [
                     headerInfo,
                     const SizedBox(height: 12),
-                    SizedBox(width: double.infinity, child: actionBtn),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        pasteBtn,
+                        actionBtn,
+                      ],
+                    ),
                   ],
                 );
               }
@@ -192,7 +234,14 @@ class DCDispatchPage extends ConsumerWidget {
                 children: [
                   Expanded(child: headerInfo),
                   const SizedBox(width: 16),
-                  actionBtn,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      pasteBtn,
+                      actionBtn,
+                    ],
+                  ),
                 ],
               );
             },
@@ -569,11 +618,16 @@ class DCDispatchPage extends ConsumerWidget {
                       final custName = order.customerName;
                       final city = order.deliveryCity;
                       final amount = order.totalAmount;
+                      final isExt = order.deliveryAgentCode?.toUpperCase().startsWith('EXT-') == true ||
+                          (order.deliveryAgentName?.toLowerCase().contains('external') == true);
                       final agentDisplay = order.deliveryAgentName != null && order.deliveryAgentName!.isNotEmpty
                           ? '${order.deliveryAgentName} (${order.deliveryAgentCode ?? 'PDA'})'
                           : 'Assigned Rider';
 
-                      return LayoutBuilder(
+                      return InkWell(
+                        onTap: () => DCOrderDetailModal.show(context, order),
+                        borderRadius: BorderRadius.circular(8),
+                        child: LayoutBuilder(
                         builder: (context, constraints) {
                           final isMobileTransit = constraints.maxWidth < 600;
 
@@ -582,20 +636,44 @@ class DCDispatchPage extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                                  color: isExt
+                                      ? const Color(0xFFD97706).withValues(alpha: 0.15)
+                                      : const Color(0xFF2563EB).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF2563EB), size: 18),
+                                child: Icon(
+                                  isExt ? Icons.local_shipping_rounded : Icons.local_shipping_outlined,
+                                  color: isExt ? const Color(0xFFD97706) : const Color(0xFF2563EB),
+                                  size: 18,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      '$orderNum • $custName',
-                                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
-                                      overflow: TextOverflow.ellipsis,
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            '$orderNum • $custName',
+                                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (isExt) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.3)),
+                                            ),
+                                            child: const Text('EXT-PDA', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                     Text(
                                       'Zone: $city • Delivery Agent: $agentDisplay',
@@ -631,6 +709,19 @@ class DCDispatchPage extends ConsumerWidget {
                             ),
                           );
 
+                          final logDeliveryBtn = ElevatedButton.icon(
+                            onPressed: () => MarkOrderDeliveredModal.show(context, order),
+                            icon: const Icon(Icons.check_circle_outline_rounded, size: 12, color: Colors.white),
+                            label: const Text('Log Delivery', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                          );
+
                           if (isMobileTransit) {
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -646,7 +737,15 @@ class DCDispatchPage extends ConsumerWidget {
                                         CurrencyFormatter.formatNaira(amount),
                                         style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
                                       ),
-                                      statusBadge,
+                                      Row(
+                                        children: [
+                                          statusBadge,
+                                          if (isExt) ...[
+                                            const SizedBox(width: 6),
+                                            logDeliveryBtn,
+                                          ],
+                                        ],
+                                      ),
                                     ],
                                   ),
                                 ],
@@ -669,13 +768,18 @@ class DCDispatchPage extends ConsumerWidget {
                                     ),
                                     const SizedBox(width: 12),
                                     statusBadge,
+                                    if (isExt) ...[
+                                      const SizedBox(width: 8),
+                                      logDeliveryBtn,
+                                    ],
                                   ],
                                 ),
                               ],
                             ),
                           );
                         },
-                      );
+                      ),
+                    );
                     },
                   ),
               ],

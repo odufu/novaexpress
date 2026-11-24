@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/registration_page.dart';
 import '../../features/auth/presentation/pages/splash_screen.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/dashboard/presentation/pages/main_bottom_nav_shell.dart';
@@ -31,13 +32,17 @@ import '../../features/dc_console/presentation/pages/dc_operations_mobile_portal
 import '../../features/dc_console/presentation/pages/dc_finance_operations_page.dart';
 import '../../features/dc_console/presentation/pages/dc_stock_operations_page.dart';
 import '../../features/dc_console/presentation/pages/general_accountant_console_page.dart';
+import '../../features/dc_console/presentation/pages/external_logistics_console_page.dart';
+import '../../features/dc_console/presentation/pages/novaxpress_logistics_admin_dashboard_page.dart';
 import '../../features/client_portal/presentation/pages/client_portal_layout.dart';
 import '../../features/client_portal/presentation/pages/closer_mobile_portal_page.dart';
 import '../../features/client_portal/presentation/pages/merchant_sales_supervisor_page.dart';
 import '../../features/client_portal/presentation/pages/marketer_mobile_portal_page.dart';
 import '../../features/client_portal/presentation/pages/merchant_settlements_mobile_page.dart';
+import '../../features/client_portal/presentation/pages/merchant_inventory_mobile_portal_page.dart';
 import '../../features/client_portal/presentation/pages/public_lead_form_page.dart';
 import '../../features/admin_console/presentation/pages/admin_console_layout.dart';
+import '../../features/admin_console/presentation/pages/agent_daily_sales_console_page.dart';
 import '../../presentation/presentation_root.dart';
 
 class RouterRefreshNotifier extends ChangeNotifier {
@@ -57,6 +62,7 @@ class RouterRefreshNotifier extends ChangeNotifier {
             previous?.user?.isDcOperations != next.user?.isDcOperations ||
             previous?.user?.isCloser != next.user?.isCloser ||
             previous?.user?.isCloserSupervisor != next.user?.isCloserSupervisor ||
+            previous?.user?.isMerchantInventoryOfficer != next.user?.isMerchantInventoryOfficer ||
             previous?.user?.isMarketer != next.user?.isMarketer ||
             previous?.user?.isClientAdmin != next.user?.isClientAdmin) {
           notifyListeners();
@@ -81,7 +87,7 @@ String? appRouteRedirect({
   final isSplash = matchedLocation == '/splash';
   final isPresentation = matchedLocation == '/presentation';
   final isPublicForm = matchedLocation.startsWith('/f/') || matchedLocation.startsWith('/lead-form/');
-  final isLoggingIn = matchedLocation == '/login' || matchedLocation == '/forgot-password';
+  final isLoggingIn = matchedLocation == '/login' || matchedLocation == '/forgot-password' || matchedLocation == '/register';
 
   debugPrint('[AUTH_ROUTER] 🚦 Route check: location="$matchedLocation", isAuthenticated=$isAuthenticated (riverpod=$isAuthFromState, supabase=$hasSupabaseSession)');
 
@@ -123,17 +129,31 @@ String? appRouteRedirect({
       return homePath;
     }
 
-    // 0. Super Admin Command Console (/admin/**)
+    final canAccessWarehouseAndDc = isSuperAdmin || user.isPlatformAdmin || isDc || user.isLogisticsAdmin;
+
+    // 0. Super Admin & Warehouse Command Console (/admin/**)
     if (matchedLocation.startsWith('/admin')) {
-      if (!isSuperAdmin) {
-        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Super Admin Console -> Redirecting to $homePath');
+      if (user.isLogisticsAdmin && !isSuperAdmin && !user.isPlatformAdmin) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: Logistics Admin redirected to designated console -> /logistics-admin');
+        return '/logistics-admin';
+      }
+      if (!canAccessWarehouseAndDc) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Warehouse Admin Console -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+
+    // NovaXpress Logistics Admin Console (/logistics-admin/**)
+    if (matchedLocation.startsWith('/logistics-admin')) {
+      if (!canAccessWarehouseAndDc) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Logistics Admin Console -> Redirecting to $homePath');
         return homePath;
       }
     }
 
     // 2. Strict Console Isolation: Distribution Center Console (/dc/**)
     if (matchedLocation.startsWith('/dc')) {
-      if (!isDc) {
+      if (!canAccessWarehouseAndDc) {
         debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access DC Console -> Redirecting to $homePath');
         return homePath;
       }
@@ -216,6 +236,19 @@ String? appRouteRedirect({
       return '/merchant-settlements';
     }
 
+    // Merchant Stock Keeper / Inventory Officer Console (/merchant-inventory/**)
+    if (matchedLocation.startsWith('/merchant-inventory')) {
+      if (!user.isMerchantInventoryOfficer && !isClientAdmin && !isSuperAdmin) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Merchant Inventory Console -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+    if (user.isMerchantInventoryOfficer &&
+        !matchedLocation.startsWith('/merchant-inventory') &&
+        !matchedLocation.startsWith('/client')) {
+      return '/merchant-inventory';
+    }
+
     // 5. Strict Console Isolation: Telesales Closer Portal (/closer/**)
     if (matchedLocation.startsWith('/closer')) {
       if (!isCloser) {
@@ -279,6 +312,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginPage(),
       ),
       GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegistrationPage(),
+      ),
+      GoRoute(
         path: '/forgot-password',
         builder: (context, state) => const ForgotPasswordPage(),
       ),
@@ -289,6 +326,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin',
         builder: (context, state) => const AdminConsoleLayout(),
+      ),
+      GoRoute(
+        path: '/agent-daily-sales',
+        builder: (context, state) => const AgentDailySalesConsolePage(),
+      ),
+      GoRoute(
+        path: '/logistics-admin',
+        builder: (context, state) => const NovaXpressLogisticsAdminDashboardPage(),
       ),
       GoRoute(
         path: '/',
@@ -329,6 +374,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const GeneralAccountantConsolePage(),
       ),
       GoRoute(
+        path: '/logistics-partner',
+        builder: (context, state) => const ExternalLogisticsConsolePage(),
+      ),
+      GoRoute(
         path: '/f/:formId',
         builder: (context, state) {
           final formId = state.pathParameters['formId'] ?? '';
@@ -345,6 +394,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/merchant-settlements',
         builder: (context, state) => const MerchantSettlementsMobilePage(),
+      ),
+      GoRoute(
+        path: '/merchant-inventory',
+        builder: (context, state) => const MerchantInventoryMobilePortalPage(),
       ),
       GoRoute(
         path: '/client',

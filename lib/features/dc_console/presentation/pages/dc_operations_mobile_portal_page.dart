@@ -14,14 +14,16 @@ import '../../../pipeline_chat/domain/entities/order_conversation.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
 import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
-import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_staff_profile_settings_tab.dart';
 import '../widgets/dc_audit_logs_tab_view.dart';
+import '../widgets/mark_order_delivered_modal.dart';
 import '../../../orders/presentation/widgets/active_follow_up_reminder_banner.dart';
+import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
+import '../../../client_portal/presentation/widgets/client_create_order_modal.dart';
 import 'dc_expenditures_page.dart';
 
 class DCOperationsMobilePortalPage extends ConsumerStatefulWidget {
@@ -272,6 +274,15 @@ class _DCOperationsMobilePortalPageState
     return 0;
   }
 
+  bool _isRiderProximityMatch(DCFleetDriver rider, OrderEntity order) {
+    final targetLga = (order.deliveryLga ?? '').trim();
+    final targetAddress = order.deliveryAddress.trim().toLowerCase();
+    final zone = rider.assignedZone.trim().toLowerCase();
+    if (targetLga.isNotEmpty && rider.coversLga(targetLga)) return true;
+    if (zone.isNotEmpty && (targetAddress.contains(zone) || targetLga.toLowerCase().contains(zone))) return true;
+    return false;
+  }
+
   void _showDispatchSheet(OrderEntity order, DistributionCenter officerDc) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -287,11 +298,11 @@ class _DCOperationsMobilePortalPageState
           final stockState = sheetRef.watch(stockProvider);
           final allOrders = sheetRef.watch(ordersProvider).orders;
 
-          // Intelligently sort riders:
-          // 1. Currently assigned rider on top
-          // 2. Riders with sufficient stock of this product first
-          // 3. Lowest active order count first (Workload Balancing to prevent overloading!)
-          // 4. Highest available stock quantity
+          // NovaXpress 3-Criteria Smart Ranking:
+          // 1. In-custody product quantity >= orderRequiredQty
+          // 2. Rider active/online availability
+          // 3. Proximity to delivery LGA / zone
+          // Combined with workload balancing
           final sortedRiders = List<DCFleetDriver>.from(dcRiders)..sort((a, b) {
             final aAssigned = order.deliveryAgentId == a.id || order.deliveryAgentCode == a.driverCode;
             final bAssigned = order.deliveryAgentId == b.id || order.deliveryAgentCode == b.driverCode;
@@ -313,14 +324,23 @@ class _DCOperationsMobilePortalPageState
 
             final aCanFulfill = aStock >= orderRequiredQty;
             final bCanFulfill = bStock >= orderRequiredQty;
-            if (aCanFulfill && !bCanFulfill) return -1;
-            if (!aCanFulfill && bCanFulfill) return 1;
 
-            // Workload Balancing: fewest active orders first!
+            final aAvailable = a.isAvailable;
+            final bAvailable = b.isAvailable;
+
+            final aProximity = _isRiderProximityMatch(a, order);
+            final bProximity = _isRiderProximityMatch(b, order);
+
+            // Compute composite match score
+            int aScore = (aCanFulfill ? 100 : 0) + (aProximity ? 50 : 0) + (aAvailable ? 30 : 0);
+            int bScore = (bCanFulfill ? 100 : 0) + (bProximity ? 50 : 0) + (bAvailable ? 30 : 0);
+
             final aLoad = _calculateRiderActiveOrders(a, allOrders);
             final bLoad = _calculateRiderActiveOrders(b, allOrders);
-            if (aLoad != bLoad) return aLoad.compareTo(bLoad);
+            aScore -= (aLoad * 2);
+            bScore -= (bLoad * 2);
 
+            if (aScore != bScore) return bScore.compareTo(aScore);
             return bStock.compareTo(aStock);
           });
 
@@ -543,6 +563,8 @@ class _DCOperationsMobilePortalPageState
                             );
                             final activeOrdersCount = _calculateRiderActiveOrders(rider, allOrders);
                             final canAssign = riderStock >= orderRequiredQty;
+                            final isProximity = _isRiderProximityMatch(rider, order);
+                            final isBestMatch = canAssign && rider.isAvailable && isProximity;
 
                             return InkWell(
                               onTap: () async {
@@ -624,6 +646,28 @@ class _DCOperationsMobilePortalPageState
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
+                                          if (isBestMatch) ...[
+                                            Container(
+                                              margin: const EdgeInsets.only(bottom: 5),
+                                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: const Color(0xFFF59E0B)),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.star_rounded, size: 13, color: Color(0xFFD97706)),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '⭐ Best Match (Stock + Available + Nearest Zone)',
+                                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFB45309)),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                           Row(
                                             children: [
                                               Flexible(
@@ -690,8 +734,8 @@ class _DCOperationsMobilePortalPageState
                                                     const SizedBox(width: 4),
                                                     Text(
                                                       canAssign
-                                                          ? 'In Possession: $riderStock avail.'
-                                                          : 'Possession: $riderStock (Needs $orderRequiredQty)',
+                                                          ? 'Stock: $riderStock avail.'
+                                                          : 'Stock: $riderStock (Needs $orderRequiredQty)',
                                                       style: GoogleFonts.inter(
                                                         fontSize: 10.5,
                                                         fontWeight: FontWeight.bold,
@@ -702,7 +746,60 @@ class _DCOperationsMobilePortalPageState
                                                 ),
                                               ),
 
-                                              // 2. Active Orders Workload Badge
+                                              // 2. Proximity Zone Match Badge
+                                              if (isProximity) ...[
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                                                    borderRadius: BorderRadius.circular(5),
+                                                    border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.3)),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.near_me_rounded, size: 12, color: Color(0xFF2563EB)),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        'Nearest Zone (${rider.assignedZone.isNotEmpty ? rider.assignedZone : (order.deliveryLga ?? "Zone")})',
+                                                        style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+
+                                              // 3. Availability Badge
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                                decoration: BoxDecoration(
+                                                  color: rider.isAvailable
+                                                      ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                                                      : const Color(0xFF64748B).withValues(alpha: 0.1),
+                                                  borderRadius: BorderRadius.circular(5),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      rider.isAvailable ? Icons.bolt_rounded : Icons.nightlight_round,
+                                                      size: 12,
+                                                      color: rider.isAvailable ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      rider.isAvailable ? 'Available' : 'Off-duty',
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 10.5,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: rider.isAvailable ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+
+                                              // 4. Active Orders Workload Badge
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                                                 decoration: BoxDecoration(
@@ -1319,6 +1416,64 @@ class _DCOperationsMobilePortalPageState
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 120),
       children: [
+        // WhatsApp & Manual Order Intake Banner
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFBBF7D0),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final created = await SmartOrderPasteModal.show(context);
+                    if (created != null && mounted) {
+                      _refreshData();
+                      _showDispatchSheet(created, officerDc);
+                    }
+                  },
+                  icon: const Icon(Icons.content_paste_go_rounded, size: 16),
+                  label: const Text(
+                    'Smart Paste (WhatsApp)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await ClientCreateOrderModal.show(context);
+                  if (mounted) _refreshData();
+                },
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text(
+                  'New Order',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0D9488),
+                  side: const BorderSide(color: Color(0xFF0D9488)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // 0. Segmented Queue Scope Toggle: My Intake Queue vs All Station Orders
         Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -1335,7 +1490,7 @@ class _DCOperationsMobilePortalPageState
                   onTap: () => setState(() => _showOnlyMyQueue = true),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                     decoration: BoxDecoration(
                       color: _showOnlyMyQueue
                           ? const Color(0xFF0D9488)
@@ -1359,13 +1514,17 @@ class _DCOperationsMobilePortalPageState
                           size: 15,
                           color: _showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'My Intake Queue ($myAssignedCount)',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: _showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            'My Intake Queue ($myAssignedCount)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ),
                           ),
                         ),
                       ],
@@ -1378,7 +1537,7 @@ class _DCOperationsMobilePortalPageState
                   onTap: () => setState(() => _showOnlyMyQueue = false),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                     decoration: BoxDecoration(
                       color: !_showOnlyMyQueue
                           ? const Color(0xFF0D9488)
@@ -1402,13 +1561,17 @@ class _DCOperationsMobilePortalPageState
                           size: 15,
                           color: !_showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'All DC Orders (${allDcOrders.length})',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: !_showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            'All DC Orders (${allDcOrders.length})',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: !_showOnlyMyQueue ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ),
                           ),
                         ),
                       ],
@@ -2231,146 +2394,203 @@ class _DCOperationsMobilePortalPageState
                         const SizedBox(height: 12),
                       ],
 
-                      // Action Buttons: Reassign, Reroute, Pipeline Chat
-                      Row(
-                        children: [
-                          if (isAssigned) ...[
-                            // Reassign Action
-                            Expanded(
-                              flex: 3,
-                              child: InkWell(
-                                onTap: isDelivered ? null : () => _showDispatchSheet(order, officerDc),
-                              borderRadius: BorderRadius.circular(14),
-                              child: Container(
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  gradient: isDelivered
-                                      ? null
-                                      : const LinearGradient(
-                                          colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
-                                        ),
-                                  color: isDelivered ? (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)) : null,
-                                  borderRadius: BorderRadius.circular(14),
-                                  boxShadow: isDelivered
-                                      ? null
-                                      : [
-                                          BoxShadow(
-                                            color: const Color(0xFF0D9488).withValues(alpha: 0.25),
-                                            blurRadius: 6,
-                                            offset: const Offset(0, 2),
+                      // Action Buttons: Reassign, Mark Delivered, Reroute, Pipeline Chat
+                      Builder(
+                        builder: (context) {
+                          final portalAuthUser = ref.watch(authProvider).user;
+                          final canDispatchDeliver = portalAuthUser != null &&
+                              (portalAuthUser.isDcOrdersAdmin || portalAuthUser.isDcManager) &&
+                              !isDelivered &&
+                              !order.isCancelled &&
+                              order.status.toLowerCase() != 'returned';
+
+                          return Row(
+                            children: [
+                              if (isAssigned) ...[
+                                // Reassign Action
+                                Expanded(
+                                  flex: 2,
+                                  child: InkWell(
+                                    onTap: isDelivered ? null : () => _showDispatchSheet(order, officerDc),
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Container(
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        gradient: isDelivered
+                                            ? null
+                                            : const LinearGradient(
+                                                colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+                                              ),
+                                        color: isDelivered
+                                            ? (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))
+                                            : null,
+                                        borderRadius: BorderRadius.circular(14),
+                                        boxShadow: isDelivered
+                                            ? null
+                                            : [
+                                                BoxShadow(
+                                                  color: const Color(0xFF0D9488).withValues(alpha: 0.25),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.two_wheeler_rounded, size: 15, color: Colors.white),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              'Reassign',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
                                         ],
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.two_wheeler_rounded, size: 15, color: Colors.white),
-                                    const SizedBox(width: 6),
-                                    Flexible(
-                                      child: Text(
-                                        isAssigned ? 'Reassign' : 'Dispatch Rider',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ],
-
-                          // Reroute DC Action
-                          Expanded(
-                            flex: 2,
-                            child: InkWell(
-                              onTap: isDelivered ? null : () => _showRerouteSheet(order, officerDc),
-                              borderRadius: BorderRadius.circular(14),
-                              child: Container(
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF37021).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.swap_horiz_rounded, size: 16, color: Color(0xFFF37021)),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        'Reroute',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFFF37021),
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(width: 8),
-
-                          // Pipeline Chat Button with Real-time Badge
-                          Consumer(
-                            builder: (context, ref, _) {
-                              final conv = ref.watch(
-                                pipelineChatProvider.select(
-                                  (s) => s.recentConversations.cast<OrderConversationEntity?>().firstWhere(
-                                        (c) => c?.orderId == order.id || (order.id.isNotEmpty && c?.orderNumber == order.orderNumber),
-                                        orElse: () => null,
-                                      ),
-                                ),
-                              );
-                              final unreadCount = conv?.unreadDcCount ?? 0;
-                              final hasUnread = unreadCount > 0;
-
-                              return Tooltip(
-                                message: hasUnread ? 'Order Pipeline Chat ($unreadCount unread)' : 'Order Pipeline Chat',
-                                child: InkWell(
-                                  onTap: () => OrderPipelineChatSheet.showForOrder(context, order),
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: Container(
-                                    width: 38,
-                                    height: 38,
-                                    decoration: BoxDecoration(
-                                      color: (hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
-                                          .withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: Center(
-                                      child: Badge(
-                                        isLabelVisible: hasUnread,
-                                        label: Text(
-                                          '$unreadCount',
-                                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
-                                        ),
-                                        backgroundColor: const Color(0xFFEF4444),
-                                        child: Icon(
-                                          hasUnread ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
-                                          size: 17,
-                                          color: hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488),
-                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              );
-                            },
-                          ),
-                        ],
+                                const SizedBox(width: 6),
+                              ],
+
+                              if (canDispatchDeliver) ...[
+                                Expanded(
+                                  flex: 2,
+                                  child: InkWell(
+                                    onTap: () => MarkOrderDeliveredModal.show(context, order),
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Container(
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981),
+                                        borderRadius: BorderRadius.circular(14),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.check_circle_outline_rounded, size: 15, color: Colors.white),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              'Delivered',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+
+                              // Reroute DC Action
+                              Expanded(
+                                flex: 2,
+                                child: InkWell(
+                                  onTap: isDelivered ? null : () => _showRerouteSheet(order, officerDc),
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    height: 38,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF37021).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.swap_horiz_rounded, size: 16, color: Color(0xFFF37021)),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            'Reroute',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: const Color(0xFFF37021),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(width: 6),
+
+                              // Pipeline Chat Button with Real-time Badge
+                              Consumer(
+                                builder: (context, ref, _) {
+                                  final conv = ref.watch(
+                                    pipelineChatProvider.select(
+                                      (s) => s.recentConversations.cast<OrderConversationEntity?>().firstWhere(
+                                            (c) => c?.orderId == order.id || (order.id.isNotEmpty && c?.orderNumber == order.orderNumber),
+                                            orElse: () => null,
+                                          ),
+                                    ),
+                                  );
+                                  final unreadCount = conv?.unreadDcCount ?? 0;
+                                  final hasUnread = unreadCount > 0;
+
+                                  return Tooltip(
+                                    message: hasUnread ? 'Order Pipeline Chat ($unreadCount unread)' : 'Order Pipeline Chat',
+                                    child: InkWell(
+                                      onTap: () => OrderPipelineChatSheet.showForOrder(context, order),
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: (hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
+                                              .withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        child: Center(
+                                          child: Badge(
+                                            isLabelVisible: hasUnread,
+                                            label: Text(
+                                              '$unreadCount',
+                                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+                                            ),
+                                            backgroundColor: const Color(0xFFEF4444),
+                                            child: Icon(
+                                              hasUnread ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
+                                              size: 17,
+                                              color: hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),

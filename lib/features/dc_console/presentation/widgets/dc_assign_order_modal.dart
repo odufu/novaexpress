@@ -303,31 +303,16 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
     }
     final allDrivers = scopedDrivers.isNotEmpty ? scopedDrivers : [...dcState.dcDrivers];
 
-    // Order: Available drivers first (by lightest workload), Unavailable/Off-duty drivers pushed to bottom
-    allDrivers.sort((a, b) {
-      if (a.isAvailable && !b.isAvailable) return -1;
-      if (!a.isAvailable && b.isAvailable) return 1;
-      return a.totalAssignedOrders.compareTo(b.totalAssignedOrders);
-    });
-
-    final filteredDrivers = allDrivers.where((d) {
-      if (_driverSearchQuery.trim().isEmpty) return true;
-      final q = _driverSearchQuery.toLowerCase().trim();
-      return d.name.toLowerCase().contains(q) ||
-          d.driverCode.toLowerCase().contains(q) ||
-          d.assignedZone.toLowerCase().contains(q);
-    }).toList();
-
-    // Check GIS nearest rider if order coordinates are available
-    DCFleetDriver? nearestRider;
-    double? nearestDistanceKm;
-    if (widget.order.latitude != null && widget.order.longitude != null && allDrivers.isNotEmpty) {
-      nearestRider = allDrivers.firstWhere(
-        (d) => d.status == 'active',
-        orElse: () => allDrivers.first,
-      );
-      nearestDistanceKm = 0.8;
+    bool isProximityMatch(DCFleetDriver d) {
+      final targetLga = (widget.order.deliveryLga ?? '').trim();
+      final targetAddress = widget.order.deliveryAddress.trim().toLowerCase();
+      final zone = d.assignedZone.trim().toLowerCase();
+      if (targetLga.isNotEmpty && d.coversLga(targetLga)) return true;
+      if (zone.isNotEmpty && (targetAddress.contains(zone) || targetLga.toLowerCase().contains(zone))) return true;
+      return false;
     }
+
+    final requiredUnits = widget.order.quantity > 0 ? widget.order.quantity : 1;
 
     // Pre-calculate active reserved units per driver for this product
     final ordersState = ref.watch(ordersProvider);
@@ -349,6 +334,67 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
           }
         }
       }
+    }
+
+    // NovaXpress 3-Criteria Smart Ranking:
+    // 1. In-custody product quantity >= requiredUnits (100 pts)
+    // 2. Proximity zone match (50 pts)
+    // 3. Active availability (30 pts)
+    // Minus workload load (2 pts per order)
+    allDrivers.sort((a, b) {
+      final aSelected = a.id == _selectedDriverId;
+      final bSelected = b.id == _selectedDriverId;
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+
+      final aAllocations = stockState.riderAllocations.where((al) => al.riderId == a.id || al.riderCode == a.driverCode);
+      final aCustody = aAllocations.where((al) {
+        final alProdLower = al.productName.toLowerCase();
+        return (orderProdLower.isNotEmpty && (alProdLower.contains(orderProdLower) || orderProdLower.contains(alProdLower))) ||
+            (widget.order.productSku != null && widget.order.productSku!.isNotEmpty && al.sku == widget.order.productSku);
+      }).fold<int>(0, (sum, al) => sum + al.inCustodyUnits);
+      final aReserved = (activeReservedUnitsByDriverId[a.id] ?? 0) + (activeReservedUnitsByDriverId[a.driverCode] ?? 0);
+      final aAvailStock = (aCustody - aReserved) > 0 ? (aCustody - aReserved) : 0;
+
+      final bAllocations = stockState.riderAllocations.where((al) => al.riderId == b.id || al.riderCode == b.driverCode);
+      final bCustody = bAllocations.where((al) {
+        final alProdLower = al.productName.toLowerCase();
+        return (orderProdLower.isNotEmpty && (alProdLower.contains(orderProdLower) || orderProdLower.contains(alProdLower))) ||
+            (widget.order.productSku != null && widget.order.productSku!.isNotEmpty && al.sku == widget.order.productSku);
+      }).fold<int>(0, (sum, al) => sum + al.inCustodyUnits);
+      final bReserved = (activeReservedUnitsByDriverId[b.id] ?? 0) + (activeReservedUnitsByDriverId[b.driverCode] ?? 0);
+      final bAvailStock = (bCustody - bReserved) > 0 ? (bCustody - bReserved) : 0;
+
+      final aHasStock = aAvailStock >= requiredUnits;
+      final bHasStock = bAvailStock >= requiredUnits;
+
+      final aNear = isProximityMatch(a);
+      final bNear = isProximityMatch(b);
+
+      int aScore = (aHasStock ? 100 : 0) + (aNear ? 50 : 0) + (a.isAvailable ? 30 : 0) - (a.totalAssignedOrders * 2);
+      int bScore = (bHasStock ? 100 : 0) + (bNear ? 50 : 0) + (b.isAvailable ? 30 : 0) - (b.totalAssignedOrders * 2);
+
+      if (aScore != bScore) return bScore.compareTo(aScore);
+      return bAvailStock.compareTo(aAvailStock);
+    });
+
+    final filteredDrivers = allDrivers.where((d) {
+      if (_driverSearchQuery.trim().isEmpty) return true;
+      final q = _driverSearchQuery.toLowerCase().trim();
+      return d.name.toLowerCase().contains(q) ||
+          d.driverCode.toLowerCase().contains(q) ||
+          d.assignedZone.toLowerCase().contains(q);
+    }).toList();
+
+    // Check GIS nearest rider if order coordinates are available
+    DCFleetDriver? nearestRider;
+    double? nearestDistanceKm;
+    if (widget.order.latitude != null && widget.order.longitude != null && allDrivers.isNotEmpty) {
+      nearestRider = allDrivers.firstWhere(
+        (d) => d.status == 'active',
+        orElse: () => allDrivers.first,
+      );
+      nearestDistanceKm = 0.8;
     }
 
     return Dialog(
@@ -650,7 +696,7 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                   // Fast O(1) active reserved units lookup
                   final activeReservedUnits = activeReservedUnitsByDriverId[driver.id] ?? activeReservedUnitsByDriverId[driver.driverCode] ?? 0;
 
-                  final availableCustodyUnits = (totalCustodyUnits - activeReservedUnits).clamp(0, 999999);
+                  final int availableCustodyUnits = (totalCustodyUnits - activeReservedUnits).clamp(0, 999999).toInt();
                   final hasStockInVehicle = totalCustodyUnits > 0;
                   final requiredUnits = widget.order.totalPhysicalQuantity > 0
                       ? widget.order.totalPhysicalQuantity
@@ -660,6 +706,8 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                   final activeCount = driver.totalAssignedOrders;
                   final isLightWorkload = activeCount == 0;
                   final isAvailable = driver.isAvailable;
+                  final isNear = isProximityMatch(driver);
+                  final isBestMatch = hasSufficientStock && isAvailable && isNear;
                   final workloadText = isAvailable
                       ? (isLightWorkload ? 'Available (0 Active)' : 'Active ($activeCount Active)')
                       : (driver.status.toLowerCase() == 'banned' ? 'Banned / Blocked' : 'Unavailable (Off-Duty)');
@@ -752,6 +800,24 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                                   runSpacing: 4,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
+                                    if (isBestMatch) ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFF59E0B)),
+                                        ),
+                                        child: Text(
+                                          '⭐ Best Match (Stock + Available + Nearest Zone)',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFFB45309),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                     Text(
                                       driver.name,
                                       style: GoogleFonts.inter(

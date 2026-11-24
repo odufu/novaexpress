@@ -1,10 +1,12 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/data/models/order_model.dart';
+import '../../../notifications/domain/entities/app_notification.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/customer_lead.dart';
 import '../../domain/entities/upg_request.dart';
@@ -180,7 +182,8 @@ class SalesSupervisorState {
 }
 
 class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
-  SalesSupervisorNotifier() : super(const SalesSupervisorState());
+  final Ref? _ref;
+  SalesSupervisorNotifier([this._ref]) : super(const SalesSupervisorState());
 
   SupabaseClient _getAdminClient() {
     return SupabaseClient(
@@ -365,6 +368,25 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
 
       upgList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+      // Emit notifications for any order status transitions
+      if (_ref != null && state.orders.isNotEmpty) {
+        for (final fresh in ordersList) {
+          final old = state.orders.where((o) => o.id == fresh.id).firstOrNull;
+          if (old != null && old.status != fresh.status) {
+            final statusPretty = fresh.status.replaceAll('_', ' ').toUpperCase();
+            try {
+              _ref?.read(notificationsProvider.notifier).emitLocalNotification(
+                title: 'Order $statusPretty: #${fresh.orderNumber}',
+                message: '#${fresh.orderNumber} for ${fresh.customerName} transitioned to $statusPretty. Closer: ${fresh.closerName ?? "Team"}.',
+                category: NotificationCategory.delivery,
+                orderId: fresh.id,
+                orderNumber: fresh.orderNumber,
+              );
+            } catch (_) {}
+          }
+        }
+      }
+
       state = state.copyWith(
         isLoading: false,
         closers: closersList,
@@ -491,6 +513,18 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
           'created_at': DateTime.now().toIso8601String(),
         });
       } catch (_) {}
+
+      if (_ref != null) {
+        try {
+          _ref?.read(notificationsProvider.notifier).emitLocalNotification(
+            title: '⚡ UPG Approved: #${upg.orderNumber}',
+            message: 'UPG of +₦${upg.upsellDelta.toStringAsFixed(0)} to ${upg.upgradedProduct} authorized for ${upg.customerName}. Closer: ${upg.closerName}.',
+            category: NotificationCategory.finance,
+            orderId: upg.orderId,
+            orderNumber: upg.orderNumber,
+          );
+        } catch (_) {}
+      }
 
       // 6. Update local state for both requests and orders
       final updatedRequests = state.upgRequests.map((r) {
@@ -765,5 +799,5 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
 
 final salesSupervisorProvider =
     StateNotifierProvider<SalesSupervisorNotifier, SalesSupervisorState>((ref) {
-  return SalesSupervisorNotifier();
+  return SalesSupervisorNotifier(ref);
 });

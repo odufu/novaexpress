@@ -14,14 +14,15 @@ import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
+import '../widgets/dc_remittance_detail_modal.dart';
 import '../widgets/dc_staff_profile_settings_tab.dart';
 import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
-import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
 
 /// Accounting Model for Unreconciled Delivered Orders
 class PendingReconciliationOrder {
@@ -151,6 +152,9 @@ class _GeneralAccountantConsolePageState
     ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
     final activeHubId = ref.read(dcConsoleProvider).activeHubId;
     ref.read(financeProvider.notifier).loadRemittances(activeHubId);
+    ref.read(ordersProvider.notifier).loadDcOrders(
+          activeHubId.isNotEmpty ? activeHubId : null,
+        );
 
     // 1. Load historical settlements
     try {
@@ -1293,88 +1297,209 @@ class _GeneralAccountantConsolePageState
     List<DCFleetDriver> drivers,
     bool isDark,
   ) {
-    if (remittances.isEmpty) {
-      return const Center(child: Text('No national remittances recorded yet.'));
+    final allOrders = ref.watch(ordersProvider).orders;
+    final financeSettings = ref.watch(dcConsoleProvider).financeSettings;
+    final unrequestedDrivers = drivers.where((d) => d.cashInCustody > 0).toList();
+
+    if (remittances.isEmpty && unrequestedDrivers.isEmpty) {
+      return const Center(child: Text('No national remittances or open field cash recorded yet.'));
     }
 
-    return ListView.separated(
+    return ListView(
       padding: const EdgeInsets.all(14),
-      itemCount: remittances.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final rem = remittances[index];
-        final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
-        final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Fleet Rider');
-
-        return Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+      children: [
+        if (unrequestedDrivers.isNotEmpty) ...[
+          Text(
+            'Field Cash Held by Riders (Direct Clearable)',
+            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800),
           ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: rem.isPending
-                      ? const Color(0xFFEA580C).withValues(alpha: 0.1)
-                      : const Color(0xFF16A34A).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  rem.isPending ? Icons.hourglass_top_rounded : Icons.check_circle_rounded,
-                  size: 19,
-                  color: rem.isPending ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      riderName,
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Ref: ${rem.referenceNumber.isNotEmpty ? rem.referenceNumber : rem.id.substring(0, 8)} • ${DateFormat('dd MMM yyyy, hh:mm a').format(rem.createdAt)}',
-                      style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+          const SizedBox(height: 8),
+          ...unrequestedDrivers.map((driver) {
+            final driverUnrequestedOrders = allOrders.where((o) =>
+              (o.deliveryAgentId == driver.id ||
+               o.deliveryAgentId == driver.driverCode ||
+               (driver.driverCode.isNotEmpty && o.deliveryAgentCode == driver.driverCode)) &&
+              (o.isDelivered || o.status.toLowerCase() == 'delivered') &&
+              !o.isDirectTransfer &&
+              !o.isRemitted &&
+              !o.isPendingClearance
+            ).toList();
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(13),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              child: Row(
                 children: [
-                  Text(
-                    CurrencyFormatter.formatNaira(rem.amount),
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
-                      color: rem.isPending ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      size: 18,
+                      color: Color(0xFFD97706),
                     ),
                   ),
-                  Text(
-                    rem.isPending ? 'Pending Audit' : 'Banked & Verified',
-                    style: GoogleFonts.inter(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w600,
-                      color: rem.isPending ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          driver.name,
+                          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '${driver.driverCode} • Gross Custody: ${CurrencyFormatter.formatNaira(driver.cashInCustody)}',
+                          style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      DCRemittanceDetailModal.showUnrequestedRiderCash(
+                        context,
+                        driver,
+                        driverUnrequestedOrders,
+                        financeSettings: financeSettings,
+                        grossOverride: driverUnrequestedOrders.isEmpty
+                            ? driver.cashInCustody
+                            : null,
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text(
+                      'Direct Clear',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
               ),
-            ],
+            );
+          }),
+          const SizedBox(height: 8),
+        ],
+        if (remittances.isNotEmpty) ...[
+          Text(
+            'Recorded Remittances (${remittances.length})',
+            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800),
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          ...remittances.map((rem) {
+            final driver = drivers
+                .where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId)
+                .firstOrNull;
+            final riderName = driver != null
+                ? driver.name
+                : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Fleet Rider');
+            final matchingOrders = allOrders.where((o) =>
+              rem.associatedOrders.any((ao) => ao.orderId == o.id || ao.orderNumber == o.orderNumber)
+            ).toList();
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => DCRemittanceDetailModal.showFromRemittanceEntity(
+                context,
+                rem,
+                driver: driver,
+                orders: matchingOrders,
+              ),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: rem.isPending
+                            ? const Color(0xFFEA580C).withValues(alpha: 0.1)
+                            : const Color(0xFF16A34A).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        rem.isPending ? Icons.hourglass_top_rounded : Icons.check_circle_rounded,
+                        size: 19,
+                        color: rem.isPending ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            riderName,
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Ref: ${rem.referenceNumber.isNotEmpty ? rem.referenceNumber : rem.id.substring(0, 8)} • ${DateFormat('dd MMM yyyy, hh:mm a').format(rem.createdAt)}',
+                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          CurrencyFormatter.formatNaira(rem.amount),
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: rem.isPending ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                          ),
+                        ),
+                        Text(
+                          rem.isPending ? 'Pending Audit • Tap' : 'Banked & Verified',
+                          style: GoogleFonts.inter(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                            color: rem.isPending ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ],
     );
   }
 

@@ -392,16 +392,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Verify Master Products Tab header
-      expect(find.textContaining('Master Products & Inventory'), findsOneWidget);
-      expect(find.text('📦 Total DC Stock'), findsOneWidget);
-      expect(find.text('🏢 Warehouse Shelf Stock'), findsOneWidget);
-      expect(find.text('🛵 In Rider Custody'), findsOneWidget);
-      expect(find.text('⚠️ Low Stock Alerts'), findsOneWidget);
+      // Verify Master Products Tab header & KPI cards
+      expect(find.text('Products Catalog'), findsOneWidget);
+      expect(find.text('Total Stock'), findsOneWidget);
+      expect(find.text('Warehouse Shelf'), findsOneWidget);
+      expect(find.text('Rider Custody'), findsOneWidget);
+      expect(find.text('Stock Alerts'), findsOneWidget);
 
       // Verify CTA buttons
-      expect(find.text('Receive Stock'), findsWidgets);
-      expect(find.text('Add New Product'), findsOneWidget);
+      expect(find.text('Inbound'), findsWidgets);
+      expect(find.text('Add Product'), findsOneWidget);
 
       // Verify products rendered
       expect(find.text('Respira Detox Tea'), findsOneWidget);

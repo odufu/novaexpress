@@ -156,16 +156,16 @@ class DCOrderPaymentMatchingPageState
     // Pre-Index Orders into O(1) Lookup Maps
     final Map<String, OrderEntity> ordersById = {};
     final Map<String, OrderEntity> ordersByNumber = {};
-    final Set<String> verifiedOrderNumbers = {};
+    final Set<String> activeOrVerifiedOrderNumbers = {};
 
     for (final rem in allRemittances) {
-      if (rem.isVerified) {
+      if (rem.isVerified || rem.isPending) {
         for (final ao in rem.associatedOrders) {
           if (ao.orderId.isNotEmpty) {
-            verifiedOrderNumbers.add(ao.orderId);
+            activeOrVerifiedOrderNumbers.add(ao.orderId);
           }
           if (ao.orderNumber.isNotEmpty) {
-            verifiedOrderNumbers.add(ao.orderNumber);
+            activeOrVerifiedOrderNumbers.add(ao.orderNumber);
           }
         }
       }
@@ -182,14 +182,15 @@ class DCOrderPaymentMatchingPageState
       if (order.isDirectTransfer) continue;
       if (order.status == 'delivered') {
         final isRemitted = order.isRemitted ||
+            order.isPendingClearance ||
             order.remittanceStatus.toLowerCase() == 'remitted' ||
             order.remittanceStatus.toLowerCase() == 'cleared' ||
             order.paymentStatus.toLowerCase() == 'remitted' ||
             order.financialSettlementStatus.toLowerCase() ==
                 'cash_remitted_verified' ||
             (order.deliveryNotes?.contains('[REMITTED') == true) ||
-            verifiedOrderNumbers.contains(order.id) ||
-            verifiedOrderNumbers.contains(order.orderNumber);
+            activeOrVerifiedOrderNumbers.contains(order.id) ||
+            activeOrVerifiedOrderNumbers.contains(order.orderNumber);
 
         if (!isRemitted) {
           final riderKey =
@@ -1626,6 +1627,8 @@ class DCOrderPaymentMatchingPageState
                         fontWeight: FontWeight.bold,
                         color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 3),
                     Row(
@@ -1649,22 +1652,26 @@ class DCOrderPaymentMatchingPageState
                                       : const Color(0xFFF59E0B))),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          isPaystack
-                              ? 'Paystack Instant'
-                              : (isBank
-                                  ? 'Bank Transfer'
-                                  : (isDirect ? 'Direct Transfer' : 'Cash Handover')),
-                          style: GoogleFonts.inter(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: isPaystack
-                                ? const Color(0xFF00A2D3)
+                        Flexible(
+                          child: Text(
+                            isPaystack
+                                ? 'Paystack Instant'
                                 : (isBank
-                                    ? const Color(0xFF3B82F6)
-                                    : (isDirect
-                                        ? const Color(0xFF10B981)
-                                        : const Color(0xFFF59E0B))),
+                                    ? 'Bank Transfer'
+                                    : (isDirect ? 'Direct Transfer' : 'Cash Handover')),
+                            style: GoogleFonts.inter(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: isPaystack
+                                  ? const Color(0xFF00A2D3)
+                                  : (isBank
+                                      ? const Color(0xFF3B82F6)
+                                      : (isDirect
+                                          ? const Color(0xFF10B981)
+                                          : const Color(0xFFF59E0B))),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -1752,8 +1759,8 @@ class DCOrderPaymentMatchingPageState
               key: 'orders',
               group: 'Shipments',
               label: 'ORDERS',
-              defaultWidth: 120,
-              minWidth: 95,
+              defaultWidth: 145,
+              minWidth: 110,
               searchString: (item) => '${item.orderCount} orders',
               sortValue: (item) => item.orderCount,
               cellBuilder: (context, item, row, isDark, brand) {
@@ -1771,12 +1778,16 @@ class DCOrderPaymentMatchingPageState
                       const Icon(Icons.inventory_2_rounded,
                           size: 13, color: Color(0xFF2563EB)),
                       const SizedBox(width: 5),
-                      Text(
-                        '${item.orderCount} ${item.orderCount == 1 ? 'Order' : 'Orders'}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2563EB),
+                      Flexible(
+                        child: Text(
+                          '${item.orderCount} ${item.orderCount == 1 ? 'Order' : 'Orders'}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF2563EB),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -1790,8 +1801,8 @@ class DCOrderPaymentMatchingPageState
               key: 'proof',
               group: 'Verification',
               label: 'PROOF / RECEIPT',
-              defaultWidth: 140,
-              minWidth: 115,
+              defaultWidth: 165,
+              minWidth: 125,
               searchString: (item) =>
                   item.depositReceiptUrl != null ? 'receipt uploaded' : 'auto cleared',
               cellBuilder: (context, item, row, isDark, brand) {
@@ -1853,12 +1864,16 @@ class DCOrderPaymentMatchingPageState
                           const Icon(Icons.attach_file_rounded,
                               size: 13, color: Color(0xFF0284C7)),
                           const SizedBox(width: 4),
-                          Text(
-                            'View Slip',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF0284C7),
+                          Flexible(
+                            child: Text(
+                              'View Slip',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF0284C7),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -1877,12 +1892,16 @@ class DCOrderPaymentMatchingPageState
                       children: [
                         const Icon(Icons.bolt_rounded, size: 12, color: Color(0xFF10B981)),
                         const SizedBox(width: 3),
-                        Text(
-                          'Auto-Cleared',
-                          style: GoogleFonts.inter(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF10B981),
+                        Flexible(
+                          child: Text(
+                            'Auto-Cleared',
+                            style: GoogleFonts.inter(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF10B981),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -1968,8 +1987,8 @@ class DCOrderPaymentMatchingPageState
               key: 'status',
               group: 'Status & Action',
               label: 'REMITTANCE STATUS',
-              defaultWidth: 180,
-              minWidth: 140,
+              defaultWidth: 215,
+              minWidth: 160,
               searchString: (item) => item.status,
               sortValue: (item) => item.status,
               cellBuilder: (context, item, row, isDark, brand) {
@@ -1982,14 +2001,17 @@ class DCOrderPaymentMatchingPageState
               key: 'action',
               group: 'Status & Action',
               label: 'ACTION',
-              defaultWidth: 140,
-              minWidth: 110,
+              defaultWidth: 170,
+              minWidth: 130,
               cellBuilder: (context, item, row, isDark, brand) {
                 final isPending = item.status == 'pending' ||
                     item.status == 'pending_audit' ||
                     item.status == 'submitted';
+                final isDirectClearable = !isPending &&
+                    !item.isVerified &&
+                    !item.isDirectTransfer;
 
-                if (isPending) {
+                if (isPending || isDirectClearable) {
                   return ElevatedButton.icon(
                     onPressed: () {
                       showDialog(
@@ -1999,11 +2021,15 @@ class DCOrderPaymentMatchingPageState
                     },
                     icon: const Icon(Icons.check_circle_outline_rounded,
                         size: 14, color: Colors.white),
-                    label: const Text('Review & Clear',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
+                    label: Text(
+                      isPending ? 'Review & Clear' : 'Verify & Clear',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
@@ -2409,7 +2435,7 @@ class DCOrderPaymentMatchingPageState
                               );
                             },
                           ),
-                        if (isPending)
+                        if (isPending || (!item.isVerified && !isDirect))
                           ElevatedButton.icon(
                             onPressed: () {
                               showDialog(
@@ -2420,8 +2446,9 @@ class DCOrderPaymentMatchingPageState
                             },
                             icon: const Icon(Icons.check_circle_outline_rounded,
                                 size: 14, color: Colors.white),
-                            label: const Text('Review & Clear',
-                                style: TextStyle(
+                            label: Text(
+                                isPending ? 'Review & Clear' : 'Verify & Clear',
+                                style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white)),
@@ -2621,10 +2648,14 @@ class DCOrderPaymentMatchingPageState
         children: [
           Icon(icon, size: 12, color: badgeColor),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-                fontSize: 10.5, fontWeight: FontWeight.bold, color: badgeColor),
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                  fontSize: 10.5, fontWeight: FontWeight.bold, color: badgeColor),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

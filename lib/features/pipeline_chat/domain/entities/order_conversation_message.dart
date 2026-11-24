@@ -21,6 +21,7 @@ enum ChatMessageType {
   voiceNote,
   fileAttachment,
   image,
+  sticker,
 }
 
 /// A message or automated milestone in the Order Conversation
@@ -70,11 +71,25 @@ class OrderConversationMessageEntity {
 
   bool get isSystem => senderRole == ChatSenderRole.system;
 
+  bool get isInternalNote =>
+      metadata['is_internal_note'] == true ||
+      metadata['type'] == 'internal_note' ||
+      metadata['internal_note'] == true;
+
   bool get isStatusEvent =>
       messageType != ChatMessageType.text &&
       messageType != ChatMessageType.voiceNote &&
       messageType != ChatMessageType.fileAttachment &&
-      messageType != ChatMessageType.image;
+      messageType != ChatMessageType.image &&
+      messageType != ChatMessageType.sticker;
+
+  bool get isSticker =>
+      messageType == ChatMessageType.sticker ||
+      metadata['type'] == 'sticker';
+
+  String? get stickerAssetPath => metadata['sticker_asset']?.toString();
+  String? get stickerUrl => metadata['sticker_url']?.toString() ?? metadata['local_data_uri']?.toString() ?? stickerAssetPath;
+  String get stickerTitle => metadata['sticker_name']?.toString() ?? 'NovaXpress Sticker';
 
   bool get isVoiceNote =>
       messageType == ChatMessageType.voiceNote ||

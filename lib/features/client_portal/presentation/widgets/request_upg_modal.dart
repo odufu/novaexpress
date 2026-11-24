@@ -183,9 +183,13 @@ class _RequestUpgModalState extends ConsumerState<RequestUpgModal> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            "#${widget.order.orderNumber}",
-                            style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+                          Expanded(
+                            child: Text(
+                              "#${widget.order.orderNumber}",
+                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),

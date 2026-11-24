@@ -140,8 +140,20 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       }
     });
 
+    bool isTest = const bool.fromEnvironment('flutter.test');
+    try {
+      if (!kIsWeb && (Platform.script.path.contains('test') ||
+          Platform.environment.containsKey('FLUTTER_TEST') ||
+          Platform.environment.containsKey('TEST_PLATFORM'))) {
+        isTest = true;
+      }
+      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
+        isTest = true;
+      }
+    } catch (_) {}
+
     // Periodic background sync timer (every 15s) when online
-    if (!const bool.fromEnvironment('flutter.test')) {
+    if (!isTest) {
       _outboxFlushTimer = Timer.periodic(const Duration(seconds: 15), (_) {
         if (mounted && _ref.read(networkProvider).isOnline) {
           flushOutbox();
@@ -335,11 +347,14 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       } catch (_) {}
     }
 
-    final scopeKey = authUser.isCloser
-        ? 'closer_${authUser.closerId ?? authUser.id}'
-        : (isMarketer
-            ? 'marketer_${authUser.marketerId ?? authUser.id}'
-            : (authUser.clientId ?? targetDcId ?? authUser.id));
+    final isSupervisor = authUser.isCloserSupervisor || authUser.isSupervisor || authUser.role.toLowerCase().contains('supervisor');
+    final scopeKey = isSupervisor
+        ? 'supervisor_${authUser.clientId ?? authUser.id}'
+        : (authUser.isCloser
+            ? 'closer_${authUser.closerId ?? authUser.id}'
+            : (isMarketer
+                ? 'marketer_${authUser.marketerId ?? authUser.id}'
+                : (authUser.clientId ?? targetDcId ?? authUser.id)));
 
     final localStorage = _ref.read(localStorageServiceProvider);
 
@@ -357,17 +372,17 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
 
     try {
       final convs = await _dataSource.fetchConversationsScoped(
-        userRole: authUser.role,
+        userRole: isSupervisor ? 'supervisor' : authUser.role,
         userId: authUser.id,
         clientId: authUser.clientId,
         distributionCenterId: targetDcId,
         deliveryAgentId: authUser.deliveryAgentId,
-        closerId: authUser.closerId ?? (authUser.isCloser ? authUser.id : null),
+        closerId: isSupervisor ? null : (authUser.closerId ?? (authUser.isCloser ? authUser.id : null)),
         marketerId: isMarketer ? (authUser.marketerId ?? authUser.id) : null,
       );
 
-      // Defense-in-depth: Filter by closer or marketer ownership
-      final filteredConvs = authUser.isCloser
+      // Defense-in-depth: Filter by closer or marketer ownership (Supervisors see all conversations)
+      final filteredConvs = (authUser.isCloser && !isSupervisor)
           ? convs.where((c) {
               final closerId = authUser.closerId ?? authUser.id;
               final closerName = authUser.fullName.trim().toLowerCase();
@@ -566,9 +581,9 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         return;
       }
 
-      // STRICT CLOSER ACCESS CONTROL: Closers can ONLY access conversations that concern them
       final authUser = _ref.read(authProvider).user;
-      if (authUser?.isCloser == true) {
+      final isSupervisor = authUser?.isCloserSupervisor == true || authUser?.isSupervisor == true || (authUser?.role ?? '').toLowerCase().contains('supervisor');
+      if (authUser?.isCloser == true && !isSupervisor) {
         final closerId = authUser?.closerId ?? authUser?.id;
         final closerName = authUser?.fullName.trim().toLowerCase();
         final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == authUser?.id);
@@ -734,7 +749,8 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       final authState = _ref.read(authProvider);
       final user = authState.user;
 
-      if (user?.isCloser == true) {
+      final isSupervisor = user?.isCloserSupervisor == true || user?.isSupervisor == true || (user?.role ?? '').toLowerCase().contains('supervisor');
+      if (user?.isCloser == true && !isSupervisor) {
         final closerId = user?.closerId ?? user?.id;
         final closerName = user?.fullName.trim().toLowerCase();
         final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == user?.id);
@@ -861,7 +877,8 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       final authState = _ref.read(authProvider);
       final user = authState.user;
 
-      if (user?.isCloser == true) {
+      final isSupervisor = user?.isCloserSupervisor == true || user?.isSupervisor == true || (user?.role ?? '').toLowerCase().contains('supervisor');
+      if (user?.isCloser == true && !isSupervisor) {
         final closerId = user?.closerId ?? user?.id;
         final closerName = user?.fullName.trim().toLowerCase();
         final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == user?.id);
@@ -976,7 +993,8 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       final authState = _ref.read(authProvider);
       final user = authState.user;
 
-      if (user?.isCloser == true) {
+      final isSupervisor = user?.isCloserSupervisor == true || user?.isSupervisor == true || (user?.role ?? '').toLowerCase().contains('supervisor');
+      if (user?.isCloser == true && !isSupervisor) {
         final closerId = user?.closerId ?? user?.id;
         final closerName = user?.fullName.trim().toLowerCase();
         final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == user?.id);

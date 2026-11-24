@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/helpers/map_launcher_helper.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../domain/entities/client_closer.dart';
 import '../providers/client_portal_provider.dart';
@@ -90,20 +91,12 @@ $companyName Management''';
   }
 
   Future<void> _sendViaWhatsApp(String companyName) async {
-    final phone = _formatPhoneNumber(widget.closer.phone);
     final message = _buildInviteMessage(companyName);
-    final encoded = Uri.encodeComponent(message);
-    final uri = Uri.parse('https://wa.me/$phone?text=$encoded');
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await _copyInviteToClipboard(companyName);
-      }
-    } catch (_) {
-      await _copyInviteToClipboard(companyName);
-    }
+    await MapLauncherHelper.launchWhatsApp(
+      context: context,
+      customerPhone: widget.closer.phone,
+      message: message,
+    );
   }
 
   Future<void> _sendViaSms(String companyName) async {

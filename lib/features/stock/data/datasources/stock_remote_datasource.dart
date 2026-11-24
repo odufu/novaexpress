@@ -201,6 +201,38 @@ abstract class StockRemoteDataSource {
     required String status,
     String? notes,
   });
+  Future<Map<String, dynamic>> syncDailyRiderSales({
+    required String riderId,
+    String? riderName,
+    required String productIdOrSku,
+    required int unitsSold,
+    String? distributionCenterId,
+    List<String> reconcileOrderIds = const [],
+    String? notes,
+  });
+  Future<Map<String, dynamic>> executeRiderToRiderBalance({
+    required String productIdOrSku,
+    required String sourceRiderId,
+    required String sourceRiderName,
+    required String destinationRiderId,
+    required String destinationRiderName,
+    required String destinationRiderCode,
+    required int quantity,
+    String? distributionCenterId,
+    String? notes,
+  });
+  Future<Map<String, dynamic>> syncRiderReturnToDc({
+    required String riderId,
+    required String productIdOrSku,
+    required int quantity,
+    String condition = 'good',
+    String? distributionCenterId,
+    String reason = 'Rider stock return',
+    String? notes,
+    bool logReturnRow = true,
+    String? returnNumber,
+    String? orderId,
+  });
 }
 
 class StockRemoteDataSourceImpl implements StockRemoteDataSource {
@@ -285,12 +317,381 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     return map;
   }
 
+  bool _isUuid(String? value) {
+    if (value == null) return false;
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value.trim());
+  }
+
+  String _upsertDcStocksTagInDescription(String? description, Map<String, int> dcStocks) {
+    final baseDesc = (description ?? '').trim();
+    if (dcStocks.isEmpty) return baseDesc;
+    final jsonTag = jsonEncode(dcStocks);
+    if (baseDesc.contains('[DC_STOCKS:')) {
+      return baseDesc.replaceAll(RegExp(r'\[DC_STOCKS:\s*\{.*?\}\]'), '[DC_STOCKS: $jsonTag]');
+    }
+    return baseDesc.isEmpty ? '[DC_STOCKS: $jsonTag]' : '$baseDesc [DC_STOCKS: $jsonTag]';
+  }
+
+  Map<String, int> _resolveDcStocksMap(Map<String, dynamic> pRow) {
+    final map = <String, int>{};
+    if (pRow['dc_stocks'] is Map && (pRow['dc_stocks'] as Map).isNotEmpty) {
+      final raw = pRow['dc_stocks'] as Map;
+      raw.forEach((k, v) {
+        if (v is num) {
+          map[k.toString()] = v.toInt();
+        } else {
+          final parsed = int.tryParse(v?.toString() ?? '');
+          if (parsed != null) map[k.toString()] = parsed;
+        }
+      });
+    } else {
+      map.addAll(_parseDcStocks(pRow['description']?.toString()));
+    }
+    return map;
+  }
+
+  Future<Map<String, dynamic>?> _resolveProductRow(
+    SupabaseClient dbClient,
+    String productIdOrSku,
+  ) async {
+    final clean = productIdOrSku.trim();
+    if (clean.isEmpty) return null;
+    try {
+      if (_isUuid(clean)) {
+        final res = await dbClient
+            .from(SupabaseConstants.productsTable)
+            .select()
+            .eq('id', clean)
+            .limit(1);
+        if ((res as List).isNotEmpty) {
+          return Map<String, dynamic>.from(res.first as Map);
+        }
+      }
+      final bySku = await dbClient
+          .from(SupabaseConstants.productsTable)
+          .select()
+          .ilike('sku', clean)
+          .limit(1);
+      if ((bySku as List).isNotEmpty) {
+        return Map<String, dynamic>.from(bySku.first as Map);
+      }
+      final byName = await dbClient
+          .from(SupabaseConstants.productsTable)
+          .select()
+          .ilike('name', clean)
+          .limit(1);
+      if ((byName as List).isNotEmpty) {
+        return Map<String, dynamic>.from(byName.first as Map);
+      }
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ℹ️ _resolveProductRow notice: $e');
+    }
+    return null;
+  }
+
+  Future<String?> _verifyValidUserId(SupabaseClient dbClient, String? candidateId) async {
+    if (!_isUuid(candidateId)) return null;
+    try {
+      final res = await dbClient
+          .from('users')
+          .select('id')
+          .eq('id', candidateId!.trim())
+          .limit(1);
+      if ((res as List).isNotEmpty) {
+        return res.first['id']?.toString();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<String?> _resolveCurrentValidUserId(SupabaseClient dbClient) async {
+    try {
+      return await _verifyValidUserId(dbClient, dbClient.auth.currentUser?.id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, String?>> _resolveRiderIdentity(
+    SupabaseClient dbClient,
+    String riderId,
+  ) async {
+    final clean = riderId.trim();
+    String effectiveAgentId = clean;
+    String? linkedUserId;
+    String? dcId;
+    String? name;
+    String? code;
+    String? operatingState;
+
+    if (clean.isEmpty) {
+      return {
+        'agentId': clean,
+        'userId': null,
+        'dcId': null,
+        'name': null,
+        'code': null,
+        'operatingState': null,
+      };
+    }
+
+    try {
+      final List<dynamic> daRes;
+      if (_isUuid(clean)) {
+        daRes = await dbClient
+            .from('delivery_agents')
+            .select('id, user_id, distribution_center_id, agent_code, operating_state, bank_account_name, users(first_name, last_name)')
+            .or('id.eq.$clean,user_id.eq.$clean')
+            .limit(1);
+      } else {
+        daRes = await dbClient
+            .from('delivery_agents')
+            .select('id, user_id, distribution_center_id, agent_code, operating_state, bank_account_name, users(first_name, last_name)')
+            .eq('agent_code', clean)
+            .limit(1);
+      }
+
+      if (daRes.isNotEmpty) {
+        final da = Map<String, dynamic>.from(daRes.first as Map);
+        effectiveAgentId = da['id']?.toString() ?? clean;
+        linkedUserId = da['user_id']?.toString();
+        dcId = da['distribution_center_id']?.toString();
+        code = da['agent_code']?.toString();
+        operatingState = da['operating_state']?.toString();
+        final rUser = da['users'] is Map<String, dynamic>
+            ? da['users'] as Map<String, dynamic>
+            : (da['users'] is List && (da['users'] as List).isNotEmpty
+                ? (da['users'] as List).first as Map<String, dynamic>
+                : null);
+        final full = '${rUser?['first_name'] ?? ''} ${rUser?['last_name'] ?? ''}'.trim();
+        name = full.isNotEmpty ? full : da['bank_account_name']?.toString();
+      }
+    } catch (_) {}
+
+    return {
+      'agentId': effectiveAgentId,
+      'userId': linkedUserId,
+      'dcId': dcId,
+      'name': name,
+      'code': code,
+      'operatingState': operatingState,
+    };
+  }
+
+  Future<String?> _ensureRiderWarehouseId({
+    required SupabaseClient dbClient,
+    required String effectiveAgentId,
+    String? linkedUserId,
+    required String riderName,
+    required String riderCode,
+    String? operatingState,
+  }) async {
+    const compId = '11111111-1111-4111-8111-111111111111';
+    if (!_isUuid(effectiveAgentId) && !_isUuid(linkedUserId)) return null;
+
+    try {
+      final String filter;
+      if (_isUuid(effectiveAgentId) && _isUuid(linkedUserId) && linkedUserId != effectiveAgentId) {
+        filter = 'rider_id.eq.$effectiveAgentId,rider_id.eq.$linkedUserId';
+      } else if (_isUuid(effectiveAgentId)) {
+        filter = 'rider_id.eq.$effectiveAgentId';
+      } else {
+        filter = 'rider_id.eq.$linkedUserId';
+      }
+
+      final wRes = await dbClient.from('warehouses').select('id').or(filter).limit(1);
+      if ((wRes as List).isNotEmpty) {
+        return wRes.first['id']?.toString();
+      }
+
+      if (_isUuid(effectiveAgentId)) {
+        final safeState = (operatingState != null && operatingState.isNotEmpty)
+            ? operatingState
+            : 'Federal Capital Territory';
+        final newW = await dbClient.from('warehouses').insert({
+          'company_id': compId,
+          'rider_id': effectiveAgentId,
+          'name': '$riderName ($riderCode) Vehicle Stock',
+          'type': 'rider_mini_hub',
+          'location_state': safeState,
+          'address': 'Vehicle Mobile Custody',
+          'is_active': true,
+        }).select().single();
+        return newW['id']?.toString();
+      }
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ℹ️ _ensureRiderWarehouseId notice: $e');
+    }
+    return null;
+  }
+
+  Future<void> _syncClientStockBalancesAndLedger({
+    required SupabaseClient dbClient,
+    required Map<String, dynamic> prodRow,
+    required String? distributionCenterId,
+    required int qtyDelta,
+    required String voucherType,
+    required String voucherNo,
+    String? orderId,
+    String? notes,
+  }) async {
+    try {
+      final prodId = prodRow['id']?.toString() ?? '';
+      final sku = prodRow['sku']?.toString().trim() ?? '';
+      final name = prodRow['name']?.toString().trim() ?? 'Product';
+      var clientId = prodRow['client_id']?.toString().trim() ?? '';
+      final clientName = prodRow['client_name']?.toString().trim() ?? '';
+
+      if (clientId.isEmpty && clientName.isNotEmpty) {
+        try {
+          final cRes = await dbClient
+              .from('clients')
+              .select('id')
+              .ilike('company_name', clientName)
+              .limit(1);
+          if ((cRes as List).isNotEmpty) {
+            clientId = cRes.first['id']?.toString() ?? '';
+          }
+        } catch (_) {}
+      }
+      if (clientId.isEmpty) return;
+
+      String? dcName;
+      String? dcCode;
+      if (_isUuid(distributionCenterId)) {
+        try {
+          final dcRes = await dbClient
+              .from('distribution_centers')
+              .select('id, name, code')
+              .eq('id', distributionCenterId!.trim())
+              .maybeSingle();
+          if (dcRes != null) {
+            dcName = dcRes['name']?.toString();
+            dcCode = dcRes['code']?.toString();
+          }
+        } catch (_) {}
+      }
+
+      final balRes = await dbClient
+          .from('client_stock_balances')
+          .select()
+          .eq('client_id', clientId);
+
+      final matches = <Map<String, dynamic>>[];
+      for (final r in balRes as List) {
+        final b = Map<String, dynamic>.from(r as Map);
+        final bProdId = b['product_id']?.toString() ?? '';
+        final bCode = b['item_code']?.toString().trim().toUpperCase() ?? '';
+        final bName = b['item_name']?.toString().trim().toLowerCase() ?? '';
+        final isMatch = (prodId.isNotEmpty && bProdId == prodId) ||
+            (sku.isNotEmpty && bCode == sku.toUpperCase()) ||
+            (name.isNotEmpty && bName == name.toLowerCase());
+        if (isMatch) {
+          matches.add(b);
+        }
+      }
+
+      Map<String, dynamic>? bal;
+      if (matches.isNotEmpty) {
+        matches.sort((a, b) {
+          final wA = a['warehouse']?.toString().toLowerCase() ?? '';
+          final wB = b['warehouse']?.toString().toLowerCase() ?? '';
+          final aDcMatch = (dcName != null && wA.contains(dcName.toLowerCase())) ||
+              (dcCode != null && wA.contains(dcCode.toLowerCase()));
+          final bDcMatch = (dcName != null && wB.contains(dcName.toLowerCase())) ||
+              (dcCode != null && wB.contains(dcCode.toLowerCase()));
+          if (aDcMatch != bDcMatch) return aDcMatch ? -1 : 1;
+          final qA = (a['balance_qty'] as num?)?.toDouble() ?? 0.0;
+          final qB = (b['balance_qty'] as num?)?.toDouble() ?? 0.0;
+          return qB.compareTo(qA);
+        });
+        bal = matches.first;
+      }
+
+      double valRate = (prodRow['cost_price'] as num?)?.toDouble() ?? 0.0;
+      String warehouse = dcName ?? 'Stores - NL';
+      String itemCode = sku.isNotEmpty ? sku : prodId;
+      String itemName = name;
+      String itemGroup = clientName.isNotEmpty ? clientName : 'Novacare';
+
+      if (bal != null) {
+        valRate = (bal['valuation_rate'] as num?)?.toDouble() ?? valRate;
+        warehouse = bal['warehouse']?.toString() ?? warehouse;
+        itemCode = bal['item_code']?.toString() ?? itemCode;
+        itemName = bal['item_name']?.toString() ?? itemName;
+        itemGroup = bal['item_group']?.toString() ?? itemGroup;
+
+        final nowIso = DateTime.now().toIso8601String();
+        if (qtyDelta < 0) {
+          final absQty = (-qtyDelta).toDouble();
+          final curOutQty = (bal['out_qty'] as num?)?.toDouble() ?? 0.0;
+          final curOutVal = (bal['out_value'] as num?)?.toDouble() ?? 0.0;
+          final curBalQty = (bal['balance_qty'] as num?)?.toDouble() ?? 0.0;
+          final newBalQty = (curBalQty - absQty).clamp(0.0, 999999999.0);
+          await dbClient.from('client_stock_balances').update({
+            'out_qty': curOutQty + absQty,
+            'out_value': curOutVal + (absQty * valRate),
+            'balance_qty': newBalQty,
+            'balance_value': newBalQty * valRate,
+            'updated_at': nowIso,
+          }).eq('id', bal['id']);
+        } else if (qtyDelta > 0) {
+          final addQty = qtyDelta.toDouble();
+          final curInQty = (bal['in_qty'] as num?)?.toDouble() ?? 0.0;
+          final curInVal = (bal['in_value'] as num?)?.toDouble() ?? 0.0;
+          final curBalQty = (bal['balance_qty'] as num?)?.toDouble() ?? 0.0;
+          final newBalQty = curBalQty + addQty;
+          await dbClient.from('client_stock_balances').update({
+            'in_qty': curInQty + addQty,
+            'in_value': curInVal + (addQty * valRate),
+            'balance_qty': newBalQty,
+            'balance_value': newBalQty * valRate,
+            'updated_at': nowIso,
+          }).eq('id', bal['id']);
+        }
+      }
+
+      await dbClient.from('client_stock_ledger_entries').insert({
+        'client_id': clientId,
+        'warehouse': warehouse,
+        'item_code': itemCode,
+        'item_name': itemName,
+        'item_group': itemGroup,
+        'voucher_type': voucherType,
+        'voucher_no': voucherNo,
+        if (_isUuid(orderId)) 'order_id': orderId,
+        'posting_date': DateTime.now().toIso8601String().split('T').first,
+        'posting_at': DateTime.now().toIso8601String(),
+        'qty_change': qtyDelta,
+        'incoming_qty': qtyDelta > 0 ? qtyDelta : 0,
+        'outgoing_qty': qtyDelta < 0 ? -qtyDelta : 0,
+        'valuation_rate': valRate,
+        'total_value': qtyDelta.abs() * valRate,
+        'notes': notes ?? voucherType,
+      });
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ℹ️ _syncClientStockBalancesAndLedger notice: $e');
+    }
+  }
+
   @override
   Future<List<StockItemModel>> getVehicleStockItems([String? agentId, String? dcId]) async {
     final dbClient = _getAuthDbClient();
     try {
       final validAgentId = (agentId != null && agentId.isNotEmpty) ? agentId : null;
       final validDcId = (dcId != null && dcId.isNotEmpty) ? dcId : null;
+
+      String resolvedAgentId = validAgentId ?? '';
+      String? resolvedLinkedUserId;
+      String? riderDcId;
+      if (validAgentId != null && validAgentId.isNotEmpty) {
+        final identity = await _resolveRiderIdentity(dbClient, validAgentId);
+        resolvedAgentId = identity['agentId'] ?? validAgentId;
+        resolvedLinkedUserId = identity['userId'];
+        riderDcId = identity['dcId'];
+      }
 
       // 1. Fetch products master catalog from Supabase (Global visibility across all DCs)
       List<dynamic> productsList = [];
@@ -309,14 +710,20 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       List<dynamic> ordersList = [];
       try {
         if (validAgentId != null && validAgentId.isNotEmpty) {
-          final ordersRes = await dbClient
-              .from(SupabaseConstants.ordersTable)
-              .select()
-              .eq('delivery_agent_id', validAgentId);
-          ordersList = ordersRes as List<dynamic>;
+          if (_isUuid(resolvedAgentId)) {
+            final agentFilter = (_isUuid(resolvedLinkedUserId) && resolvedLinkedUserId != resolvedAgentId)
+                ? 'delivery_agent_id.eq.$resolvedAgentId,delivery_agent_id.eq.$resolvedLinkedUserId'
+                : 'delivery_agent_id.eq.$resolvedAgentId';
+            final ordersRes = await dbClient
+                .from(SupabaseConstants.ordersTable)
+                .select()
+                .or(agentFilter);
+            ordersList = ordersRes as List<dynamic>;
+          } else {
+            ordersList = [];
+          }
         } else if (validDcId != null && validDcId.isNotEmpty) {
-          final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(validDcId.trim());
-          if (isUuid) {
+          if (_isUuid(validDcId)) {
             final ordersRes = await dbClient
                 .from(SupabaseConstants.ordersTable)
                 .select()
@@ -337,47 +744,45 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
 
       final Map<String, int> riderAllocatedUnits = {};
       final Map<String, Map<String, dynamic>> agentInventoryMap = {};
-      String? riderDcId;
       try {
-        if (validAgentId != null && validAgentId.isNotEmpty) {
-          // Resolve both agent id, user id, and host DC for resilient lookup
-          String agentId = validAgentId;
-          String? linkedUserId;
-          try {
-            final da = await dbClient
-                .from('delivery_agents')
-                .select('id, user_id, distribution_center_id')
-                .or('id.eq.$validAgentId,user_id.eq.$validAgentId')
-                .limit(1);
-            if ((da as List).isNotEmpty) {
-              agentId = da.first['id']?.toString() ?? validAgentId;
-              linkedUserId = da.first['user_id']?.toString();
-              riderDcId = da.first['distribution_center_id']?.toString();
-            }
-          } catch (_) {}
-
+        if (validAgentId != null && validAgentId.isNotEmpty && _isUuid(resolvedAgentId)) {
           // Authoritative vehicle custody from agent_inventory
           try {
+            final aiFilter = (_isUuid(resolvedLinkedUserId) && resolvedLinkedUserId != resolvedAgentId)
+                ? 'delivery_agent_id.eq.$resolvedAgentId,delivery_agent_id.eq.$resolvedLinkedUserId'
+                : 'delivery_agent_id.eq.$resolvedAgentId';
             final aiRes = await dbClient
                 .from('agent_inventory')
                 .select('product_id, total_in_custody, available_count, delivered_count_today, returned_count')
-                .or(linkedUserId != null && linkedUserId != agentId
-                    ? 'delivery_agent_id.eq.$agentId,delivery_agent_id.eq.$linkedUserId'
-                    : 'delivery_agent_id.eq.$agentId');
+                .or(aiFilter);
             for (final row in aiRes as List) {
               final rMap = Map<String, dynamic>.from(row as Map);
               final pId = rMap['product_id']?.toString() ?? '';
-              if (pId.isNotEmpty) {
+              if (pId.isEmpty) continue;
+              final prev = agentInventoryMap[pId];
+              if (prev == null) {
                 agentInventoryMap[pId] = rMap;
+              } else {
+                agentInventoryMap[pId] = {
+                  'product_id': pId,
+                  'total_in_custody': ((prev['total_in_custody'] as num?)?.toInt() ?? 0) +
+                      ((rMap['total_in_custody'] as num?)?.toInt() ?? 0),
+                  'available_count': ((prev['available_count'] as num?)?.toInt() ?? 0) +
+                      ((rMap['available_count'] as num?)?.toInt() ?? 0),
+                  'delivered_count_today': ((prev['delivered_count_today'] as num?)?.toInt() ?? 0) +
+                      ((rMap['delivered_count_today'] as num?)?.toInt() ?? 0),
+                  'returned_count': ((prev['returned_count'] as num?)?.toInt() ?? 0) +
+                      ((rMap['returned_count'] as num?)?.toInt() ?? 0),
+                };
               }
             }
           } catch (aiErr) {
             debugPrint('[STOCK_DATASOURCE] ℹ️ agent_inventory query note: $aiErr');
           }
 
-          final riderFilter = (linkedUserId != null && linkedUserId != agentId)
-              ? 'rider_id.eq.$agentId,rider_id.eq.$linkedUserId'
-              : 'rider_id.eq.$agentId';
+          final riderFilter = (_isUuid(resolvedLinkedUserId) && resolvedLinkedUserId != resolvedAgentId)
+              ? 'rider_id.eq.$resolvedAgentId,rider_id.eq.$resolvedLinkedUserId'
+              : 'rider_id.eq.$resolvedAgentId';
 
           // Find rider's warehouse
           final wRes = await dbClient
@@ -388,13 +793,13 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
 
           final String trfFilter;
           if (wIds.isNotEmpty) {
-            trfFilter = (linkedUserId != null && linkedUserId != agentId)
-                ? 'receiver_id.eq.$agentId,receiver_id.eq.$linkedUserId,destination_warehouse_id.in.(${wIds.join(",")})'
-                : 'receiver_id.eq.$agentId,destination_warehouse_id.in.(${wIds.join(",")})';
+            trfFilter = (_isUuid(resolvedLinkedUserId) && resolvedLinkedUserId != resolvedAgentId)
+                ? 'receiver_id.eq.$resolvedAgentId,receiver_id.eq.$resolvedLinkedUserId,destination_warehouse_id.in.(${wIds.join(",")})'
+                : 'receiver_id.eq.$resolvedAgentId,destination_warehouse_id.in.(${wIds.join(",")})';
           } else {
-            trfFilter = (linkedUserId != null && linkedUserId != agentId)
-                ? 'receiver_id.eq.$agentId,receiver_id.eq.$linkedUserId'
-                : 'receiver_id.eq.$agentId';
+            trfFilter = (_isUuid(resolvedLinkedUserId) && resolvedLinkedUserId != resolvedAgentId)
+                ? 'receiver_id.eq.$resolvedAgentId,receiver_id.eq.$resolvedLinkedUserId'
+                : 'receiver_id.eq.$resolvedAgentId';
           }
 
           final tRes = await dbClient
@@ -418,32 +823,68 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
               riderAllocatedUnits[pId] = (riderAllocatedUnits[pId] ?? 0) + qty;
             }
           }
-        } else if (validDcId != null && validDcId.isNotEmpty) {
-          // DC Overview: Only count dc_to_rider transfers belonging to THIS DC
+        } else if (validDcId != null && validDcId.isNotEmpty && _isUuid(validDcId)) {
+          // DC Overview: Aggregate DC riders' agent_inventory + dc_to_rider transfers belonging to THIS DC
           try {
-            final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(validDcId.trim());
-            if (isUuid) {
-              final tRes = await dbClient
-                  .from('stock_transfers')
-                  .select('id, destination_warehouse_id, source_dc_id, status, transfer_type, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)')
-                  .eq('source_dc_id', validDcId.trim())
-                  .eq('transfer_type', 'dc_to_rider')
-                  .not('status', 'in', '("cancelled","rejected")');
-
-              for (final t in tRes as List) {
-                final tMap = Map<String, dynamic>.from(t as Map);
-                final status = tMap['status']?.toString().toLowerCase() ?? '';
-                final items = tMap['stock_transfer_items'] as List? ?? [];
-                for (final it in items) {
-                  final itemMap = Map<String, dynamic>.from(it as Map);
-                  final pId = itemMap['product_id']?.toString() ?? '';
-                  final qty = status == 'completed'
-                      ? ((itemMap['quantity_received'] as num?)?.toInt() ??
-                          (itemMap['quantity_shipped'] as num?)?.toInt() ??
-                          0)
-                      : ((itemMap['quantity_shipped'] as num?)?.toInt() ?? 0);
-                  riderAllocatedUnits[pId] = (riderAllocatedUnits[pId] ?? 0) + qty;
+            final dcAgentsRes = await dbClient
+                .from('delivery_agents')
+                .select('id, user_id')
+                .eq('distribution_center_id', validDcId.trim());
+            final Set<String> dcAgentIds = {};
+            for (final da in dcAgentsRes as List) {
+              final id = da['id']?.toString();
+              final uId = da['user_id']?.toString();
+              if (_isUuid(id)) dcAgentIds.add(id!);
+              if (_isUuid(uId)) dcAgentIds.add(uId!);
+            }
+            if (dcAgentIds.isNotEmpty) {
+              final aiRes = await dbClient
+                  .from('agent_inventory')
+                  .select('delivery_agent_id, product_id, total_in_custody, available_count, delivered_count_today, returned_count')
+                  .filter('delivery_agent_id', 'in', dcAgentIds.toList());
+              for (final row in aiRes as List) {
+                final rMap = Map<String, dynamic>.from(row as Map);
+                final pId = rMap['product_id']?.toString() ?? '';
+                if (pId.isEmpty) continue;
+                final prev = agentInventoryMap[pId];
+                if (prev == null) {
+                  agentInventoryMap[pId] = rMap;
+                } else {
+                  agentInventoryMap[pId] = {
+                    'product_id': pId,
+                    'total_in_custody': ((prev['total_in_custody'] as num?)?.toInt() ?? 0) +
+                        ((rMap['total_in_custody'] as num?)?.toInt() ?? 0),
+                    'available_count': ((prev['available_count'] as num?)?.toInt() ?? 0) +
+                        ((rMap['available_count'] as num?)?.toInt() ?? 0),
+                    'delivered_count_today': ((prev['delivered_count_today'] as num?)?.toInt() ?? 0) +
+                        ((rMap['delivered_count_today'] as num?)?.toInt() ?? 0),
+                    'returned_count': ((prev['returned_count'] as num?)?.toInt() ?? 0) +
+                        ((rMap['returned_count'] as num?)?.toInt() ?? 0),
+                  };
                 }
+              }
+            }
+
+            final tRes = await dbClient
+                .from('stock_transfers')
+                .select('id, destination_warehouse_id, source_dc_id, status, transfer_type, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)')
+                .eq('source_dc_id', validDcId.trim())
+                .eq('transfer_type', 'dc_to_rider')
+                .not('status', 'in', '("cancelled","rejected")');
+
+            for (final t in tRes as List) {
+              final tMap = Map<String, dynamic>.from(t as Map);
+              final status = tMap['status']?.toString().toLowerCase() ?? '';
+              final items = tMap['stock_transfer_items'] as List? ?? [];
+              for (final it in items) {
+                final itemMap = Map<String, dynamic>.from(it as Map);
+                final pId = itemMap['product_id']?.toString() ?? '';
+                final qty = status == 'completed'
+                    ? ((itemMap['quantity_received'] as num?)?.toInt() ??
+                        (itemMap['quantity_shipped'] as num?)?.toInt() ??
+                        0)
+                    : ((itemMap['quantity_shipped'] as num?)?.toInt() ?? 0);
+                riderAllocatedUnits[pId] = (riderAllocatedUnits[pId] ?? 0) + qty;
               }
             }
           } catch (_) {}
@@ -454,6 +895,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
 
       final List<StockItemModel> resultItems = [];
       final Set<String> processedNames = {};
+      final Set<String> processedProductIds = {};
       final checkDcId = (validDcId != null && validDcId.isNotEmpty) ? validDcId : riderDcId;
       final dcStateMap = (checkDcId != null && checkDcId.isNotEmpty)
           ? await _resolveDcStateMap(dbClient)
@@ -467,6 +909,9 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         final pName = json['name']?.toString() ?? '';
         final pSku = json['sku']?.toString() ?? '';
 
+        if (pId.isNotEmpty) {
+          processedProductIds.add(pId);
+        }
         if (pName.isNotEmpty) {
           processedNames.add(pName.toLowerCase());
         }
@@ -505,23 +950,19 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         bool isCoveredByTargetDc = true;
 
         final dbQty = (json['stock_quantity'] as num?)?.toInt() ?? 0;
+        final dbDelivered = (json['delivered_count'] as num?)?.toInt() ?? 0;
+        final dbDamaged = (json['damaged_count'] as num?)?.toInt() ?? 0;
         final pDesc = json['description']?.toString() ?? '';
+        final Map<String, int> dcStocksMap = _resolveDcStocksMap(json);
 
         if (checkDcId != null && checkDcId.isNotEmpty) {
-          Map<String, int> dcStocks = {};
-          if (json['dc_stocks'] is Map && (json['dc_stocks'] as Map).isNotEmpty) {
-            final rawMap = json['dc_stocks'] as Map;
-            dcStocks = rawMap.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
-          } else {
-            dcStocks = _parseDcStocks(pDesc);
-          }
           final originDc = _parseOriginDc(pDesc);
           final coveringStates = _parseCoveringStates(pDesc);
 
-          if (coveringStates.isNotEmpty || dcStocks.isNotEmpty) {
+          if (coveringStates.isNotEmpty || dcStocksMap.isNotEmpty) {
             final dcState = dcStateMap[checkDcId] ?? '';
             final bool matchesDcState = coveringStates.any((st) => _stateMatches(dcState, st));
-            final bool matchesExplicitDc = dcStocks.containsKey(checkDcId) || originDc == checkDcId;
+            final bool matchesExplicitDc = dcStocksMap.containsKey(checkDcId) || originDc == checkDcId;
 
             isCoveredByTargetDc = matchesDcState || matchesExplicitDc;
           } else {
@@ -530,16 +971,22 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           }
         }
 
+        final invMapRow = agentInventoryMap[pId];
+        final invDelivered = (invMapRow?['delivered_count_today'] as num?)?.toInt() ?? 0;
+        final invReturned = (invMapRow?['returned_count'] as num?)?.toInt() ?? 0;
+        final invTotal = (invMapRow?['total_in_custody'] as num?)?.toInt() ?? 0;
+        final invAvail = (invMapRow?['available_count'] as num?)?.toInt() ?? invTotal;
+
+        final int effectiveDelivered;
+        final int effectiveReturned;
+
         if (validAgentId != null) {
-          if (agentInventoryMap.containsKey(pId)) {
-            final inv = agentInventoryMap[pId]!;
-            final invAvail = (inv['available_count'] as num?)?.toInt() ?? 0;
-            final invTotal = (inv['total_in_custody'] as num?)?.toInt() ?? invAvail;
-            final invDelivered = (inv['delivered_count_today'] as num?)?.toInt() ?? deliveredQty;
-            final invReturned = (inv['returned_count'] as num?)?.toInt() ?? returnedQty;
+          effectiveDelivered = invDelivered > deliveredQty ? invDelivered : deliveredQty;
+          effectiveReturned = invReturned > returnedQty ? invReturned : returnedQty;
+          if (invMapRow != null) {
             availableCount = invAvail;
             totalInCustody = invTotal;
-            assignedCount = invTotal + invDelivered + invReturned;
+            assignedCount = invTotal + effectiveDelivered + effectiveReturned;
           } else {
             // Rider View: Available is physical transfers minus delivered orders
             final netInVehicle = (totalAllocatedToRider - deliveredQty - returnedQty).clamp(0, 999999);
@@ -549,29 +996,21 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           }
         } else {
           // DC Supervisor View: Warehouse shelf stock strictly scoped to this DC
-          int scopedQty = 0;
           if (validDcId != null && validDcId.isNotEmpty) {
-            Map<String, int> dcStocks = {};
-            if (json['dc_stocks'] is Map && (json['dc_stocks'] as Map).isNotEmpty) {
-              final rawMap = json['dc_stocks'] as Map;
-              dcStocks = rawMap.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
-            } else {
-              dcStocks = _parseDcStocks(pDesc);
-            }
             final originDc = _parseOriginDc(pDesc);
-
-            if (isCoveredByTargetDc) {
-              scopedQty = dcStocks[validDcId] ?? (originDc == validDcId ? dbQty : 0);
-            } else {
-              scopedQty = 0;
-            }
+            final int scopedQty = isCoveredByTargetDc
+                ? (dcStocksMap[validDcId] ?? (originDc == validDcId ? dbQty : 0))
+                : 0;
             availableCount = scopedQty.clamp(0, 999999);
           } else {
             availableCount = dbQty.clamp(0, 999999);
           }
 
-          // In DC Overview, assignedCount reflects riders belonging to this DC + completed DC deliveries
-          assignedCount = totalAllocatedToRider + deliveredQty + returnedQty;
+          effectiveDelivered = [dbDelivered, invDelivered, deliveredQty].reduce((a, b) => a > b ? a : b);
+          effectiveReturned = invReturned > returnedQty ? invReturned : returnedQty;
+          final int invAssignedTotal = invTotal + effectiveDelivered + effectiveReturned;
+          final int trfAssignedTotal = totalAllocatedToRider + deliveredQty + returnedQty;
+          assignedCount = invAssignedTotal > trfAssignedTotal ? invAssignedTotal : trfAssignedTotal;
           totalInCustody = availableCount;
         }
 
@@ -593,15 +1032,16 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
             isCoveredByTargetDc ||
             availableCount > 0 ||
             totalAllocatedToRider > 0 ||
-            deliveredQty > 0 ||
+            effectiveDelivered > 0 ||
             inTransitQty > 0;
 
         if (shouldInclude) {
           json['assigned_count'] = assignedCount;
-          json['delivered_count'] = deliveredQty;
+          json['delivered_count'] = effectiveDelivered;
           json['available_count'] = availableCount;
-          json['returned_count'] = returnedQty;
-          json['complaint_count'] = returnedQty;
+          json['returned_count'] = effectiveReturned;
+          json['damaged_count'] = dbDamaged;
+          json['complaint_count'] = dbDamaged;
           json['reserved_count'] = inTransitQty;
           json['total_in_custody'] = totalInCustody;
 
@@ -612,12 +1052,18 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       // 2. Also process any products from active/delivered orders that weren't in products table
       for (final o in ordersList) {
         final oMap = o as Map<String, dynamic>;
+        final oProdId = oMap['product_id']?.toString() ?? '';
         final oProdName = oMap['product_name']?.toString() ?? '';
         final cleanBaseName = oProdName.split('(').first.trim();
-        if (cleanBaseName.isEmpty || processedNames.contains(cleanBaseName.toLowerCase())) {
+        if (cleanBaseName.isEmpty ||
+            processedNames.contains(cleanBaseName.toLowerCase()) ||
+            (oProdId.isNotEmpty && processedProductIds.contains(oProdId))) {
           continue;
         }
         processedNames.add(cleanBaseName.toLowerCase());
+        if (oProdId.isNotEmpty) {
+          processedProductIds.add(oProdId);
+        }
 
         int deliveredQty = 0;
         int inTransitQty = 0;
@@ -664,7 +1110,14 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         ));
       }
 
-      return resultItems;
+      final seenIds = <String>{};
+      final uniqueResult = <StockItemModel>[];
+      for (final it in resultItems) {
+        if (seenIds.add(it.id)) {
+          uniqueResult.add(it);
+        }
+      }
+      return uniqueResult;
     } catch (e) {
       debugPrint('[STOCK_DATASOURCE] ⚠️ getVehicleStockItems error: $e');
       return [];
@@ -905,63 +1358,19 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     final dbClient = _getAuthDbClient();
     const compId = '11111111-1111-4111-8111-111111111111';
 
-    // 1. Resolve authoritative product from Supabase
-    String resolvedProdId = productIdOrSku;
-    String resolvedProdName = 'Product';
-    String resolvedProdSku = 'SKU';
-    int currentStock = 0;
-    final isProdUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(productIdOrSku.trim());
-    try {
-      final query = dbClient.from('products').select('id, name, sku, stock_quantity');
-      final prodRes = isProdUuid
-          ? await query.eq('id', productIdOrSku.trim()).limit(1)
-          : await query.or('sku.eq.${productIdOrSku.trim()},name.eq.${productIdOrSku.trim()}').limit(1);
+    // 1. Resolve authoritative product & rider identity
+    final prodRow = await _resolveProductRow(dbClient, productIdOrSku);
+    final resolvedProdId = prodRow?['id']?.toString() ?? productIdOrSku;
+    final resolvedProdName = prodRow?['name']?.toString() ?? 'Product';
+    final resolvedProdSku = prodRow?['sku']?.toString() ?? 'SKU';
 
-      if ((prodRes as List).isNotEmpty) {
-        final row = prodRes.first;
-        resolvedProdId = row['id'].toString();
-        resolvedProdName = row['name']?.toString() ?? 'Product';
-        resolvedProdSku = row['sku']?.toString() ?? 'SKU';
-        currentStock = (row['stock_quantity'] as num?)?.toInt() ?? 0;
-      }
-    } catch (_) {}
-
-    // 2. Decrement warehouse stock quantity
-    final remaining = (currentStock - quantity).clamp(0, 999999);
-    try {
-      await dbClient
-          .from('products')
-          .update({
-            'stock_quantity': remaining,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', resolvedProdId);
-    } catch (_) {}
-
-    // 3. Resiliently resolve rider's delivery_agents record and distribution center
-    String resolvedRiderAgentId = riderId;
-    String? linkedUserId;
+    final identity = await _resolveRiderIdentity(dbClient, riderId);
+    final resolvedRiderAgentId = identity['agentId'] ?? riderId;
+    final linkedUserId = identity['userId'];
     String? resolvedDcId = (distributionCenterId != null && distributionCenterId.isNotEmpty)
         ? distributionCenterId
-        : null;
+        : identity['dcId'];
 
-    try {
-      final daRes = await dbClient
-          .from('delivery_agents')
-          .select('id, user_id, distribution_center_id')
-          .or('id.eq.$riderId,user_id.eq.$riderId')
-          .limit(1);
-      if ((daRes as List).isNotEmpty) {
-        final da = daRes.first;
-        resolvedRiderAgentId = da['id']?.toString() ?? riderId;
-        linkedUserId = da['user_id']?.toString();
-        if (resolvedDcId == null || resolvedDcId.isEmpty) {
-          resolvedDcId = da['distribution_center_id']?.toString();
-        }
-      }
-    } catch (_) {}
-
-    // If DC is still not resolved, query distribution_centers for any active valid DC
     if (resolvedDcId == null || resolvedDcId.isEmpty) {
       try {
         final dcRes = await dbClient.from('distribution_centers').select('id').limit(1).single();
@@ -969,61 +1378,50 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       } catch (_) {}
     }
 
-    // Resolve valid dispatched_by (must exist in users table or be null)
-    String? validDispatchedBy;
-    try {
-      final currentAuthId = dbClient.auth.currentUser?.id;
-      if (currentAuthId != null) {
-        final uRes = await dbClient.from('users').select('id').eq('id', currentAuthId).limit(1);
-        if ((uRes as List).isNotEmpty) {
-          validDispatchedBy = currentAuthId;
-        }
+    // 2. Decrement global + DC-scoped warehouse shelf stock in products
+    int remaining = 0;
+    if (prodRow != null && _isUuid(resolvedProdId)) {
+      final int currentGlobal = (prodRow['stock_quantity'] as num?)?.toInt() ?? 0;
+      remaining = (currentGlobal - quantity).clamp(0, 999999);
+      final dcStocks = _resolveDcStocksMap(prodRow);
+      if (resolvedDcId != null && resolvedDcId.isNotEmpty) {
+        final currentDcQty = dcStocks[resolvedDcId] ?? currentGlobal;
+        final nextDcQty = (currentDcQty - quantity).clamp(0, 999999);
+        dcStocks[resolvedDcId] = nextDcQty;
+        remaining = nextDcQty;
       }
-    } catch (_) {}
-
-    // 4. Resolve or create rider vehicle warehouse in warehouses table
-    String? riderWarehouseId;
-    try {
-      final filter = (linkedUserId != null && linkedUserId != resolvedRiderAgentId)
-          ? 'rider_id.eq.$resolvedRiderAgentId,rider_id.eq.$linkedUserId'
-          : 'rider_id.eq.$resolvedRiderAgentId';
-      final wRes = await dbClient
-          .from('warehouses')
-          .select('id')
-          .or(filter)
-          .limit(1);
-      if ((wRes as List).isNotEmpty) {
-        riderWarehouseId = wRes.first['id'].toString();
-      } else {
-        String riderState = 'Federal Capital Territory';
-        try {
-          final daStateRes = await dbClient
-              .from('delivery_agents')
-              .select('operating_state')
-              .eq('id', resolvedRiderAgentId)
-              .maybeSingle();
-          if (daStateRes != null && daStateRes['operating_state'] != null && daStateRes['operating_state'].toString().isNotEmpty) {
-            riderState = daStateRes['operating_state'].toString();
-          }
-        } catch (_) {}
-
-        final newW = await dbClient.from('warehouses').insert({
-          'company_id': compId,
-          'rider_id': resolvedRiderAgentId,
-          'name': '$riderName ($riderCode) Vehicle Stock',
-          'type': 'rider_mini_hub',
-          'location_state': riderState,
-          'address': 'Vehicle Mobile Custody',
-          'is_active': true,
-        }).select().single();
-        riderWarehouseId = newW['id'].toString();
+      final updatedDesc = _upsertDcStocksTagInDescription(
+        prodRow['description']?.toString(),
+        dcStocks,
+      );
+      try {
+        await dbClient.from('products').update({
+          'stock_quantity': (currentGlobal - quantity).clamp(0, 999999),
+          'available_count': (currentGlobal - quantity).clamp(0, 999999),
+          if (dcStocks.isNotEmpty) 'dc_stocks': dcStocks,
+          'description': updatedDesc,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', resolvedProdId);
+      } catch (e) {
+        debugPrint('[STOCK_DATASOURCE] ℹ️ products shelf update notice: $e');
       }
-    } catch (wErr) {
-      debugPrint('[STOCK_DATASOURCE] ℹ️ warehouses notice: $wErr');
     }
 
-    // 5. Insert relational stock_transfers and stock_transfer_items
-    if (riderWarehouseId != null && resolvedDcId != null && resolvedDcId.isNotEmpty) {
+    final validDispatchedBy = await _resolveCurrentValidUserId(dbClient);
+    final validReceiverUserId = await _verifyValidUserId(dbClient, linkedUserId);
+
+    // 3. Resolve or create rider vehicle warehouse in warehouses table
+    final riderWarehouseId = await _ensureRiderWarehouseId(
+      dbClient: dbClient,
+      effectiveAgentId: resolvedRiderAgentId,
+      linkedUserId: linkedUserId,
+      riderName: riderName,
+      riderCode: riderCode,
+      operatingState: identity['operatingState'],
+    );
+
+    // 4. Insert relational stock_transfers and stock_transfer_items
+    if (riderWarehouseId != null && _isUuid(resolvedDcId) && _isUuid(resolvedProdId)) {
       try {
         final wbNumber = 'WB-TRF-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
 
@@ -1034,10 +1432,10 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           'transfer_type': 'dc_to_rider',
           'source_dc_id': resolvedDcId,
           'destination_warehouse_id': riderWarehouseId,
-          'receiver_id': resolvedRiderAgentId,
+          if (validReceiverUserId != null) 'receiver_id': validReceiverUserId,
           'receiver_name': riderName,
           'receiver_role': 'delivery_agent',
-          'dispatched_by': validDispatchedBy,
+          if (validDispatchedBy != null) 'dispatched_by': validDispatchedBy,
           'status': 'pending_rider_acceptance',
           'notes': 'DC Handover to $riderName ($riderCode)',
         }).select().single();
@@ -1057,19 +1455,22 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       }
     }
 
-    // 6. Send real-time notification to rider in Supabase
-    try {
-      await dbClient.from('notifications').insert({
-        'company_id': compId,
-        'delivery_agent_id': resolvedRiderAgentId,
-        'title': 'New Stock Allocated! 📦',
-        'message': '+$quantity units of $resolvedProdName ($resolvedProdSku) allocated to your vehicle custody.',
-        'category': 'inventory',
-        'action_route': '/stock',
-        'is_read': false,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-    } catch (_) {}
+    // 5. Send real-time notification to rider in Supabase
+    if (_isUuid(resolvedRiderAgentId)) {
+      try {
+        await dbClient.from('notifications').insert({
+          'company_id': compId,
+          'delivery_agent_id': resolvedRiderAgentId,
+          if (_isUuid(resolvedDcId)) 'distribution_center_id': resolvedDcId,
+          'title': 'New Stock Allocated! 📦',
+          'message': '+$quantity units of $resolvedProdName ($resolvedProdSku) allocated to your vehicle custody.',
+          'category': 'inventory',
+          'action_route': '/stock',
+          'is_read': false,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
+    }
 
     return {
       'success': true,
@@ -1089,38 +1490,39 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
   }) async {
     if (quantity <= 0) return false;
     final dbClient = _getAuthDbClient();
-    final isProdUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(productIdOrSku.trim());
     try {
-      final query = dbClient.from('products').select('id, stock_quantity, description');
-      final prodRes = isProdUuid
-          ? await query.eq('id', productIdOrSku.trim()).limit(1)
-          : await query.or('sku.eq.${productIdOrSku.trim()},name.eq.${productIdOrSku.trim()}').limit(1);
-
-      if ((prodRes as List).isNotEmpty) {
-        final row = prodRes.first;
-        final current = (row['stock_quantity'] as num?)?.toInt() ?? 0;
-        var desc = row['description']?.toString() ?? '';
-
+      final prodRow = await _resolveProductRow(dbClient, productIdOrSku);
+      if (prodRow != null) {
+        final current = (prodRow['stock_quantity'] as num?)?.toInt() ?? 0;
+        final dcStocks = _resolveDcStocksMap(prodRow);
         if (distributionCenterId != null && distributionCenterId.trim().isNotEmpty) {
-          final dcStocks = _parseDcStocks(desc);
           final cleanDc = distributionCenterId.trim();
           dcStocks[cleanDc] = (dcStocks[cleanDc] ?? 0) + quantity;
-          final jsonTag = jsonEncode(dcStocks);
-          if (desc.contains('[DC_STOCKS:')) {
-            desc = desc.replaceAll(RegExp(r'\[DC_STOCKS:\s*\{.*?\}\]'), '[DC_STOCKS: $jsonTag]');
-          } else {
-            desc = '$desc [DC_STOCKS: $jsonTag]'.trim();
-          }
         }
+        final desc = _upsertDcStocksTagInDescription(
+          prodRow['description']?.toString(),
+          dcStocks,
+        );
 
-        await dbClient
-            .from('products')
-            .update({
-              'stock_quantity': current + quantity,
-              'description': desc,
-              'updated_at': DateTime.now().toIso8601String(),
-            })
-            .eq('id', row['id']);
+        await dbClient.from('products').update({
+          'stock_quantity': current + quantity,
+          'available_count': current + quantity,
+          if (dcStocks.isNotEmpty) 'dc_stocks': dcStocks,
+          'description': desc,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', prodRow['id']);
+
+        await _syncClientStockBalancesAndLedger(
+          dbClient: dbClient,
+          prodRow: prodRow,
+          distributionCenterId: distributionCenterId,
+          qtyDelta: quantity,
+          voucherType: 'purchase_receipt',
+          voucherNo: waybillNumber?.isNotEmpty == true
+              ? waybillNumber!
+              : 'RCV-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+          notes: 'DC Stock Inbound${supplierName != null && supplierName.isNotEmpty ? " from $supplierName" : ""}',
+        );
       }
       return true;
     } catch (_) {
@@ -1163,33 +1565,39 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         }
       } catch (_) {}
 
-      // Resolve linked user id if a specific riderId was queried
+      String? canonicalRiderId = validRiderId;
       String? linkedUserId;
       if (validRiderId != null && agentsMap.containsKey(validRiderId)) {
         final a = agentsMap[validRiderId]!;
-        linkedUserId = a['user_id']?.toString() ?? a['id']?.toString();
+        canonicalRiderId = a['id']?.toString() ?? validRiderId;
+        linkedUserId = a['user_id']?.toString();
       }
 
       // 3a. Read live vehicle custody from authoritative agent_inventory table
       final Map<String, RiderStockAllocation> allocationsMap = {};
+      final Set<String> authoritativeAgentInvKeys = {};
       try {
-        var aiQuery = dbClient.from('agent_inventory').select();
-        if (validRiderId != null) {
-          final filter = linkedUserId != null && linkedUserId != validRiderId
-              ? 'delivery_agent_id.eq.$validRiderId,delivery_agent_id.eq.$linkedUserId'
-              : 'delivery_agent_id.eq.$validRiderId';
-          aiQuery = aiQuery.or(filter);
+        final List<dynamic> aiRes;
+        if (canonicalRiderId != null && _isUuid(canonicalRiderId)) {
+          final filter = (_isUuid(linkedUserId) && linkedUserId != canonicalRiderId)
+              ? 'delivery_agent_id.eq.$canonicalRiderId,delivery_agent_id.eq.$linkedUserId'
+              : 'delivery_agent_id.eq.$canonicalRiderId';
+          aiRes = await dbClient.from('agent_inventory').select().or(filter);
+        } else if (validRiderId != null) {
+          aiRes = const [];
+        } else {
+          aiRes = await dbClient.from('agent_inventory').select();
         }
-        final aiRes = await aiQuery;
-        for (final item in aiRes as List) {
+        for (final item in aiRes) {
           final aiMap = Map<String, dynamic>.from(item as Map);
-          final rId = aiMap['delivery_agent_id']?.toString() ?? '';
+          final rawRid = aiMap['delivery_agent_id']?.toString() ?? '';
+          final agentInfo = agentsMap[rawRid] ?? {};
+          final rId = agentInfo['id']?.toString() ?? rawRid;
           final pId = aiMap['product_id']?.toString() ?? '';
           final totalCustody = (aiMap['total_in_custody'] as num?)?.toInt() ?? 0;
           final deliveredToday = (aiMap['delivered_count_today'] as num?)?.toInt() ?? 0;
           final returnedCount = (aiMap['returned_count'] as num?)?.toInt() ?? 0;
 
-          final agentInfo = agentsMap[rId] ?? {};
           final agentDc = agentInfo['distribution_center_id']?.toString();
           if (validDcId != null && agentDc != null && agentDc.isNotEmpty && agentDc != validDcId) {
             continue;
@@ -1218,28 +1626,44 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           final client = pInfo['owner_name']?.toString() ?? pInfo['client_name']?.toString() ?? '';
 
           final key = '${rId}_$pId';
-          allocationsMap[key] = RiderStockAllocation(
-            id: 'alloc_${key.hashCode.abs()}',
-            riderId: rId,
-            riderName: rName,
-            riderCode: rCode,
-            productId: pId,
-            productName: pName,
-            sku: sku,
-            clientName: client,
-            allocatedUnits: totalCustody + deliveredToday + returnedCount,
-            deliveredUnits: deliveredToday,
-            inCustodyUnits: totalCustody,
-            returnedUnits: returnedCount,
-            unitPrice: price,
-            allocatedAt: DateTime.tryParse(aiMap['updated_at']?.toString() ?? '') ?? DateTime.now(),
-          );
+          authoritativeAgentInvKeys.add(key);
+          final updatedAt = DateTime.tryParse(aiMap['updated_at']?.toString() ?? '') ?? DateTime.now();
+          final existing = allocationsMap[key];
+          if (existing == null) {
+            allocationsMap[key] = RiderStockAllocation(
+              id: 'alloc_${key.hashCode.abs()}',
+              riderId: rId,
+              riderName: rName,
+              riderCode: rCode,
+              productId: pId,
+              productName: pName,
+              sku: sku,
+              clientName: client,
+              allocatedUnits: totalCustody + deliveredToday + returnedCount,
+              deliveredUnits: deliveredToday,
+              inCustodyUnits: totalCustody,
+              returnedUnits: returnedCount,
+              unitPrice: price,
+              allocatedAt: updatedAt,
+            );
+          } else {
+            final combinedCustody = existing.inCustodyUnits + totalCustody;
+            final combinedDelivered = existing.deliveredUnits + deliveredToday;
+            final combinedReturned = existing.returnedUnits + returnedCount;
+            allocationsMap[key] = existing.copyWith(
+              allocatedUnits: combinedCustody + combinedDelivered + combinedReturned,
+              deliveredUnits: combinedDelivered,
+              inCustodyUnits: combinedCustody,
+              returnedUnits: combinedReturned,
+              allocatedAt: updatedAt.isAfter(existing.allocatedAt) ? updatedAt : existing.allocatedAt,
+            );
+          }
         }
       } catch (e) {
         debugPrint('[STOCK_DATASOURCE] ℹ️ agent_inventory allocation query notice: $e');
       }
 
-      // 3b. Augment with stock_transfers (warehouses or direct receiver_id)
+      // 3b. Augment with stock_transfers (pending handovers & legacy fallback)
       final Map<String, Map<String, dynamic>> warehouseToRider = {};
       try {
         final wRes = await dbClient
@@ -1248,13 +1672,15 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
             .not('rider_id', 'is', null);
         for (final w in wRes as List) {
           final wMap = Map<String, dynamic>.from(w as Map);
-          final rId = wMap['rider_id']?.toString() ?? '';
-          final agentInfo = agentsMap[rId] ?? {};
+          final rawRid = wMap['rider_id']?.toString() ?? '';
+          final agentInfo = agentsMap[rawRid] ?? {};
+          final canonRid = agentInfo['id']?.toString() ?? rawRid;
           final agentDc = agentInfo['distribution_center_id']?.toString();
 
           final bool isMatch = validRiderId == null ||
-              rId == validRiderId ||
-              (linkedUserId != null && rId == linkedUserId);
+              canonRid == canonicalRiderId ||
+              rawRid == validRiderId ||
+              (linkedUserId != null && rawRid == linkedUserId);
           final bool isDcMatch = validDcId == null || agentDc == validDcId;
 
           if (isMatch && isDcMatch) {
@@ -1266,14 +1692,15 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       try {
         var tQuery = dbClient
             .from('stock_transfers')
-            .select('id, destination_warehouse_id, receiver_id, source_dc_id, status, created_at, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)');
+            .select('id, destination_warehouse_id, receiver_id, source_dc_id, status, transfer_type, created_at, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)')
+            .not('status', 'in', '("cancelled","rejected")');
 
         if (warehouseToRider.isNotEmpty) {
           tQuery = tQuery.filter('destination_warehouse_id', 'in', warehouseToRider.keys.toList());
-        } else if (validRiderId != null) {
-          final filter = linkedUserId != null && linkedUserId != validRiderId
-              ? 'receiver_id.eq.$validRiderId,receiver_id.eq.$linkedUserId'
-              : 'receiver_id.eq.$validRiderId';
+        } else if (validRiderId != null && _isUuid(canonicalRiderId)) {
+          final filter = (_isUuid(linkedUserId) && linkedUserId != canonicalRiderId)
+              ? 'receiver_id.eq.$canonicalRiderId,receiver_id.eq.$linkedUserId'
+              : 'receiver_id.eq.$canonicalRiderId';
           tQuery = tQuery.or(filter);
         } else {
           tQuery = tQuery.eq('transfer_type', 'dc_to_rider');
@@ -1282,12 +1709,14 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         final tRes = await tQuery;
         for (final t in tRes as List) {
           final tMap = Map<String, dynamic>.from(t as Map);
+          final tStatus = tMap['status']?.toString().toLowerCase() ?? '';
           final destWarehouseId = tMap['destination_warehouse_id']?.toString() ?? '';
           final wInfo = warehouseToRider[destWarehouseId];
-          final rId = wInfo?['rider_id']?.toString() ?? tMap['receiver_id']?.toString() ?? '';
-          if (rId.isEmpty) continue;
+          final rawRid = wInfo?['rider_id']?.toString() ?? tMap['receiver_id']?.toString() ?? '';
+          if (rawRid.isEmpty) continue;
 
-          final agentInfo = agentsMap[rId] ?? {};
+          final agentInfo = agentsMap[rawRid] ?? {};
+          final rId = agentInfo['id']?.toString() ?? rawRid;
           final agentDc = agentInfo['distribution_center_id']?.toString();
           final sourceDc = tMap['source_dc_id']?.toString();
 
@@ -1315,9 +1744,11 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           for (final it in items) {
             final itemMap = Map<String, dynamic>.from(it as Map);
             final pId = itemMap['product_id']?.toString() ?? '';
-            final qty = (itemMap['quantity_shipped'] as num?)?.toInt() ??
-                (itemMap['quantity_received'] as num?)?.toInt() ??
-                0;
+            final qty = tStatus == 'completed'
+                ? ((itemMap['quantity_received'] as num?)?.toInt() ??
+                    (itemMap['quantity_shipped'] as num?)?.toInt() ??
+                    0)
+                : ((itemMap['quantity_shipped'] as num?)?.toInt() ?? 0);
 
             final pInfo = productMap[pId] ?? {};
             final pName = pInfo['name']?.toString() ?? 'Product';
@@ -1326,6 +1757,11 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
             final client = pInfo['owner_name']?.toString() ?? pInfo['client_name']?.toString() ?? '';
 
             final key = '${rId}_$pId';
+            if (authoritativeAgentInvKeys.contains(key) && tStatus == 'completed') {
+              // Completed handovers are already accounted for in agent_inventory
+              continue;
+            }
+
             final existing = allocationsMap[key];
             if (existing == null) {
               allocationsMap[key] = RiderStockAllocation(
@@ -1343,9 +1779,10 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
                 unitPrice: price,
                 allocatedAt: DateTime.tryParse(tMap['created_at']?.toString() ?? '') ?? DateTime.now(),
               );
-            } else if (existing.allocatedUnits < qty) {
+            } else {
               allocationsMap[key] = existing.copyWith(
                 allocatedUnits: existing.allocatedUnits + qty,
+                inCustodyUnits: existing.inCustodyUnits + qty,
               );
             }
           }
@@ -1354,26 +1791,35 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         debugPrint('[STOCK_DATASOURCE] ℹ️ stock_transfers allocation query notice: $e');
       }
 
-      // Reconcile delivered and returned counts from orders
+      // Reconcile delivered and returned counts from orders ONLY when no authoritative agent_inventory exists
       List<dynamic> orders = [];
       try {
         final oQuery = dbClient.from('orders').select();
-        final isUuid = validDcId != null && RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(validDcId.trim());
-        final oRes = validRiderId != null
-            ? await oQuery.eq('delivery_agent_id', validRiderId)
-            : (isUuid ? await oQuery.eq('distribution_center_id', validDcId.trim()) : await oQuery);
-        orders = oRes as List<dynamic>;
+        if (validRiderId != null && _isUuid(canonicalRiderId)) {
+          final filter = (_isUuid(linkedUserId) && linkedUserId != canonicalRiderId)
+              ? 'delivery_agent_id.eq.$canonicalRiderId,delivery_agent_id.eq.$linkedUserId'
+              : 'delivery_agent_id.eq.$canonicalRiderId';
+          orders = await oQuery.or(filter) as List<dynamic>;
+        } else if (validDcId != null && _isUuid(validDcId)) {
+          orders = await oQuery.eq('distribution_center_id', validDcId.trim()) as List<dynamic>;
+        } else if (validRiderId == null && validDcId == null) {
+          orders = await oQuery as List<dynamic>;
+        }
       } catch (_) {}
 
       for (final o in orders) {
         final oMap = Map<String, dynamic>.from(o as Map);
-        final oRiderId = oMap['delivery_agent_id']?.toString() ?? '';
+        final rawORid = oMap['delivery_agent_id']?.toString() ?? '';
+        final oRiderId = agentsMap[rawORid]?['id']?.toString() ?? rawORid;
         final oProdId = oMap['product_id']?.toString() ?? '';
         final oProdName = oMap['product_name']?.toString() ?? '';
         final oStatus = oMap['status']?.toString().toLowerCase() ?? '';
         final oQty = (oMap['quantity'] as num?)?.toInt() ?? 1;
 
         final key = '${oRiderId}_$oProdId';
+        if (authoritativeAgentInvKeys.contains(key)) {
+          continue;
+        }
         if (allocationsMap.containsKey(key)) {
           final current = allocationsMap[key]!;
           if (oStatus == 'delivered') {
@@ -1386,13 +1832,16 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           } else if (oStatus == 'returned' || oStatus == 'failed') {
             allocationsMap[key] = current.copyWith(
               returnedUnits: current.returnedUnits + oQty,
+              inCustodyUnits: (current.inCustodyUnits - oQty).clamp(0, 999999),
             );
           }
         } else {
           // If no formal stock transfer was logged yet but active orders exist
           for (final entryKey in allocationsMap.keys) {
+            if (authoritativeAgentInvKeys.contains(entryKey)) continue;
             final alloc = allocationsMap[entryKey]!;
             if (alloc.riderId == oRiderId &&
+                oProdName.isNotEmpty &&
                 (alloc.productName.toLowerCase().contains(oProdName.toLowerCase()) ||
                     oProdName.toLowerCase().contains(alloc.productName.toLowerCase()))) {
               if (oStatus == 'delivered') {
@@ -1422,18 +1871,9 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
   }) async {
     final dbClient = _getAuthDbClient();
     try {
-      // Resolve agent ID (handle user_id vs id)
-      String effectiveAgentId = riderId;
-      try {
-        final daRes = await dbClient
-            .from('delivery_agents')
-            .select('id')
-            .or('id.eq.$riderId,user_id.eq.$riderId')
-            .limit(1);
-        if ((daRes as List).isNotEmpty) {
-          effectiveAgentId = daRes.first['id']?.toString() ?? riderId;
-        }
-      } catch (_) {}
+      final identity = await _resolveRiderIdentity(dbClient, riderId);
+      final effectiveAgentId = identity['agentId'] ?? riderId;
+      if (!_isUuid(effectiveAgentId) || !_isUuid(productId)) return;
 
       final existing = await dbClient
           .from('agent_inventory')
@@ -1451,16 +1891,17 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         await dbClient.from('agent_inventory').update({
           'available_count': (curAvailable + inCustodyDelta - deliveredDelta).clamp(0, 999999),
           'total_in_custody': (curCustody + inCustodyDelta - deliveredDelta - returnedDelta).clamp(0, 999999),
-          'delivered_count_today': curDelivered + (deliveredDelta > 0 ? deliveredDelta : 0),
-          'returned_count': curReturned + (returnedDelta > 0 ? returnedDelta : 0),
+          'delivered_count_today': (curDelivered + deliveredDelta).clamp(0, 999999),
+          'returned_count': (curReturned + returnedDelta).clamp(0, 999999),
           'updated_at': DateTime.now().toIso8601String(),
         }).eq('delivery_agent_id', effectiveAgentId).eq('product_id', productId);
-      } else if (inCustodyDelta > 0) {
+      } else if (inCustodyDelta != 0 || deliveredDelta > 0 || returnedDelta > 0) {
+        final initCustody = inCustodyDelta > 0 ? inCustodyDelta : 0;
         await dbClient.from('agent_inventory').insert({
           'delivery_agent_id': effectiveAgentId,
           'product_id': productId,
-          'available_count': inCustodyDelta,
-          'total_in_custody': inCustodyDelta,
+          'available_count': initCustody,
+          'total_in_custody': initCustody,
           'delivered_count_today': deliveredDelta > 0 ? deliveredDelta : 0,
           'returned_count': returnedDelta > 0 ? returnedDelta : 0,
           'updated_at': DateTime.now().toIso8601String(),
@@ -1616,26 +2057,19 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     String? notes,
   }) async {
     final dbClient = _getAuthDbClient();
-    final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-    final validOrderUuid = uuidRegex.hasMatch(orderId.trim()) ? orderId.trim() : null;
+    final validOrderUuid = _isUuid(orderId) ? orderId.trim() : null;
 
     try {
-      // 1. Resolve agent's distribution center
-      String? dcId = destinationDcId;
-      if (dcId == null || dcId.isEmpty) {
-        try {
-          final daRes = await dbClient
-              .from('delivery_agents')
-              .select('distribution_center_id')
-              .or('id.eq.$deliveryAgentId,user_id.eq.$deliveryAgentId')
-              .limit(1);
-          if ((daRes as List).isNotEmpty) {
-            dcId = daRes.first['distribution_center_id']?.toString();
-          }
-        } catch (_) {}
-      }
+      final identity = await _resolveRiderIdentity(dbClient, deliveryAgentId);
+      final effectiveAgentId = identity['agentId'] ?? deliveryAgentId;
+      final prodRow = await _resolveProductRow(dbClient, productId);
+      final resolvedProdId = prodRow?['id']?.toString() ?? productId;
 
-      // Fallback: check order's DC if orderId is valid
+      // 1. Resolve agent's / order's distribution center
+      String? dcId = (destinationDcId != null && destinationDcId.trim().isNotEmpty)
+          ? destinationDcId.trim()
+          : identity['dcId'];
+
       if ((dcId == null || dcId.isEmpty) && validOrderUuid != null) {
         try {
           final ordRes = await dbClient
@@ -1656,30 +2090,65 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         } catch (_) {}
       }
 
-      // 2. Insert into stock_returns table
-      final insertPayload = <String, dynamic>{
-        'return_number': returnNumber.isNotEmpty ? returnNumber : 'RET-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
-        'delivery_agent_id': deliveryAgentId,
-        'distribution_center_id': dcId,
-        if (destinationDcId != null && destinationDcId.isNotEmpty) 'destination_dc_id': destinationDcId,
-        'product_id': productId,
-        'quantity': quantity > 0 ? quantity : 1,
-        'reason': reason.isNotEmpty ? reason : 'customer_rejected',
-        'condition': condition ?? 'good',
-        'status': 'submitted',
-        'notes': notes,
-        'created_at': DateTime.now().toIso8601String(),
-      };
-      if (validOrderUuid != null) {
-        insertPayload['order_id'] = validOrderUuid;
+      final safeQty = quantity > 0 ? quantity : 1;
+      final cleanCondition = (condition != null && condition.trim().isNotEmpty)
+          ? condition.trim()
+          : 'good';
+      final isImmediateSync =
+          orderId == 'MANUAL-DAMAGE-RETURN' || orderId == 'OFFBOARD-CLEARANCE';
+      final validReceivedBy =
+          isImmediateSync ? await _resolveCurrentValidUserId(dbClient) : null;
+      final retNo = returnNumber.isNotEmpty
+          ? returnNumber
+          : 'RET-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+      final nowIso = DateTime.now().toIso8601String();
+
+      // 2. Insert into stock_returns table using only verified DDL columns
+      if (_isUuid(resolvedProdId)) {
+        final insertPayload = <String, dynamic>{
+          'return_number': retNo,
+          if (_isUuid(effectiveAgentId)) 'delivery_agent_id': effectiveAgentId,
+          if (_isUuid(dcId)) 'distribution_center_id': dcId,
+          if (_isUuid(destinationDcId)) 'destination_dc_id': destinationDcId!.trim(),
+          'product_id': resolvedProdId,
+          'quantity': safeQty,
+          'reason': reason.isNotEmpty ? reason : 'customer_rejected',
+          'condition': cleanCondition,
+          'status': isImmediateSync ? 'approved' : 'submitted',
+          if (validReceivedBy != null) 'received_by': validReceivedBy,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+          'created_at': nowIso,
+          if (isImmediateSync) 'received_at': nowIso,
+        };
+        if (validOrderUuid != null) {
+          insertPayload['order_id'] = validOrderUuid;
+        }
+
+        await dbClient.from('stock_returns').insert(insertPayload);
       }
 
-      await dbClient.from('stock_returns').insert(insertPayload);
+      // 3. For immediate DC-processed spoilage or offboard clearance, balance system custody & shelf immediately
+      if (isImmediateSync) {
+        await syncRiderReturnToDc(
+          riderId: effectiveAgentId,
+          productIdOrSku: resolvedProdId,
+          quantity: safeQty,
+          condition: cleanCondition,
+          distributionCenterId: dcId,
+          reason: reason,
+          notes: notes,
+          logReturnRow: false,
+          returnNumber: retNo,
+          orderId: validOrderUuid,
+        );
+      }
 
       return {
         'status': 'success',
-        'returnNumber': insertPayload['return_number'],
-        'message': 'Stock return logged and submitted to handling DC for restocking.',
+        'returnNumber': retNo,
+        'message': isImmediateSync
+            ? 'Stock return verified and balanced across system inventory.'
+            : 'Stock return logged and submitted to handling DC for restocking.',
       };
     } catch (e) {
       debugPrint('[STOCK_DATASOURCE] ⚠️ processStockReturn error: $e');
@@ -2452,6 +2921,607 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     } catch (e) {
       debugPrint('[STOCK_DATASOURCE] ⚠️ fulfillStockRequest error: $e');
       return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> syncDailyRiderSales({
+    required String riderId,
+    String? riderName,
+    required String productIdOrSku,
+    required int unitsSold,
+    String? distributionCenterId,
+    List<String> reconcileOrderIds = const [],
+    String? notes,
+  }) async {
+    final dbClient = _getAuthDbClient();
+    const compId = '11111111-1111-4111-8111-111111111111';
+    try {
+      final prodRow = await _resolveProductRow(dbClient, productIdOrSku);
+      final resolvedProdId = prodRow?['id']?.toString() ?? productIdOrSku;
+      final prodName = prodRow?['name']?.toString() ?? 'Product';
+      final prodSku = prodRow?['sku']?.toString() ?? '';
+
+      final identity = await _resolveRiderIdentity(dbClient, riderId);
+      final effectiveAgentId = identity['agentId'] ?? riderId;
+      final resolvedRiderName = (riderName != null && riderName.trim().isNotEmpty)
+          ? riderName.trim()
+          : (identity['name'] ?? 'Courier');
+      String? effectiveDcId = (distributionCenterId != null && distributionCenterId.trim().isNotEmpty)
+          ? distributionCenterId.trim()
+          : identity['dcId'];
+
+      // 1. Reconcile any selected open orders that the rider forgot to mark delivered
+      int reconciledOrdersCount = 0;
+      int reconciledOrdersQty = 0;
+      String? reconciledOrderUuid;
+      final nowIso = DateTime.now().toIso8601String();
+
+      for (final rawId in reconcileOrderIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet()) {
+        try {
+          final existingRes = _isUuid(rawId)
+              ? await dbClient
+                  .from(SupabaseConstants.ordersTable)
+                  .select('id, status, quantity, product_id, distribution_center_id')
+                  .eq('id', rawId)
+                  .limit(1)
+              : await dbClient
+                  .from(SupabaseConstants.ordersTable)
+                  .select('id, status, quantity, product_id, distribution_center_id')
+                  .eq('order_number', rawId)
+                  .limit(1);
+          if ((existingRes as List).isEmpty) continue;
+          final oRow = Map<String, dynamic>.from(existingRes.first as Map);
+          final curStatus = (oRow['status']?.toString() ?? '').toLowerCase();
+          if (curStatus == 'delivered' || curStatus == 'completed') continue;
+
+          final oId = oRow['id']?.toString() ?? '';
+          if (oId.isEmpty) continue;
+          final oQty = ((oRow['quantity'] as num?)?.toInt() ?? 1).clamp(1, 999999);
+
+          await dbClient.from(SupabaseConstants.ordersTable).update({
+            'status': 'delivered',
+            'delivered_at': nowIso,
+            'updated_at': nowIso,
+            if (_isUuid(effectiveAgentId)) 'delivery_agent_id': effectiveAgentId,
+            if (notes != null && notes.trim().isNotEmpty)
+              'delivery_notes': 'Balanced via Daily Sales: ${notes.trim()}',
+          }).eq('id', oId);
+
+          reconciledOrdersCount++;
+          reconciledOrdersQty += oQty;
+          reconciledOrderUuid ??= oId;
+          if ((effectiveDcId == null || effectiveDcId.isEmpty) &&
+              oRow['distribution_center_id'] != null) {
+            effectiveDcId = oRow['distribution_center_id'].toString();
+          }
+        } catch (ordErr) {
+          debugPrint('[STOCK_DATASOURCE] ℹ️ order reconciliation notice ($rawId): $ordErr');
+        }
+      }
+
+      final effectiveUnitsSold =
+          unitsSold > reconciledOrdersQty ? unitsSold : reconciledOrdersQty;
+      if (effectiveUnitsSold <= 0) {
+        return {
+          'success': false,
+          'effectiveUnitsSold': 0,
+          'reconciledOrdersCount': reconciledOrdersCount,
+          'message': 'Enter units sold or select open orders to balance.',
+        };
+      }
+
+      // 2. Deduct physical units from rider custody in agent_inventory (avoiding double deduction)
+      if (_isUuid(effectiveAgentId) && _isUuid(resolvedProdId)) {
+        try {
+          final existingRows = await dbClient
+              .from('agent_inventory')
+              .select()
+              .eq('delivery_agent_id', effectiveAgentId)
+              .eq('product_id', resolvedProdId)
+              .limit(1);
+          if ((existingRows as List).isNotEmpty) {
+            final row = Map<String, dynamic>.from(existingRows.first as Map);
+            final curAvail = (row['available_count'] as num?)?.toInt() ?? 0;
+            final curCustody = (row['total_in_custody'] as num?)?.toInt() ?? 0;
+            final curDelivered = (row['delivered_count_today'] as num?)?.toInt() ?? 0;
+
+            await dbClient.from('agent_inventory').update({
+              'available_count': (curAvail - effectiveUnitsSold).clamp(0, 999999),
+              'total_in_custody': (curCustody - effectiveUnitsSold).clamp(0, 999999),
+              'delivered_count_today': curDelivered + effectiveUnitsSold,
+              'updated_at': nowIso,
+            }).eq('id', row['id']);
+          } else {
+            await dbClient.from('agent_inventory').insert({
+              'delivery_agent_id': effectiveAgentId,
+              'product_id': resolvedProdId,
+              'available_count': 0,
+              'total_in_custody': 0,
+              'delivered_count_today': effectiveUnitsSold,
+              'returned_count': 0,
+              'updated_at': nowIso,
+            });
+          }
+        } catch (aiErr) {
+          debugPrint('[STOCK_DATASOURCE] ℹ️ syncDailyRiderSales agent_inventory note: $aiErr');
+        }
+      }
+
+      // 3. Increment cumulative delivered count on product (do NOT double-deduct DC shelf)
+      if (prodRow != null && _isUuid(resolvedProdId)) {
+        try {
+          final curDelivered = (prodRow['delivered_count'] as num?)?.toInt() ?? 0;
+          await dbClient.from(SupabaseConstants.productsTable).update({
+            'delivered_count': curDelivered + effectiveUnitsSold,
+            'updated_at': nowIso,
+          }).eq('id', resolvedProdId);
+        } catch (pErr) {
+          debugPrint('[STOCK_DATASOURCE] ℹ️ syncDailyRiderSales product note: $pErr');
+        }
+      }
+
+      // 4. Balance Merchant / Finance Ledger & Client Stock Balances
+      if (prodRow != null) {
+        final voucherNo = 'EOD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+        await _syncClientStockBalancesAndLedger(
+          dbClient: dbClient,
+          prodRow: prodRow,
+          distributionCenterId: effectiveDcId,
+          qtyDelta: -effectiveUnitsSold,
+          voucherType: 'sales_order_delivery',
+          voucherNo: voucherNo,
+          orderId: reconciledOrderUuid,
+          notes:
+              'Daily Sales Balance ($resolvedRiderName): $effectiveUnitsSold x $prodName'
+              '${reconciledOrdersCount > 0 ? " [$reconciledOrdersCount open order(s) closed]" : ""}'
+              '${notes != null && notes.trim().isNotEmpty ? " - ${notes.trim()}" : ""}',
+        );
+      }
+
+      // 5. Notify rider & DC console
+      try {
+        final skuLabel = prodSku.isNotEmpty ? ' ($prodSku)' : '';
+        if (_isUuid(effectiveAgentId)) {
+          await dbClient.from('notifications').insert({
+            'company_id': compId,
+            'delivery_agent_id': effectiveAgentId,
+            if (_isUuid(effectiveDcId)) 'distribution_center_id': effectiveDcId,
+            'title': 'Daily Sales & Custody Balanced',
+            'message':
+                '$effectiveUnitsSold units of $prodName$skuLabel reconciled from vehicle custody'
+                '${reconciledOrdersCount > 0 ? " and $reconciledOrdersCount order(s) closed as delivered" : ""}.',
+            'category': 'inventory',
+            'action_route': '/stock',
+            'is_read': false,
+            'created_at': nowIso,
+          });
+        }
+        if (_isUuid(effectiveDcId)) {
+          await dbClient.from('notifications').insert({
+            'company_id': compId,
+            'distribution_center_id': effectiveDcId,
+            'title': 'System Stock Balanced: $resolvedRiderName',
+            'message':
+                'Recorded $effectiveUnitsSold sold unit(s) of $prodName$skuLabel'
+                '${reconciledOrdersCount > 0 ? " ($reconciledOrdersCount forgotten order(s) closed)" : ""}.',
+            'category': 'inventory',
+            'action_route': '/dc-stock-ops',
+            'is_read': false,
+            'created_at': nowIso,
+          });
+        }
+      } catch (_) {}
+
+      return {
+        'success': true,
+        'effectiveUnitsSold': effectiveUnitsSold,
+        'reconciledOrdersCount': reconciledOrdersCount,
+        'message':
+            'Balanced $effectiveUnitsSold units of $prodName across system inventory'
+            '${reconciledOrdersCount > 0 ? " ($reconciledOrdersCount order(s) marked delivered)" : ""}.',
+      };
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ⚠️ syncDailyRiderSales error: $e');
+      return {
+        'success': false,
+        'effectiveUnitsSold': unitsSold,
+        'reconciledOrdersCount': 0,
+        'message': 'Daily sales saved locally ($e).',
+      };
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> executeRiderToRiderBalance({
+    required String productIdOrSku,
+    required String sourceRiderId,
+    required String sourceRiderName,
+    required String destinationRiderId,
+    required String destinationRiderName,
+    required String destinationRiderCode,
+    required int quantity,
+    String? distributionCenterId,
+    String? notes,
+  }) async {
+    final dbClient = _getAuthDbClient();
+    const compId = '11111111-1111-4111-8111-111111111111';
+    final nowIso = DateTime.now().toIso8601String();
+    final safeQty = quantity > 0 ? quantity : 1;
+
+    try {
+      final prodRow = await _resolveProductRow(dbClient, productIdOrSku);
+      final resolvedProdId = prodRow?['id']?.toString() ?? productIdOrSku;
+      final prodName = prodRow?['name']?.toString() ?? 'Product';
+      final prodSku = prodRow?['sku']?.toString() ?? '';
+
+      final srcIdentity = await _resolveRiderIdentity(dbClient, sourceRiderId);
+      final dstIdentity = await _resolveRiderIdentity(dbClient, destinationRiderId);
+
+      final srcAgentId = srcIdentity['agentId'] ?? sourceRiderId;
+      final dstAgentId = dstIdentity['agentId'] ?? destinationRiderId;
+      final effectiveDcId = (distributionCenterId != null && distributionCenterId.trim().isNotEmpty)
+          ? distributionCenterId.trim()
+          : (dstIdentity['dcId'] ?? srcIdentity['dcId']);
+
+      // 1. Deduct from source rider custody & credit destination rider custody in agent_inventory
+      if (_isUuid(resolvedProdId)) {
+        if (_isUuid(srcAgentId)) {
+          try {
+            final srcRows = await dbClient
+                .from('agent_inventory')
+                .select()
+                .eq('delivery_agent_id', srcAgentId)
+                .eq('product_id', resolvedProdId)
+                .limit(1);
+            if ((srcRows as List).isNotEmpty) {
+              final row = Map<String, dynamic>.from(srcRows.first as Map);
+              final curAvail = (row['available_count'] as num?)?.toInt() ?? 0;
+              final curCustody = (row['total_in_custody'] as num?)?.toInt() ?? 0;
+              await dbClient.from('agent_inventory').update({
+                'available_count': (curAvail - safeQty).clamp(0, 999999),
+                'total_in_custody': (curCustody - safeQty).clamp(0, 999999),
+                'updated_at': nowIso,
+              }).eq('id', row['id']);
+            }
+          } catch (e) {
+            debugPrint('[STOCK_DATASOURCE] ℹ️ R2R source deduct note: $e');
+          }
+        }
+
+        if (_isUuid(dstAgentId)) {
+          try {
+            final dstRows = await dbClient
+                .from('agent_inventory')
+                .select()
+                .eq('delivery_agent_id', dstAgentId)
+                .eq('product_id', resolvedProdId)
+                .limit(1);
+            if ((dstRows as List).isNotEmpty) {
+              final row = Map<String, dynamic>.from(dstRows.first as Map);
+              final curAvail = (row['available_count'] as num?)?.toInt() ?? 0;
+              final curCustody = (row['total_in_custody'] as num?)?.toInt() ?? 0;
+              await dbClient.from('agent_inventory').update({
+                'available_count': curAvail + safeQty,
+                'total_in_custody': curCustody + safeQty,
+                'updated_at': nowIso,
+              }).eq('id', row['id']);
+            } else {
+              await dbClient.from('agent_inventory').insert({
+                'delivery_agent_id': dstAgentId,
+                'product_id': resolvedProdId,
+                'total_in_custody': safeQty,
+                'available_count': safeQty,
+                'reserved_count': 0,
+                'delivered_count_today': 0,
+                'returned_count': 0,
+                'awaiting_return_count': 0,
+                'updated_at': nowIso,
+              });
+            }
+          } catch (e) {
+            debugPrint('[STOCK_DATASOURCE] ℹ️ R2R dest credit note: $e');
+          }
+        }
+      }
+
+      // 2. Ensure warehouses & log completed rider_to_rider transfer with validated FKs
+      final srcWarehouseId = await _ensureRiderWarehouseId(
+        dbClient: dbClient,
+        effectiveAgentId: srcAgentId,
+        linkedUserId: srcIdentity['userId'],
+        riderName: sourceRiderName,
+        riderCode: srcIdentity['code'] ?? 'RDR-SRC',
+        operatingState: srcIdentity['operatingState'],
+      );
+      final dstWarehouseId = await _ensureRiderWarehouseId(
+        dbClient: dbClient,
+        effectiveAgentId: dstAgentId,
+        linkedUserId: dstIdentity['userId'],
+        riderName: destinationRiderName,
+        riderCode: destinationRiderCode,
+        operatingState: dstIdentity['operatingState'],
+      );
+
+      final validSenderUserId =
+          await _verifyValidUserId(dbClient, srcIdentity['userId']) ??
+          await _resolveCurrentValidUserId(dbClient);
+      final validReceiverUserId =
+          await _verifyValidUserId(dbClient, dstIdentity['userId']);
+      final validDispatchedBy = await _resolveCurrentValidUserId(dbClient);
+      final wbNumber = 'WB-R2R-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+
+      if (_isUuid(resolvedProdId)) {
+        try {
+          final trf = await dbClient.from('stock_transfers').insert({
+            'waybill_number': wbNumber,
+            'transfer_number': wbNumber,
+            'company_id': compId,
+            'transfer_type': 'rider_to_rider',
+            if (_isUuid(effectiveDcId)) 'source_dc_id': effectiveDcId,
+            if (_isUuid(srcWarehouseId)) 'source_warehouse_id': srcWarehouseId,
+            if (_isUuid(dstWarehouseId)) 'destination_warehouse_id': dstWarehouseId,
+            if (validSenderUserId != null) 'sender_id': validSenderUserId,
+            'sender_name': sourceRiderName,
+            'sender_role': 'delivery_agent',
+            if (validDispatchedBy != null) 'dispatched_by': validDispatchedBy,
+            if (validReceiverUserId != null) 'receiver_id': validReceiverUserId,
+            'receiver_name': destinationRiderName,
+            'receiver_role': 'delivery_agent',
+            if (validReceiverUserId != null) 'received_by': validReceiverUserId,
+            'dispatched_at': nowIso,
+            'received_at': nowIso,
+            'status': 'completed',
+            'notes':
+                'Rider-to-Rider transfer: $sourceRiderName -> $destinationRiderName ($destinationRiderCode)'
+                '${notes != null && notes.trim().isNotEmpty ? " | ${notes.trim()}" : ""}',
+          }).select().single();
+
+          await dbClient.from('stock_transfer_items').insert({
+            'transfer_id': trf['id'].toString(),
+            'product_id': resolvedProdId,
+            'quantity_shipped': safeQty,
+            'quantity_received': safeQty,
+          });
+        } catch (trfErr) {
+          debugPrint('[STOCK_DATASOURCE] ℹ️ R2R stock_transfers log notice: $trfErr');
+        }
+      }
+
+      // 3. Notify both couriers
+      try {
+        final skuLabel = prodSku.isNotEmpty ? ' ($prodSku)' : '';
+        if (_isUuid(srcAgentId)) {
+          await dbClient.from('notifications').insert({
+            'company_id': compId,
+            'delivery_agent_id': srcAgentId,
+            if (_isUuid(effectiveDcId)) 'distribution_center_id': effectiveDcId,
+            'title': 'Stock Rebalanced to Peer Rider',
+            'message':
+                '-$safeQty unit(s) of $prodName$skuLabel transferred to $destinationRiderName.',
+            'category': 'inventory',
+            'action_route': '/stock',
+            'is_read': false,
+            'created_at': nowIso,
+          });
+        }
+        if (_isUuid(dstAgentId)) {
+          await dbClient.from('notifications').insert({
+            'company_id': compId,
+            'delivery_agent_id': dstAgentId,
+            if (_isUuid(effectiveDcId)) 'distribution_center_id': effectiveDcId,
+            'title': 'Inbound Stock From $sourceRiderName',
+            'message':
+                '+$safeQty unit(s) of $prodName$skuLabel credited to your vehicle custody ($wbNumber).',
+            'category': 'inventory',
+            'action_route': '/stock',
+            'is_read': false,
+            'created_at': nowIso,
+          });
+        }
+      } catch (_) {}
+
+      return {
+        'success': true,
+        'transferNumber': wbNumber,
+        'message':
+            'Transferred $safeQty unit(s) of $prodName from $sourceRiderName to $destinationRiderName.',
+      };
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ⚠️ executeRiderToRiderBalance error: $e');
+      return {
+        'success': false,
+        'message': 'Rider-to-Rider transfer saved locally ($e).',
+      };
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> syncRiderReturnToDc({
+    required String riderId,
+    required String productIdOrSku,
+    required int quantity,
+    String condition = 'good',
+    String? distributionCenterId,
+    String reason = 'Rider stock return',
+    String? notes,
+    bool logReturnRow = true,
+    String? returnNumber,
+    String? orderId,
+  }) async {
+    final dbClient = _getAuthDbClient();
+    const compId = '11111111-1111-4111-8111-111111111111';
+    final nowIso = DateTime.now().toIso8601String();
+    final safeQty = quantity > 0 ? quantity : 1;
+    final cleanCond = condition.trim().toLowerCase().isEmpty ? 'good' : condition.trim().toLowerCase();
+    final isGood = cleanCond == 'good' || cleanCond == 'sellable' || cleanCond == 'sealed';
+
+    try {
+      final prodRow = await _resolveProductRow(dbClient, productIdOrSku);
+      final resolvedProdId = prodRow?['id']?.toString() ?? productIdOrSku;
+      final prodName = prodRow?['name']?.toString() ?? 'Product';
+      final prodSku = prodRow?['sku']?.toString() ?? '';
+
+      final identity = await _resolveRiderIdentity(dbClient, riderId);
+      final effectiveAgentId = identity['agentId'] ?? riderId;
+      final riderDisplayName = identity['name'] ?? 'Courier';
+      String? resolvedDcId = (distributionCenterId != null && distributionCenterId.trim().isNotEmpty)
+          ? distributionCenterId.trim()
+          : identity['dcId'];
+
+      if (resolvedDcId == null || resolvedDcId.isEmpty) {
+        try {
+          final firstDc = await dbClient.from('distribution_centers').select('id').limit(1).single();
+          resolvedDcId = firstDc['id']?.toString();
+        } catch (_) {}
+      }
+
+      // 1. Deduct returned/spoiled units from rider agent_inventory
+      if (_isUuid(effectiveAgentId) && _isUuid(resolvedProdId)) {
+        try {
+          final aiRows = await dbClient
+              .from('agent_inventory')
+              .select()
+              .eq('delivery_agent_id', effectiveAgentId)
+              .eq('product_id', resolvedProdId)
+              .limit(1);
+          if ((aiRows as List).isNotEmpty) {
+            final row = Map<String, dynamic>.from(aiRows.first as Map);
+            final curAvail = (row['available_count'] as num?)?.toInt() ?? 0;
+            final curCustody = (row['total_in_custody'] as num?)?.toInt() ?? 0;
+            final curReturned = (row['returned_count'] as num?)?.toInt() ?? 0;
+
+            await dbClient.from('agent_inventory').update({
+              'available_count': (curAvail - safeQty).clamp(0, 999999),
+              'total_in_custody': (curCustody - safeQty).clamp(0, 999999),
+              'returned_count': curReturned + safeQty,
+              'updated_at': nowIso,
+            }).eq('id', row['id']);
+          }
+        } catch (aiErr) {
+          debugPrint('[STOCK_DATASOURCE] ℹ️ syncRiderReturnToDc agent_inventory note: $aiErr');
+        }
+      }
+
+      // 2. Balance DC shelf & client stock ledger
+      final retNo = (returnNumber != null && returnNumber.isNotEmpty)
+          ? returnNumber
+          : 'RET-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+      if (prodRow != null && _isUuid(resolvedProdId)) {
+        try {
+          if (isGood) {
+            final curGlobal = (prodRow['stock_quantity'] as num?)?.toInt() ?? 0;
+            final dcStocks = _resolveDcStocksMap(prodRow);
+            if (resolvedDcId != null && resolvedDcId.isNotEmpty) {
+              dcStocks[resolvedDcId] = (dcStocks[resolvedDcId] ?? curGlobal) + safeQty;
+            }
+            final updatedDesc = _upsertDcStocksTagInDescription(
+              prodRow['description']?.toString(),
+              dcStocks,
+            );
+
+            await dbClient.from(SupabaseConstants.productsTable).update({
+              'stock_quantity': curGlobal + safeQty,
+              'available_count': curGlobal + safeQty,
+              if (dcStocks.isNotEmpty) 'dc_stocks': dcStocks,
+              'description': updatedDesc,
+              'updated_at': nowIso,
+            }).eq('id', resolvedProdId);
+
+            await _syncClientStockBalancesAndLedger(
+              dbClient: dbClient,
+              prodRow: prodRow,
+              distributionCenterId: resolvedDcId,
+              qtyDelta: safeQty,
+              voucherType: 'stock_return',
+              voucherNo: retNo,
+              orderId: _isUuid(orderId) ? orderId!.trim() : null,
+              notes: 'Good Stock Returned to DC by $riderDisplayName: $safeQty x $prodName ($reason)',
+            );
+          } else {
+            final curDamaged = (prodRow['damaged_count'] as num?)?.toInt() ?? 0;
+            await dbClient.from(SupabaseConstants.productsTable).update({
+              'damaged_count': curDamaged + safeQty,
+              'updated_at': nowIso,
+            }).eq('id', resolvedProdId);
+
+            await _syncClientStockBalancesAndLedger(
+              dbClient: dbClient,
+              prodRow: prodRow,
+              distributionCenterId: resolvedDcId,
+              qtyDelta: 0,
+              voucherType: 'inventory_adjustment',
+              voucherNo: retNo,
+              orderId: _isUuid(orderId) ? orderId!.trim() : null,
+              notes:
+                  'Spoiled / Damaged Stock Return ($riderDisplayName): $safeQty x $prodName [$reason]'
+                  '${notes != null && notes.trim().isNotEmpty ? " - ${notes.trim()}" : ""}',
+            );
+          }
+        } catch (pErr) {
+          debugPrint('[STOCK_DATASOURCE] ℹ️ syncRiderReturnToDc product/ledger note: $pErr');
+        }
+      }
+
+      // 3. Optionally insert approved stock_returns log using ONLY valid DDL columns
+      if (logReturnRow && _isUuid(resolvedProdId)) {
+        try {
+          final validReceivedBy = await _resolveCurrentValidUserId(dbClient);
+          await dbClient.from('stock_returns').insert({
+            'return_number': retNo,
+            if (_isUuid(effectiveAgentId)) 'delivery_agent_id': effectiveAgentId,
+            if (_isUuid(resolvedDcId)) 'distribution_center_id': resolvedDcId,
+            if (_isUuid(resolvedDcId)) 'destination_dc_id': resolvedDcId,
+            'product_id': resolvedProdId,
+            if (_isUuid(orderId)) 'order_id': orderId!.trim(),
+            'quantity': safeQty,
+            'reason': reason.isNotEmpty ? reason : 'Rider stock return',
+            'condition': cleanCond,
+            'status': 'approved',
+            if (validReceivedBy != null) 'received_by': validReceivedBy,
+            if (notes != null && notes.isNotEmpty) 'notes': notes,
+            'created_at': nowIso,
+            'received_at': nowIso,
+          });
+        } catch (retErr) {
+          debugPrint('[STOCK_DATASOURCE] ℹ️ syncRiderReturnToDc stock_returns insert note: $retErr');
+        }
+      }
+
+      // 4. Notify rider & DC
+      try {
+        final skuLabel = prodSku.isNotEmpty ? ' ($prodSku)' : '';
+        if (_isUuid(effectiveAgentId)) {
+          await dbClient.from('notifications').insert({
+            'company_id': compId,
+            'delivery_agent_id': effectiveAgentId,
+            if (_isUuid(resolvedDcId)) 'distribution_center_id': resolvedDcId,
+            'title': isGood ? 'Stock Returned to DC' : 'Damaged/Spoiled Stock Recorded',
+            'message':
+                '$safeQty unit(s) of $prodName$skuLabel logged ($cleanCond) and removed from your custody.',
+            'category': 'inventory',
+            'action_route': '/stock',
+            'is_read': false,
+            'created_at': nowIso,
+          });
+        }
+      } catch (_) {}
+
+      return {
+        'success': true,
+        'condition': cleanCond,
+        'returnNumber': retNo,
+        'message': isGood
+            ? 'Returned $safeQty good unit(s) of $prodName back to DC shelf.'
+            : 'Logged $safeQty damaged/spoiled unit(s) of $prodName for QC replacement.',
+      };
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ⚠️ syncRiderReturnToDc error: $e');
+      return {
+        'success': false,
+        'condition': cleanCond,
+        'message': 'Return recorded locally ($e).',
+      };
     }
   }
 }

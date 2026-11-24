@@ -35,6 +35,28 @@ class MockTestOrdersNotifier extends StateNotifier<OrdersState> implements Order
   }
 
   @override
+  Future<void> markOrdersAsRemitted({
+    required List<String> orderIds,
+    required String remittanceId,
+    required String status,
+  }) async {
+    final isCleared = status == 'remitted' || status == 'cleared';
+    final updatedList = state.orders.map((o) {
+      if (orderIds.contains(o.id) || orderIds.contains(o.orderNumber)) {
+        return o.copyWith(
+          paymentStatus: isCleared ? 'remitted' : o.paymentStatus,
+          remittanceStatus: status,
+          financialSettlementStatus:
+              isCleared ? 'cash_remitted_verified' : 'pending_remittance',
+          remittanceReference: remittanceId,
+        );
+      }
+      return o;
+    }).toList();
+    state = state.copyWith(orders: updatedList);
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -84,6 +106,63 @@ class MockTestFinanceNotifier extends StateNotifier<FinanceState> implements Fin
     );
     state = state.copyWith(remittances: [newRem, ...state.remittances]);
     return true;
+  }
+
+  @override
+  Future<Map<String, dynamic>> clearUnrequestedRemittanceDirectly({
+    required String riderId,
+    required String riderName,
+    String? riderCode,
+    required double netAmount,
+    double grossAmount = 0.0,
+    double commissionDeducted = 0.0,
+    double transportAllowanceDeducted = 0.0,
+    double failedStipendsDeducted = 0.0,
+    double posFee = 0.0,
+    String paymentMethod = 'cash_to_dc',
+    String? referenceNumber,
+    String? notes,
+    String? companyId,
+    String? distributionCenterId,
+    List<OrderEntity> orders = const [],
+  }) async {
+    final refCode = referenceNumber ?? 'DIR-CLR-TEST-01';
+    final newRem = RemittanceEntity(
+      id: 'rem-dir-01',
+      referenceNumber: refCode,
+      companyId: companyId ?? '22222222-2222-4222-8222-222222222222',
+      deliveryAgentId: riderId,
+      amount: netAmount,
+      grossCollections: grossAmount,
+      commissionDeducted: commissionDeducted,
+      transportAllowanceDeducted: transportAllowanceDeducted,
+      failedStipendsDeducted: failedStipendsDeducted,
+      posFee: posFee,
+      paymentMethod: paymentMethod,
+      status: 'verified',
+      associatedOrders: orders
+          .map(
+            (o) => RemittanceOrderItem(
+              orderId: o.id,
+              orderNumber: o.orderNumber,
+              customerName: o.customerName,
+              status: o.status,
+              paymentType: o.paymentType,
+              cashCollected: o.totalAmount,
+              date: o.createdAt,
+            ),
+          )
+          .toList(),
+      createdAt: DateTime.now(),
+      verifiedAt: DateTime.now(),
+    );
+    state = state.copyWith(remittances: [newRem, ...state.remittances]);
+    return {
+      'success': true,
+      'remittanceId': newRem.id,
+      'referenceNumber': refCode,
+      'clearedOrderCount': orders.length,
+    };
   }
 
   @override

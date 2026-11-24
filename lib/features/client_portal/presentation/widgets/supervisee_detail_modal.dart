@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/helpers/map_launcher_helper.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../providers/sales_supervisor_provider.dart';
@@ -122,7 +123,11 @@ class _SuperviseeDetailModalState extends State<SuperviseeDetailModal> {
                   IconButton(
                     icon: const Icon(Icons.chat_rounded, color: Color(0xFF2563EB), size: 20),
                     tooltip: 'WhatsApp Rep',
-                    onPressed: () => launchUrl(Uri.parse('https://wa.me/234${closer.phone.replaceAll(RegExp(r"[^0-9]"), "")}')),
+                    onPressed: () => MapLauncherHelper.launchWhatsApp(
+                      context: context,
+                      customerPhone: closer.phone,
+                      message: 'Hello ${closer.fullName}, this is your sales supervisor from Novacare.',
+                    ),
                   ),
                 ],
                 IconButton(

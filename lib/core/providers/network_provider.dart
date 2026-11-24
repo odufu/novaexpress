@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../widgets/offline_sync_banner.dart';
@@ -44,8 +47,20 @@ class NetworkNotifier extends StateNotifier<NetworkState> {
 
   NetworkNotifier()
       : super(NetworkState(lastChecked: DateTime.now())) {
+    bool isTest = const bool.fromEnvironment('flutter.test');
+    try {
+      if (!kIsWeb && (Platform.script.path.contains('test') ||
+          Platform.environment.containsKey('FLUTTER_TEST') ||
+          Platform.environment.containsKey('TEST_PLATFORM'))) {
+        isTest = true;
+      }
+      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
+        isTest = true;
+      }
+    } catch (_) {}
+
     // Only start periodic ping in real runtime, not in unit tests
-    if (!const bool.fromEnvironment('flutter.test')) {
+    if (!isTest) {
       _startMonitoring();
     }
   }

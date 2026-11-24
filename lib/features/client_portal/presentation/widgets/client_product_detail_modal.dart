@@ -849,30 +849,29 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        order.orderNumber,
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2563EB),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '• ${order.customerName}',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    order.orderNumber,
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF2563EB),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (order.customerName.trim().isNotEmpty) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      order.customerName,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   const SizedBox(height: 2),
                   Text(
                     '${order.deliveryCity}, ${order.deliveryState} ${order.lga != null ? "(${order.lga})" : ""} • Qty: ${order.quantity > 0 ? order.quantity : 1} units ${order.packageDealName != null ? "(${order.packageDealName})" : ""}',
@@ -883,20 +882,22 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   '₦${Formatters.currency(order.totalAmount)}',
                   style: GoogleFonts.inter(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w800,
                     color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
@@ -904,7 +905,7 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                   child: Text(
                     statusLabel,
                     style: GoogleFonts.inter(
-                      fontSize: 9.5,
+                      fontSize: 8.5,
                       fontWeight: FontWeight.bold,
                       color: statusColor,
                     ),
@@ -912,7 +913,7 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                 ),
               ],
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             Icon(Icons.chevron_right_rounded, size: 16, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
           ],
         ),
@@ -1197,62 +1198,55 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.domain_rounded, color: Color(0xFF7C3AED), size: 22),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Total Network Stock: $effectiveTotal units',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                      ),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isNarrow = constraints.maxWidth < 540;
+                          final infoColumn = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    'Total Network Stock: $effectiveTotal units',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        '100% ACCOUNTED FOR',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: const Color(0xFF10B981),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Valuation: ₦${Formatters.currency(effectiveTotal * (product.defaultUnitPrice > 0 ? product.defaultUnitPrice : 21500))}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF10B981),
                                   ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '100% ACCOUNTED FOR',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF10B981),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Valuation: ₦${Formatters.currency(effectiveTotal * (product.defaultUnitPrice > 0 ? product.defaultUnitPrice : 21500))}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF10B981),
                                 ),
-                              ],
-                            ),
-                          ),
-                          ElevatedButton.icon(
+                              ),
+                            ],
+                          );
+
+                          final custodyButton = ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2563EB),
                               foregroundColor: Colors.white,
@@ -1268,8 +1262,53 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                             },
                             icon: const Icon(Icons.table_view_rounded, size: 14),
                             label: const Text('Open Custody Table', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                          ),
-                        ],
+                          );
+
+                          if (isNarrow) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.domain_rounded, color: Color(0xFF7C3AED), size: 22),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: infoColumn),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: custodyButton,
+                                ),
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.domain_rounded, color: Color(0xFF7C3AED), size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(child: infoColumn),
+                              const SizedBox(width: 12),
+                              custodyButton,
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
                       const Divider(height: 1),

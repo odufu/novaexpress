@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/nigeria_locations.dart';
+import '../../../../core/helpers/map_launcher_helper.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../../../orders/domain/entities/order.dart';
@@ -933,11 +934,12 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                           minimumSize: Size.zero,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                         ),
-                        onPressed: () async {
-                          var cleanPhone = order.customerPhone.replaceAll(RegExp(r'[^0-9]'), '');
-                          if (cleanPhone.startsWith('0')) cleanPhone = '234${cleanPhone.substring(1)}';
-                          final uri = Uri.parse('https://wa.me/$cleanPhone');
-                          if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        onPressed: () {
+                          MapLauncherHelper.launchWhatsApp(
+                            context: context,
+                            customerPhone: order.customerPhone,
+                            message: 'Hello ${order.customerName}, this is regarding your order #${order.orderNumber}.',
+                          );
                         },
                         icon: const Icon(Icons.chat_bubble_rounded, size: 13),
                         label: Text('WhatsApp', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),

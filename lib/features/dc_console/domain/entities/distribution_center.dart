@@ -31,6 +31,9 @@ class DistributionCenter {
   final int storageCapacityUnits;
   final int totalAssignedRiders;
   final int activeInventoryBatches;
+  final String? bankName;
+  final String? bankAccountNumber;
+  final String? bankAccountName;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -54,6 +57,9 @@ class DistributionCenter {
     this.storageCapacityUnits = 25000,
     this.totalAssignedRiders = 0,
     this.activeInventoryBatches = 0,
+    this.bankName,
+    this.bankAccountNumber,
+    this.bankAccountName,
     this.createdAt,
     this.updatedAt,
   });
@@ -161,6 +167,9 @@ class DistributionCenter {
     int? storageCapacityUnits,
     int? totalAssignedRiders,
     int? activeInventoryBatches,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -184,6 +193,9 @@ class DistributionCenter {
       storageCapacityUnits: storageCapacityUnits ?? this.storageCapacityUnits,
       totalAssignedRiders: totalAssignedRiders ?? this.totalAssignedRiders,
       activeInventoryBatches: activeInventoryBatches ?? this.activeInventoryBatches,
+      bankName: bankName ?? this.bankName,
+      bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
+      bankAccountName: bankAccountName ?? this.bankAccountName,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -269,6 +281,9 @@ class DistributionCenter {
       storageCapacityUnits: (json['storage_capacity_units'] as num?)?.toInt() ?? (json['storageCapacityUnits'] as num?)?.toInt() ?? 25000,
       totalAssignedRiders: (json['total_assigned_riders'] as num?)?.toInt() ?? (json['totalAssignedRiders'] as num?)?.toInt() ?? 0,
       activeInventoryBatches: (json['active_inventory_batches'] as num?)?.toInt() ?? (json['activeInventoryBatches'] as num?)?.toInt() ?? 0,
+      bankName: json['bank_name']?.toString() ?? json['bankName']?.toString(),
+      bankAccountNumber: json['bank_account_number']?.toString() ?? json['bankAccountNumber']?.toString() ?? json['account_number']?.toString(),
+      bankAccountName: json['bank_account_name']?.toString() ?? json['bankAccountName']?.toString() ?? json['account_name']?.toString(),
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now() : (json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now() : DateTime.now()),
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) ?? DateTime.now() : (json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt'].toString()) ?? DateTime.now() : DateTime.now()),
     );
@@ -296,6 +311,9 @@ class DistributionCenter {
       'storage_capacity_units': storageCapacityUnits,
       'total_assigned_riders': totalAssignedRiders,
       'active_inventory_batches': activeInventoryBatches,
+      'bank_name': bankName,
+      'bank_account_number': bankAccountNumber,
+      'bank_account_name': bankAccountName,
       'created_at': createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
       'updated_at': updatedAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
     };

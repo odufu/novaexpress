@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/signature_storage_service.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
+import '../../../../core/widgets/nova_critical_action_confirmation_modal.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
@@ -43,8 +45,13 @@ class DCDailyMerchantSettlementModal extends ConsumerStatefulWidget {
 class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchantSettlementModal> {
   late Set<String> _selectedOrderIds;
   final TextEditingController _otherChargesController = TextEditingController(text: '0');
+  final TextEditingController _failedFeeController = TextEditingController(text: '0');
+  final TextEditingController _actualRemittanceController = TextEditingController();
+  final TextEditingController _discrepancyChargeNameController =
+      TextEditingController(text: 'Bank Electronic Transfer Charge');
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
+  bool _actualManuallyEdited = false;
 
   Uint8List? _receiptBytes;
   String? _receiptFileName;
@@ -59,6 +66,9 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
   @override
   void dispose() {
     _otherChargesController.dispose();
+    _failedFeeController.dispose();
+    _actualRemittanceController.dispose();
+    _discrepancyChargeNameController.dispose();
     _notesController.dispose();
     _referenceController.dispose();
     super.dispose();
@@ -129,9 +139,17 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
       }
     }
 
+    final double failedFee = double.tryParse(_failedFeeController.text) ?? 0.0;
     final double otherCharges = double.tryParse(_otherChargesController.text) ?? 0.0;
-    final double totalDeductions = totalDeliveryFees + totalPlatformFees + totalGatewayFees + otherCharges;
-    final double netPayout = grossCollections - totalDeductions;
+    final double totalDeductions = totalDeliveryFees + totalPlatformFees + totalGatewayFees + failedFee + otherCharges;
+    final double calculatedNet = (grossCollections - totalDeductions).clamp(0.0, double.infinity);
+
+    if (!_actualManuallyEdited) {
+      _actualRemittanceController.text = calculatedNet.toStringAsFixed(2);
+    }
+    final double enteredActual = double.tryParse(_actualRemittanceController.text) ?? calculatedNet;
+    final double discrepancy = calculatedNet - enteredActual;
+    final bool hasDiscrepancy = discrepancy.abs() > 1.0;
 
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -235,8 +253,12 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
                                 totalDeliveryFees: totalDeliveryFees,
                                 totalPlatformFees: totalPlatformFees,
                                 totalGatewayFees: totalGatewayFees,
+                                failedFee: failedFee,
                                 otherCharges: otherCharges,
-                                netPayout: netPayout,
+                                calculatedNet: calculatedNet,
+                                enteredActual: enteredActual,
+                                discrepancy: discrepancy,
+                                hasDiscrepancy: hasDiscrepancy,
                                 activeOrders: activeOrders,
                                 activeDcId: activeDcId,
                               ),
@@ -263,8 +285,12 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
                                   totalDeliveryFees: totalDeliveryFees,
                                   totalPlatformFees: totalPlatformFees,
                                   totalGatewayFees: totalGatewayFees,
+                                  failedFee: failedFee,
                                   otherCharges: otherCharges,
-                                  netPayout: netPayout,
+                                  calculatedNet: calculatedNet,
+                                  enteredActual: enteredActual,
+                                  discrepancy: discrepancy,
+                                  hasDiscrepancy: hasDiscrepancy,
                                   activeOrders: activeOrders,
                                   activeDcId: activeDcId,
                                 ),
@@ -404,12 +430,16 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
     required double totalDeliveryFees,
     required double totalPlatformFees,
     required double totalGatewayFees,
+    required double failedFee,
     required double otherCharges,
-    required double netPayout,
+    required double calculatedNet,
+    required double enteredActual,
+    required double discrepancy,
+    required bool hasDiscrepancy,
     required List<OrderEntity> activeOrders,
     required String activeDcId,
   }) {
-    final effectiveNet = netPayout > 0 ? netPayout : 0.0;
+    final effectiveActual = enteredActual > 0 ? enteredActual : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -421,17 +451,149 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Itemized Settlement Calculation', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('System Net Calculation', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'NO MERCHANT APPROVAL NEEDED',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0D9488),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           _buildCalculationRow('Gross Delivered Sales', currency.format(grossCollections), isPositive: true),
           const Divider(height: 14),
           _buildCalculationRow('Logistics Delivery Fees', '- ${currency.format(totalDeliveryFees)}', isNegative: true),
+          if (failedFee > 0)
+            _buildCalculationRow('Failed Attempt Fees', '- ${currency.format(failedFee)}', isNegative: true),
           _buildCalculationRow('Platform Commission Fees', '- ${currency.format(totalPlatformFees)}', isNegative: true),
           _buildCalculationRow('Paystack Gateway Fees', '- ${currency.format(totalGatewayFees)}', isNegative: true),
           if (otherCharges > 0)
             _buildCalculationRow('Auxiliary Charges', '- ${currency.format(otherCharges)}', isNegative: true),
           const Divider(height: 16),
-          _buildCalculationRow('Net Liquid Payout', currency.format(effectiveNet), isBold: true, isHighlight: true),
+          _buildCalculationRow('Calculated Net Remittance', currency.format(calculatedNet), isBold: true, isHighlight: true),
+          const SizedBox(height: 16),
+
+          // ACCOUNTANT REMITTANCE AMOUNT INPUT BOX
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: hasDiscrepancy ? const Color(0xFFF59E0B) : const Color(0xFF0D9488),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Accountant Remittance to Submit (₦)',
+                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
+                    if (hasDiscrepancy)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'VARIANCE LOGGED',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFFF59E0B),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _actualRemittanceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: GoogleFonts.jetBrainsMono(fontSize: 16, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    prefixText: '₦ ',
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _actualManuallyEdited = true;
+                    });
+                  },
+                ),
+                if (hasDiscrepancy) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.15 : 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '⚠️ Difference of ${currency.format(discrepancy.abs())} detected. Specify charge name and comments below:',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B)),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _discrepancyChargeNameController,
+                          style: GoogleFonts.inter(fontSize: 12),
+                          decoration: InputDecoration(
+                            labelText: 'Discrepancy / Charge Name',
+                            labelStyle: GoogleFonts.inter(fontSize: 11.5),
+                            filled: true,
+                            fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            isDense: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _notesController,
+                          style: GoogleFonts.inter(fontSize: 12),
+                          decoration: InputDecoration(
+                            labelText: 'Accountant Comments & Audit Justification',
+                            labelStyle: GoogleFonts.inter(fontSize: 11.5),
+                            filled: true,
+                            fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            isDense: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
 
           // Merchant Bank Details Card with 1-tap Copy
@@ -498,7 +660,7 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '⚡ Central DC physically sends ₦${currency.format(effectiveNet).replaceAll('₦', '')} to this account and attaches the receipt below.',
+                  '⚡ Central DC physically sends ₦${currency.format(effectiveActual).replaceAll('₦', '')} to this account and attaches the receipt below.',
                   style: GoogleFonts.inter(fontSize: 10.5, fontStyle: FontStyle.italic, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                 ),
               ],
@@ -615,11 +777,47 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
               onPressed: activeOrders.isEmpty
                   ? null
                   : () async {
+                      final currentUser = ref.read(authProvider).user;
+
+                      // Strict Confirmation Modal
+                      final confirmed = await NovaCriticalActionConfirmationModal.show(
+                        context: context,
+                        actionName: 'Instant Merchant Remittance Clearance',
+                        promptMessage:
+                            'You are about to perform the following action, of this value as broken down below, should we continue?',
+                        operatorAccount: currentUser?.email ?? 'accountant@novaxpress.ng',
+                        confirmLabel: 'Approve & Clear Funds Immediately',
+                        cancelLabel: 'Disapprove / Cancel',
+                        brandColor: const Color(0xFF0D9488),
+                        valuesets: {
+                          'Merchant Partner': widget.client.companyName,
+                          'Eligible Orders Included': '${activeOrders.length} orders',
+                          'Gross COD Ingested': currency.format(grossCollections),
+                          'Logistics Delivery Fees': '- ${currency.format(totalDeliveryFees)}',
+                          if (failedFee > 0)
+                            'Failed Attempt Fees': '- ${currency.format(failedFee)}',
+                          'Electronic Transfer Fees': '- ${currency.format(totalGatewayFees)}',
+                          if (hasDiscrepancy) ...{
+                            'Discrepancy [${_discrepancyChargeNameController.text.trim()}]':
+                                '${discrepancy > 0 ? "-" : "+"}${currency.format(discrepancy.abs())}',
+                            'Accountant Comments': _notesController.text.trim().isNotEmpty
+                                ? _notesController.text.trim()
+                                : 'Manual Adjustment Recorded',
+                          },
+                          'Final Cleared Remittance': currency.format(effectiveActual),
+                          'Destination Account':
+                              '${widget.client.bankName} • ${widget.client.accountNumber}',
+                          'Executing Accountant': currentUser?.email ?? 'accountant@novaxpress.ng',
+                        },
+                      );
+
+                      if (!confirmed || !mounted) return;
+
                       try {
                         await showAppLoadingDialog(
                           context: context,
-                          message: 'Remitting Settlement...',
-                          subMessage: 'Uploading transfer receipt & locking ${activeOrders.length} orders...',
+                          message: 'Clearing Settlement Immediately...',
+                          subMessage: 'Registering remittance & locking ${activeOrders.length} orders...',
                           isDark: isDark,
                           task: () async {
                             final now = DateTime.now();
@@ -636,7 +834,7 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
                               );
                             }
 
-                            // 2. Execute manual settlement batch
+                            // 2. Execute manual settlement batch (immediate clearance)
                             final result = await ref.read(dcConsoleProvider.notifier).executeDailyMerchantSettlement(
                               clientId: widget.client.id,
                               dcId: activeDcId,
@@ -644,8 +842,10 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
                               periodEnd: now,
                               customDeductions: {
                                 'other_charges': otherCharges,
+                                'discrepancy_name': _discrepancyChargeNameController.text.trim(),
+                                'discrepancy_amount': discrepancy,
                                 'notes': _notesController.text.isNotEmpty
-                                    ? _notesController.text
+                                    ? _notesController.text.trim()
                                     : 'Manual Bank Transfer Settlement Fulfilled by Central DC',
                               },
                               orderIds: selectedIds,
@@ -658,9 +858,9 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
                               logisticsFeesDeducted: totalDeliveryFees,
                               platformFeesDeducted: totalPlatformFees,
                               gatewayFeesDeducted: totalGatewayFees,
-                              failedAttemptFeesDeducted: 0.0,
-                              otherChargesDeducted: otherCharges,
-                              netPayoutAmount: effectiveNet,
+                              failedAttemptFeesDeducted: failedFee,
+                              otherChargesDeducted: otherCharges + (hasDiscrepancy ? discrepancy : 0),
+                              netPayoutAmount: effectiveActual,
                               destinationBankName: widget.client.bankName,
                               destinationAccountNumber: widget.client.accountNumber,
                               destinationAccountName: widget.client.accountName.isNotEmpty ? widget.client.accountName : widget.client.companyName,
@@ -675,9 +875,11 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
                         if (mounted) {
                           Navigator.of(context).pop();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('✅ Settlement remitted successfully! Merchant has been notified with the transfer receipt.'),
-                              backgroundColor: Color(0xFF0D9488),
+                            SnackBar(
+                              content: Text(
+                                '✅ Settlement of ${currency.format(effectiveActual)} has been CLEARED immediately throughout the system.',
+                              ),
+                              backgroundColor: const Color(0xFF0D9488),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );

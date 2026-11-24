@@ -490,5 +490,63 @@ void main() {
       expect(notifier.state.stockItems.first.availableCount, 9);
       expect(notifier.state.stockItems.first.returnedCount, 3);
     });
+
+    testWidgets('7. StockPage Daily Sales & Order Balance modal balances vehicle stock and selects unmarked open orders', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(480, 1000));
+
+      final fakeRepo = FakeStockRepository();
+      final container = ProviderContainer(
+        overrides: [
+          authProvider.overrideWith((ref) => MockAuthNotifier(mockUser)),
+          notificationsProvider.overrideWith((ref) => FakeNotificationsNotifier()),
+          ordersProvider.overrideWith((ref) => MockOrdersNotifier([mockTiedOrder])),
+          stockProvider.overrideWith(
+            (ref) => StockNotifier(repository: fakeRepo)
+              ..state = StockState(
+                stockItems: [mockStockItem],
+                riderAllocations: [mockAllocation],
+                isLoading: false,
+              ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: StockPage(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('Daily Sales & Order Balance'), findsOneWidget);
+      final balanceBtn = find.text('Balance');
+      expect(balanceBtn, findsOneWidget);
+
+      await tester.ensureVisible(balanceBtn);
+      await tester.tap(balanceBtn);
+      await tester.pumpAndSettle();
+
+      // Verify modal opens with unmarked open order for Grazer Herbal Tea
+      expect(find.textContaining('Unmarked Open Orders to Close (1)'), findsOneWidget);
+      expect(find.textContaining('TRK-9001-LAG'), findsOneWidget);
+
+      // Check the forgotten open order checkbox (auto-populates Units Sold Today = 5)
+      await tester.tap(find.byType(CheckboxListTile).first);
+      await tester.pump();
+
+      await tester.tap(find.text('Save Daily Sales & Balance Stock'));
+      await tester.pumpAndSettle();
+
+      final updatedState = container.read(stockProvider);
+      final updatedAlloc = updatedState.riderAllocations.firstWhere((a) => a.riderId == 'drv_emeka_1');
+      expect(updatedAlloc.inCustodyUnits, 7); // 12 - 5
+      expect(updatedAlloc.deliveredUnits, 13); // 8 + 5
+    });
   });
 }

@@ -439,7 +439,14 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   void _onPersonnelTypeChanged(String type) {
     final notifier = ref.read(dcOnboardDraftProvider.notifier);
     notifier.setPersonnelType(type);
-    if (type == 'pda') {
+    if (type == 'external_pda') {
+      _vehicleModelController.text = '3PL / Partner Courier Vehicle';
+      _commissionController.text = '1500';
+      _transportAllowanceController.text = '0';
+      _failedAllowanceController.text = '500';
+      _baseSalaryController.text = '0';
+      notifier.setCompensationType('commission');
+    } else if (type == 'pda') {
       _vehicleModelController.text = 'Bajaj Boxer 100 (Personal)';
       _commissionController.text = '1000';
       _transportAllowanceController.text = '1500';
@@ -496,18 +503,21 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         ? '1234'
         : _tempPinController.text.trim();
 
+    final isExternalPda = draftState.personnelType == 'external_pda';
     final isPda = draftState.personnelType == 'pda';
     final randomSuffix =
         (100 + (DateTime.now().millisecondsSinceEpoch % 899)).toString();
-    final driverCode = isPda ? 'PDA-7$randomSuffix' : 'RDR-$randomSuffix';
+    final driverCode = isExternalPda
+        ? 'EXT-PDA-$randomSuffix'
+        : (isPda ? 'PDA-7$randomSuffix' : 'RDR-$randomSuffix');
 
-    final commission =
-        double.tryParse(_commissionController.text) ?? (isPda ? 1000.0 : 500.0);
+    final commission = double.tryParse(_commissionController.text) ??
+        (isExternalPda ? 1500.0 : (isPda ? 1000.0 : 500.0));
     final transport = double.tryParse(_transportAllowanceController.text) ??
-        (isPda ? 1500.0 : 800.0);
+        (isExternalPda ? 0.0 : (isPda ? 1500.0 : 800.0));
     final failed = double.tryParse(_failedAllowanceController.text) ?? 500.0;
-    final salary =
-        double.tryParse(_baseSalaryController.text) ?? (isPda ? 0.0 : 120000.0);
+    final salary = double.tryParse(_baseSalaryController.text) ??
+        ((isExternalPda || isPda) ? 0.0 : 120000.0);
     final upsell = double.tryParse(_upsellBonusController.text) ?? 10.0;
 
     String finalDriverCode = driverCode;
@@ -647,8 +657,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       'email': email,
       'password': tempPassword,
       'pin': tempPin,
-      'personnelType':
-          isPda ? 'PDA (Personal Vehicle)' : 'In-House Rider (Company Fleet)',
+      'personnelType': isExternalPda
+          ? 'External PDA / 3PL Partner (Offline Courier)'
+          : (isPda ? 'PDA (Personal Vehicle)' : 'In-House Rider (Company Fleet)'),
       'hub': 'Central Command Distribution Center (DC-CMD-01)',
       'agreement':
           '₦${commission.toInt()} Comm. + ₦${transport.toInt()} Transport',
@@ -937,10 +948,11 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         // Personnel Type Selection Cards (Responsive Layout)
         LayoutBuilder(
           builder: (context, constraints) {
-            final isNarrow = constraints.maxWidth < 600;
+            final isNarrow = constraints.maxWidth < 650;
+            final isDesktop = constraints.maxWidth >= 900;
             final double cardWidth = isNarrow
                 ? constraints.maxWidth
-                : (constraints.maxWidth - 12) / 2;
+                : (isDesktop ? (constraints.maxWidth - 24) / 3 : (constraints.maxWidth - 12) / 2);
 
             return Wrap(
               spacing: 12,
@@ -970,6 +982,19 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     icon: Icons.delivery_dining_rounded,
                     isSelected: draftState.personnelType == 'in_house_rider',
                     onTap: () => _onPersonnelTypeChanged('in_house_rider'),
+                  ),
+                ),
+                SizedBox(
+                  width: cardWidth,
+                  child: _buildPersonnelTypeCard(
+                    typeKey: 'external_pda',
+                    title: 'External PDA / 3PL Partner',
+                    badge: 'Offline Courier (Non-App)',
+                    description:
+                        'Third-party courier or offline agent who does NOT use the mobile app. Stock is assigned by Stock Ops, and order deliveries are logged manually by Dispatch Ops.',
+                    icon: Icons.local_shipping_rounded,
+                    isSelected: draftState.personnelType == 'external_pda',
+                    onTap: () => _onPersonnelTypeChanged('external_pda'),
                   ),
                 ),
               ],
@@ -1463,9 +1488,33 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   // STEP 2: LOGIN CREDENTIALS & SECURITY
   // ---------------------------------------------------------------------------
   Widget _buildStep2LoginSecurity(bool isDark, DCOnboardDraftState draftState) {
+    final isExternalPda = draftState.personnelType == 'external_pda';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (isExternalPda) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD97706).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.35)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Offline Courier Notice: External PDAs do not use the mobile app. Dispatch Ops will log their deliveries and order status manually. An internal placeholder login account is prepared automatically.',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFD97706)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         Text(
           'Agent Login Account & Mobile Credentials',
           style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
@@ -2137,12 +2186,36 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     _buildSlipRow('Operational Hub:', slip['hub']),
                     _buildSlipRow('Rate Agreement:', slip['agreement'],
                         isBold: true),
-                    const Divider(height: 16),
-                    _buildSlipRow('Mobile Login Email:', slip['email'],
-                        isCode: true),
-                    _buildSlipRow('Temporary Password:', slip['password'],
-                        isCode: true),
-                    _buildSlipRow('Security PIN:', slip['pin'], isCode: true),
+                    if (slip['personnelType'].toString().contains('External PDA')) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Offline Courier: Does not require app login. Stock is allocated by Stock Ops, and order deliveries are logged manually by Dispatch Ops.',
+                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFD97706)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      const Divider(height: 16),
+                      _buildSlipRow('Mobile Login Email:', slip['email'],
+                          isCode: true),
+                      _buildSlipRow('Temporary Password:', slip['password'],
+                          isCode: true),
+                      _buildSlipRow('Security PIN:', slip['pin'], isCode: true),
+                    ],
                   ],
                 ),
               ),

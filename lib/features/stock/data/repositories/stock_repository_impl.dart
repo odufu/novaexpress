@@ -469,4 +469,77 @@ class StockRepositoryImpl implements StockRepository {
       notes: notes,
     );
   }
+
+  @override
+  Future<Map<String, dynamic>> syncDailyRiderSales({
+    required String riderId,
+    String? riderName,
+    required String productIdOrSku,
+    required int unitsSold,
+    String? distributionCenterId,
+    List<String> reconcileOrderIds = const [],
+    String? notes,
+  }) async {
+    return await remoteDataSource.syncDailyRiderSales(
+      riderId: riderId,
+      riderName: riderName,
+      productIdOrSku: productIdOrSku,
+      unitsSold: unitsSold,
+      distributionCenterId: distributionCenterId,
+      reconcileOrderIds: reconcileOrderIds,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> executeRiderToRiderBalance({
+    required String productIdOrSku,
+    required String sourceRiderId,
+    required String sourceRiderName,
+    required String destinationRiderId,
+    required String destinationRiderName,
+    required String destinationRiderCode,
+    required int quantity,
+    String? distributionCenterId,
+    String? notes,
+  }) async {
+    return await remoteDataSource.executeRiderToRiderBalance(
+      productIdOrSku: productIdOrSku,
+      sourceRiderId: sourceRiderId,
+      sourceRiderName: sourceRiderName,
+      destinationRiderId: destinationRiderId,
+      destinationRiderName: destinationRiderName,
+      destinationRiderCode: destinationRiderCode,
+      quantity: quantity,
+      distributionCenterId: distributionCenterId,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> syncRiderReturnToDc({
+    required String riderId,
+    required String productIdOrSku,
+    required int quantity,
+    String condition = 'good',
+    String? distributionCenterId,
+    String reason = 'Rider stock return',
+    String? notes,
+    bool logReturnRow = true,
+    String? returnNumber,
+    String? orderId,
+  }) async {
+    return await remoteDataSource.syncRiderReturnToDc(
+      riderId: riderId,
+      productIdOrSku: productIdOrSku,
+      quantity: quantity,
+      condition: condition,
+      distributionCenterId: distributionCenterId,
+      reason: reason,
+      notes: notes,
+      logReturnRow: logReturnRow,
+      returnNumber: returnNumber,
+      orderId: orderId,
+    );
+  }
 }

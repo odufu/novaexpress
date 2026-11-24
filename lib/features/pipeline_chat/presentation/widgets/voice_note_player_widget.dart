@@ -168,8 +168,8 @@ class _VoiceNotePlayerWidgetState extends State<VoiceNotePlayerWidget> {
     final currentMs = _position.inMilliseconds.clamp(0, totalMs);
     final progress = (currentMs / totalMs).clamp(0.0, 1.0);
 
-    final primaryAccent = const Color(0xFF00A884); // WhatsApp Signature Emerald
-    final playedBarColor = const Color(0xFF00A884);
+    const primaryAccent = Color(0xFF00A884); // WhatsApp Signature Emerald
+    const playedBarColor = Color(0xFF00A884);
     final unplayedBarColor = widget.isDark
         ? const Color(0xFF8696A0).withOpacity(0.4)
         : const Color(0xFF667781).withOpacity(0.35);

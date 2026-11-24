@@ -196,4 +196,36 @@ abstract class StockRepository {
     required String status,
     String? notes,
   });
+  Future<Map<String, dynamic>> syncDailyRiderSales({
+    required String riderId,
+    String? riderName,
+    required String productIdOrSku,
+    required int unitsSold,
+    String? distributionCenterId,
+    List<String> reconcileOrderIds = const [],
+    String? notes,
+  });
+  Future<Map<String, dynamic>> executeRiderToRiderBalance({
+    required String productIdOrSku,
+    required String sourceRiderId,
+    required String sourceRiderName,
+    required String destinationRiderId,
+    required String destinationRiderName,
+    required String destinationRiderCode,
+    required int quantity,
+    String? distributionCenterId,
+    String? notes,
+  });
+  Future<Map<String, dynamic>> syncRiderReturnToDc({
+    required String riderId,
+    required String productIdOrSku,
+    required int quantity,
+    String condition = 'good',
+    String? distributionCenterId,
+    String reason = 'Rider stock return',
+    String? notes,
+    bool logReturnRow = true,
+    String? returnNumber,
+    String? orderId,
+  });
 }

@@ -6,6 +6,7 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/client_logo_widget.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/presentation/widgets/change_password_modal.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_create_order_modal.dart';
 import 'client_closer_workspace_page.dart';
@@ -361,25 +362,6 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                       isCollapsed: isCollapsed,
                       isDrawer: isDrawer,
                     ),
-                  if (state.clientProfile.isEnterprise)
-                    _buildNavItem(
-                      key: 'closers',
-                      title: 'Closers',
-                      icon: Icons.people_alt_rounded,
-                      badge: state.closers.isNotEmpty ? '${state.closers.length}' : null,
-                      isSelected: activeTab == 'closers',
-                      isCollapsed: isCollapsed,
-                      isDrawer: isDrawer,
-                    ),
-                  _buildNavItem(
-                    key: 'marketing',
-                    title: 'Marketing',
-                    icon: Icons.campaign_rounded,
-                    badge: state.leadForms.isNotEmpty ? '${state.leadForms.length}' : null,
-                    isSelected: activeTab == 'marketing',
-                    isCollapsed: isCollapsed,
-                    isDrawer: isDrawer,
-                  ),
                 ],
               ],
             ),
@@ -393,12 +375,22 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
               border: Border(top: BorderSide(color: Color(0xFF1A2B48))),
             ),
             child: isCollapsed
-                ? Center(
-                    child: IconButton(
-                      icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 20),
-                      tooltip: 'Sign Out',
-                      onPressed: () => _confirmLogout(context),
-                    ),
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.key_rounded, color: Color(0xFF8293B5), size: 18),
+                        tooltip: 'Change Password',
+                        onPressed: () {
+                          ChangePasswordModal.show(context, email: authUser?.email);
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
+                        tooltip: 'Sign Out',
+                        onPressed: () => _confirmLogout(context),
+                      ),
+                    ],
                   )
                 : Row(
                     children: [
@@ -451,6 +443,13 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                             ],
                           ),
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.key_rounded, color: Color(0xFF8293B5), size: 18),
+                        tooltip: 'Change Password',
+                        onPressed: () {
+                          ChangePasswordModal.show(context, email: authUser?.email);
+                        },
                       ),
                       IconButton(
                         icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
@@ -1092,8 +1091,6 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         (key: 'inventory', label: 'Inventory', icon: Icons.warehouse_rounded),
       (key: 'products', label: 'Products', icon: Icons.inventory_2_rounded),
       (key: 'finance_remittance', label: 'Finance', icon: Icons.account_balance_wallet_rounded),
-      if (state.clientProfile.isEnterprise)
-        (key: 'closers', label: 'Closers', icon: Icons.people_alt_rounded),
     ];
 
     return Container(

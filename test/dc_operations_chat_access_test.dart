@@ -13,6 +13,39 @@ import 'package:novexps/features/pipeline_chat/presentation/providers/pipeline_c
 import 'package:novexps/features/pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
 
+class MockDCConsoleNotifier extends StateNotifier<DCConsoleState> implements DCConsoleNotifier {
+  MockDCConsoleNotifier(super.initialState);
+
+  @override
+  Future<void> loadDistributionCentersFromDatabase() async {}
+
+  @override
+  Future<void> loadDriversFromDatabase() async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class MockOrdersNotifier extends StateNotifier<OrdersState> implements OrdersNotifier {
+  MockOrdersNotifier(super.initialState);
+
+  @override
+  Future<void> loadDcOrders([String? dcId]) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class MockPipelineChatNotifier extends StateNotifier<PipelineChatState> implements PipelineChatNotifier {
+  MockPipelineChatNotifier(super.initialState);
+
+  @override
+  Future<void> loadScopedConversations({bool silent = false}) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class MockStockNotifier extends StateNotifier<StockState> implements StockNotifier {
   MockStockNotifier() : super(const StockState());
 
@@ -117,7 +150,7 @@ void main() {
       expect(state.getUnreadCountForRole('closer'), equals(0));
     });
 
-    testWidgets('DCOperationsMobilePortalPage displays floating chat widget and order chat button with badges', (tester) async {
+    testWidgets('DCOperationsMobilePortalPage displays bottom nav chat tab and order chat buttons with badges', (tester) async {
       tester.view.physicalSize = const Size(400, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -131,22 +164,21 @@ void main() {
                   getCurrentUserUseCase: ref.read(getCurrentUserUseCaseProvider),
                 )..state = const AuthState(user: testOfficer)),
             dcConsoleProvider.overrideWith(
-              (ref) => DCConsoleNotifier()
-                ..state = DCConsoleState(
+              (ref) => MockDCConsoleNotifier(
+                DCConsoleState(
                   distributionCenters: [wuseDc],
                   activeHubId: wuseDc.id,
                 ),
+              ),
             ),
             ordersProvider.overrideWith(
-              (ref) => OrdersNotifier(ref.read(ordersRepositoryProvider))
-                ..state = OrdersState(orders: [sampleOrder]),
+              (ref) => MockOrdersNotifier(OrdersState(orders: [sampleOrder])),
             ),
             stockProvider.overrideWith((ref) => MockStockNotifier()),
             pipelineChatProvider.overrideWith(
-              (ref) => PipelineChatNotifier(
-                ref.read(pipelineChatDataSourceProvider),
-                ref,
-              )..state = PipelineChatState(recentConversations: [sampleConversation]),
+              (ref) => MockPipelineChatNotifier(
+                PipelineChatState(recentConversations: [sampleConversation]),
+              ),
             ),
           ],
           child: const MaterialApp(
@@ -157,10 +189,11 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // 1. Floating Action Button is present on DCOperationsMobilePortalPage
-      expect(find.byType(PipelineChatFloatingActionButton), findsOneWidget);
+      // 1. Floating Action Button is removed in favor of dedicated Chat bottom navigation destination
+      expect(find.byType(PipelineChatFloatingActionButton), findsNothing);
+      expect(find.text('Chat'), findsOneWidget);
 
-      // 2. Unread badge '1' is displayed on the floating action button
+      // 2. Unread badge '1' is displayed in AppBar
       expect(find.text('1'), findsWidgets);
 
       // 3. Order Pipeline Chats button is in the AppBar

@@ -100,6 +100,9 @@ Warehouse shelf inventory for "${widget.item.name}" (SKU: ${widget.item.sku}) at
 • Active Fleet / Courier Custody: ${widget.item.assignedCount} Units
 • Delivered to Date: ${widget.item.deliveredCount} Units
 
+⏳ Nationwide Redistribution Lead Time: ~2 WEEKS
+Redistributing products across covering states takes approximately 2 weeks. Immediate batch requisition is essential so riders maintain continuous stock without business disruption.
+
 ⚠️ Impact: New customer order dispatches from this hub are halted once couriers exhaust their current stock.
 
 Action Required:
@@ -413,7 +416,53 @@ https://novaxpress.ng/client/inventory
             ),
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+
+          // 2.5 2-WEEK REDISTRIBUTION LEAD TIME ADVISORY
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEA580C).withValues(alpha: isDark ? 0.15 : 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFEA580C).withValues(alpha: 0.35),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.timer_outlined, size: 20, color: Color(0xFFEA580C)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '2-Week Redistribution Lead Time Advisory',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFEA580C),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'National line-haul transit and inter-state logistics require up to 14 days to redistribute stock across covering states. Request product early so riders maintain buffer stock and sales do not stall.',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          height: 1.35,
+                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
 
           // 3. URGENCY & RECOMMENDED BATCH SIZE SELECTORS
           Row(
@@ -432,6 +481,7 @@ https://novaxpress.ng/client/inventory
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       value: _selectedUrgency,
+                      isExpanded: true,
                       decoration: InputDecoration(
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -442,15 +492,27 @@ https://novaxpress.ng/client/inventory
                       items: const [
                         DropdownMenuItem(
                           value: 'CRITICAL',
-                          child: Text('🔴 Critical (Zero Stock - Order Stalled)', style: TextStyle(fontSize: 12)),
+                          child: Text(
+                            '🔴 Critical (Zero Stock)',
+                            style: TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         DropdownMenuItem(
                           value: 'URGENT',
-                          child: Text('🟠 Urgent (High Run-Rate)', style: TextStyle(fontSize: 12)),
+                          child: Text(
+                            '🟠 Urgent (High Run-Rate)',
+                            style: TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         DropdownMenuItem(
                           value: 'STANDARD',
-                          child: Text('🟡 Standard Re-order Notice', style: TextStyle(fontSize: 12)),
+                          child: Text(
+                            '🟡 Standard Re-order',
+                            style: TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                       onChanged: (val) {
@@ -516,10 +578,14 @@ https://novaxpress.ng/client/inventory
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Urgent Restock Dispatch Notice',
-                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  'Urgent Restock Dispatch Notice',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               InkWell(
                 onTap: _updateGeneratedMessage,
                 borderRadius: BorderRadius.circular(4),

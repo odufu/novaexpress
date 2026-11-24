@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/domain/entities/rider_stock_allocation.dart';
@@ -15,6 +17,7 @@ import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/dc_transaction_record.dart';
 import '../providers/dc_console_provider.dart';
+import 'dc_remittance_detail_modal.dart';
 import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
@@ -148,10 +151,9 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
     final isDark = theme.brightness == Brightness.dark;
 
     final dcState = ref.watch(dcConsoleProvider);
-    final currentDriver = dcState.drivers.firstWhere(
+    final currentDriver = dcState.drivers.where(
       (d) => d.id == widget.driver.id || d.driverCode == widget.driver.driverCode || (d.email.isNotEmpty && d.email.toLowerCase() == widget.driver.email.toLowerCase()),
-      orElse: () => widget.driver,
-    );
+    ).firstOrNull ?? widget.driver;
     final driver = currentDriver;
 
     final ordersState = ref.watch(ordersProvider);
@@ -701,8 +703,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                 ExcelColumnDef<OrderEntity>(
                   key: 'orderNum',
                   label: 'ORDER #',
-                  defaultWidth: 150,
-                  minWidth: 120,
+                  defaultWidth: 185,
+                  minWidth: 140,
                   sortValue: (o) => o.orderNumber,
                   searchString: (o) => o.orderNumber,
                   cellBuilder: (context, order, row, isDark, brand) {
@@ -711,12 +713,16 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                       children: [
                         const Icon(Icons.local_shipping_outlined, size: 15, color: Color(0xFF2563EB)),
                         const SizedBox(width: 6),
-                        Text(
-                          order.orderNumber,
-                          style: GoogleFonts.firaCode(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                        Flexible(
+                          child: Text(
+                            order.orderNumber,
+                            style: GoogleFonts.firaCode(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -770,8 +776,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                 ExcelColumnDef<OrderEntity>(
                   key: 'channel',
                   label: 'CHANNEL',
-                  defaultWidth: 140,
-                  minWidth: 110,
+                  defaultWidth: 155,
+                  minWidth: 120,
                   sortValue: (o) => o.paymentMethod,
                   searchString: (o) => o.isDirectTransfer ? 'Paystack' : 'Cash POD',
                   cellBuilder: (context, order, row, isDark, brand) {
@@ -784,12 +790,16 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                           color: order.isDirectTransfer ? const Color(0xFF2563EB) : const Color(0xFF10B981),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          order.isDirectTransfer ? 'Paystack' : 'Cash POD',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: order.isDirectTransfer ? const Color(0xFF2563EB) : const Color(0xFF10B981),
+                        Flexible(
+                          child: Text(
+                            order.isDirectTransfer ? 'Paystack' : 'Cash POD',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: order.isDirectTransfer ? const Color(0xFF2563EB) : const Color(0xFF10B981),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -816,8 +826,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                 ExcelColumnDef<OrderEntity>(
                   key: 'status',
                   label: 'STATUS',
-                  defaultWidth: 130,
-                  minWidth: 100,
+                  defaultWidth: 165,
+                  minWidth: 125,
                   sortValue: (o) => o.status,
                   searchString: (o) => o.status,
                   cellBuilder: (context, order, row, isDark, brand) {
@@ -970,6 +980,34 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
     final remittanceSearchQuery = ref.watch(riderRemittanceSearchProvider);
     final remittanceFilter = ref.watch(riderRemittanceFilterProvider);
     final remittanceSort = ref.watch(riderRemittanceSortProvider);
+    final authUser = ref.watch(authProvider).user;
+    final canClearFinance = authUser != null &&
+        (authUser.isDcFinanceAdmin ||
+            authUser.isGeneralAccountant ||
+            authUser.isDcManager);
+    final List<OrderEntity> unrequestedCashOrders = (() {
+      final requestedKeys = <String>{};
+      if (canClearFinance) {
+        final remittances = ref.watch(financeProvider).remittances;
+        for (final rem in remittances) {
+          if (rem.isPending || rem.isVerified) {
+            for (final ao in rem.associatedOrders) {
+              if (ao.orderId.isNotEmpty) requestedKeys.add(ao.orderId);
+              if (ao.orderNumber.isNotEmpty) requestedKeys.add(ao.orderNumber);
+            }
+          }
+        }
+      }
+      return deliveredCashOrders
+          .where(
+            (o) =>
+                !o.isRemitted &&
+                !o.isPendingClearance &&
+                !requestedKeys.contains(o.id) &&
+                !requestedKeys.contains(o.orderNumber),
+          )
+          .toList();
+    })();
 
     // 2. Filter transactions
     var filtered = transactions.where((t) {
@@ -1076,6 +1114,88 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
           ),
 
           const SizedBox(height: 18),
+
+          if (canClearFinance && (toRemit > 0 || unrequestedCashOrders.isNotEmpty)) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.14 : 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: Color(0xFFD97706),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Direct Finance Clearance Ready',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${CurrencyFormatter.formatNaira(toRemit)} held in custody • Clear directly even if ${driver.name.split(' ').first} has not submitted a request.',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      DCRemittanceDetailModal.showUnrequestedRiderCash(
+                        context,
+                        driver,
+                        unrequestedCashOrders,
+                        financeSettings: settings,
+                        grossOverride: unrequestedCashOrders.isEmpty
+                            ? (driver.cashInCustody > 0 ? driver.cashInCustody : toRemit)
+                            : null,
+                      );
+                    },
+                    icon: const Icon(Icons.verified_rounded, size: 15),
+                    label: const Text(
+                      'Clear Unrequested Cash',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // 2. Search Bar, Filters & Sorting
           _buildSearchAndFilterControls(
@@ -1188,8 +1308,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                 ExcelColumnDef<DCTransactionRecord>(
                   key: 'channel',
                   label: 'PAYMENT CHANNEL',
-                  defaultWidth: 160,
-                  minWidth: 120,
+                  defaultWidth: 215,
+                  minWidth: 150,
                   sortValue: (t) => t.channel,
                   searchString: (t) => t.channel,
                   cellBuilder: (context, txn, row, isDark, brand) {
@@ -1202,7 +1322,14 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                           color: txn.isPaystack ? const Color(0xFF2563EB) : const Color(0xFF10B981),
                         ),
                         const SizedBox(width: 4),
-                        Text(txn.channel, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500)),
+                        Flexible(
+                          child: Text(
+                            txn.channel,
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     );
                   },
@@ -1283,8 +1410,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                 ExcelColumnDef<DCTransactionRecord>(
                   key: 'status',
                   label: 'STATUS',
-                  defaultWidth: 130,
-                  minWidth: 100,
+                  defaultWidth: 155,
+                  minWidth: 115,
                   sortValue: (t) => t.paystackStatusDisplay,
                   searchString: (t) => t.paystackStatusDisplay,
                   cellBuilder: (context, txn, row, isDark, brand) {
@@ -1494,14 +1621,18 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Vehicle Stock Inventory',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+              Expanded(
+                child: Text(
+                  'Vehicle Stock Inventory',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: () => _showAssignProductToThisRiderDialog(context, isDark, driver, stockState.stockItems),
                 icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
@@ -1941,7 +2072,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                         if (val != null) {
                           setDialogState(() {
                             selectedProdId = val;
-                            final newTarget = availableProducts.firstWhere((p) => p.id == val, orElse: () => availableProducts.first);
+                            final newTarget = uniqueMap[val] ?? availableProducts.first;
                             qtyCtrl.text = newTarget.availableCount >= 5 ? '5' : '${newTarget.availableCount}';
                           });
                         }
@@ -2722,6 +2853,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
       child: Text(
         label,
         style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: fg),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
@@ -2767,6 +2900,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
       child: Text(
         label,
         style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: fg),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

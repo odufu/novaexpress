@@ -10,6 +10,7 @@ import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../../core/widgets/notification_sound_settings_modal.dart';
 import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/presentation/widgets/change_password_modal.dart';
 import '../../../client_portal/presentation/providers/client_portal_provider.dart';
 
 final editProfileAvatarUrlProvider = StateProvider.autoDispose<String?>((ref) => null);
@@ -640,6 +641,58 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 20),
+                        const Divider(),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.orange.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.shield_outlined, color: AppColors.orange, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Account Security',
+                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+                                    ),
+                                    Text(
+                                      'Update your login credentials and password',
+                                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.orange,
+                                  side: const BorderSide(color: AppColors.orange),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () {
+                                  ChangePasswordModal.show(context, email: widget.user.email);
+                                },
+                                icon: const Icon(Icons.key_rounded, size: 15),
+                                label: const Text('Change Password', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

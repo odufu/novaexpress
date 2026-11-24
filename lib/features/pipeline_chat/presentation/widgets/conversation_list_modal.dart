@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../client_portal/presentation/providers/client_portal_provider.dart';
+import '../../../client_portal/presentation/providers/sales_supervisor_provider.dart';
+import '../../../orders/domain/entities/order.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/order_conversation.dart';
 import '../providers/pipeline_chat_provider.dart';
 import 'order_pipeline_chat_sheet.dart';
@@ -81,6 +86,19 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(pipelineChatProvider.notifier).loadScopedConversations();
+      if (ref.read(ordersProvider).orders.isEmpty) {
+        ref.read(ordersProvider.notifier).loadOrders();
+      }
+      final authUser = ref.read(authProvider).user;
+      final isSupervisor = authUser?.isCloserSupervisor == true ||
+          authUser?.isSupervisor == true ||
+          (authUser?.role ?? '').toLowerCase().contains('supervisor');
+      if (isSupervisor && ref.read(salesSupervisorProvider).orders.isEmpty) {
+        ref.read(salesSupervisorProvider.notifier).loadSupervisorData(clientId: authUser?.clientId);
+      }
+      if (ref.read(clientPortalProvider).orders.isEmpty) {
+        ref.read(clientPortalProvider.notifier).loadClientData();
+      }
     });
   }
 
@@ -195,27 +213,125 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
     final chatState = ref.watch(pipelineChatProvider);
     final authUser = ref.watch(authProvider).user;
     final userRole = authUser?.role ?? 'client';
-    final isCloser = authUser?.isCloser == true;
+    final isSupervisor = authUser?.isCloserSupervisor == true ||
+        authUser?.isSupervisor == true ||
+        (authUser?.role ?? '').toLowerCase().contains('supervisor');
+    final isCloser = authUser?.isCloser == true && !isSupervisor;
     final closerId = authUser?.closerId ?? authUser?.id;
     final closerName = authUser?.fullName.trim().toLowerCase();
 
-    // Defense-in-depth: Closers only have access to conversations that concern their orders
-    final allConversations = isCloser
-        ? chatState.recentConversations.where((conv) {
-            final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == authUser?.id);
-            final matchName = closerName != null && closerName.isNotEmpty && conv.closerName != null && conv.closerName!.trim().toLowerCase() == closerName;
-            return matchId || matchName;
-          }).toList()
-        : chatState.recentConversations;
+    // Collect all orders accessible to this user
+    final orderList = <OrderEntity>[];
+    try {
+      orderList.addAll(ref.watch(ordersProvider).orders);
+    } catch (_) {}
+    try {
+      orderList.addAll(ref.watch(salesSupervisorProvider).orders);
+    } catch (_) {}
+    try {
+      orderList.addAll(ref.watch(clientPortalProvider).orders);
+    } catch (_) {}
+
+    // Deduplicate orders by id and orderNumber
+    final seenOrderKeys = <String>{};
+    final uniqueOrders = <OrderEntity>[];
+    for (final o in orderList) {
+      if (seenOrderKeys.add(o.id) && (o.orderNumber.isEmpty || seenOrderKeys.add(o.orderNumber))) {
+        uniqueOrders.add(o);
+      }
+    }
+
+    final closerCode = authUser?.closerCode;
+
+    // Filter orders if user is closer (supervisors, DC admins, and merchants see all)
+    List<OrderEntity> scopedOrders = uniqueOrders;
+    if (isCloser) {
+      final matches = uniqueOrders.where((o) {
+        final matchId = o.closerId != null &&
+            (o.closerId == closerId || o.closerId == authUser?.id || (closerCode != null && o.closerId == closerCode));
+        final matchName = closerName != null &&
+            closerName.isNotEmpty &&
+            o.closerName != null &&
+            o.closerName!.trim().toLowerCase() == closerName;
+        final matchCode = closerCode != null &&
+            closerCode.isNotEmpty &&
+            (o.closerCode == closerCode || (o.deliveryNotes != null && o.deliveryNotes!.contains(closerCode)));
+        return matchId || matchName || matchCode;
+      }).toList();
+      // If closer matches exist, show those. If none match specifically yet orders exist, fallback to all unique orders
+      scopedOrders = matches.isNotEmpty ? matches : uniqueOrders;
+    }
+
+    // Defense-in-depth: Closers filter conversations
+    List<OrderConversationEntity> baseConversations = chatState.recentConversations;
+    if (isCloser) {
+      final matches = chatState.recentConversations.where((conv) {
+        final matchId = conv.closerId != null &&
+            (conv.closerId == closerId || conv.closerId == authUser?.id || (closerCode != null && conv.closerId == closerCode));
+        final matchName = closerName != null &&
+            closerName.isNotEmpty &&
+            conv.closerName != null &&
+            conv.closerName!.trim().toLowerCase() == closerName;
+        return matchId || matchName;
+      }).toList();
+      baseConversations = matches.isNotEmpty ? matches : chatState.recentConversations;
+    }
+
+    // Merge conversations with available orders so that every order has a WhatsApp card
+    final Map<String, OrderConversationEntity> mergedMap = {};
+    for (final conv in baseConversations) {
+      mergedMap[conv.orderId] = conv;
+      mergedMap[conv.orderNumber] = conv;
+    }
+
+    final allConversations = List<OrderConversationEntity>.from(baseConversations);
+    for (final o in scopedOrders) {
+      if (!mergedMap.containsKey(o.id) && !mergedMap.containsKey(o.orderNumber)) {
+        final synthConv = OrderConversationEntity(
+          id: 'synth_${o.id}',
+          orderId: o.id,
+          orderNumber: o.orderNumber,
+          customerName: o.customerName.trim().isNotEmpty ? o.customerName : 'Customer',
+          customerPhone: o.customerPhone,
+          clientId: o.clientId ?? '11111111-1111-4111-8111-111111111111',
+          clientName: o.clientName.trim().isNotEmpty
+              ? o.clientName
+              : (o.clientCompany.trim().isNotEmpty ? o.clientCompany : 'NOVACARE LIMITED'),
+          distributionCenterId: o.distributionCenterId,
+          distributionCenterName: o.distributionCenterName,
+          deliveryAgentId: o.deliveryAgentId,
+          deliveryAgentName: o.deliveryAgentName,
+          closerId: o.closerId,
+          closerName: o.closerName,
+          orderStatus: o.status,
+          currentProductName: o.productName.isNotEmpty ? o.productName : null,
+          currentPackageName: o.packageDealName,
+          currentTotalAmount: o.totalAmount,
+          lastMessageText: 'Order #${o.orderNumber} • ${o.status.replaceAll('_', ' ').toUpperCase()} • Tap to open pipeline chat',
+          lastMessageSenderName: 'System',
+          lastMessageAt: o.updatedAt ?? o.createdAt,
+          unreadClientCount: 0,
+          unreadDcCount: 0,
+          unreadRiderCount: 0,
+          createdAt: o.createdAt,
+          updatedAt: o.updatedAt ?? o.createdAt,
+        );
+        allConversations.add(synthConv);
+        mergedMap[o.id] = synthConv;
+        mergedMap[o.orderNumber] = synthConv;
+      }
+    }
 
     // Filter conversations chronologically top to bottom and by search query
     final filteredConversations = allConversations.where((conv) {
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       final cust = conv.customerName.toLowerCase();
+      final phone = (conv.customerPhone ?? '').toLowerCase();
       final num = conv.orderNumber.toLowerCase();
       final prod = (conv.currentProductName ?? '').toLowerCase();
-      return cust.contains(q) || num.contains(q) || prod.contains(q);
+      final stat = conv.orderStatus.toLowerCase();
+      return cust.contains(q) || num.contains(q) || prod.contains(q) || phone.contains(q) || stat.contains(q);
     }).toList();
 
     // Already ordered by last_message_at DESC from remote source, but sort defensively
@@ -302,7 +418,11 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          isCloser ? 'Live coordination for your booked & assigned orders' : 'Live coordination between Merchant, DC & Rider',
+                          isCloser
+                              ? 'Live coordination for your booked & assigned orders'
+                              : (isSupervisor
+                                  ? 'Team coordination for all supervised company orders'
+                                  : 'Live coordination between Merchant, DC & Rider'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.inter(
@@ -518,6 +638,28 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                 height: 1.4,
               ),
             ),
+            if (_searchQuery.isEmpty) ...[
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF37021),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () {
+                  ref.read(pipelineChatProvider.notifier).loadScopedConversations();
+                  ref.read(ordersProvider.notifier).loadOrders();
+                  final user = ref.read(authProvider).user;
+                  if (user?.isCloserSupervisor == true || user?.isSupervisor == true) {
+                    ref.read(salesSupervisorProvider.notifier).loadSupervisorData(clientId: user?.clientId);
+                  }
+                  ref.read(clientPortalProvider.notifier).loadClientData();
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Refresh Orders & Conversations', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ],
           ],
         ),
       ),
@@ -669,6 +811,45 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                             color: const Color(0xFF10B981),
                           ),
                         ),
+                      ),
+                      // Pending UPG Request Tag (Auto-removed on approval/rejection)
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final hasPendingUpg = ref.watch(salesSupervisorProvider).pendingUpgRequests.any(
+                                (u) => u.orderId == conv.orderId || u.orderNumber == conv.orderNumber,
+                              );
+                          if (!hasPendingUpg) return const SizedBox.shrink();
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF37021),
+                              borderRadius: BorderRadius.circular(4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFF37021).withValues(alpha: 0.35),
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.bolt_rounded, size: 11, color: Colors.white),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '⚡ UPG PENDING',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                       if (isFromMarketer && conv.marketerName != null && conv.marketerName!.isNotEmpty)
                         Container(

@@ -52,7 +52,7 @@ class _ActiveFollowUpReminderBannerState
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
-    )..repeat(reverse: true);
+    );
 
     _pulseAnimation = Tween<double>(begin: 0.96, end: 1.04).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
@@ -235,7 +235,24 @@ class _ActiveFollowUpReminderBannerState
       return true;
     }).toList();
 
-    if (dueOrders.isEmpty) return const SizedBox.shrink();
+    if (dueOrders.isEmpty) {
+      if (_pulseController.isAnimating) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _pulseController.isAnimating) {
+            _pulseController.stop();
+          }
+        });
+      }
+      return const SizedBox.shrink();
+    }
+
+    if (!_pulseController.isAnimating) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_pulseController.isAnimating) {
+          _pulseController.repeat(reverse: true);
+        }
+      });
+    }
 
     // Trigger audible chime once per active interval
     _checkAndPlaySound(dueOrders);

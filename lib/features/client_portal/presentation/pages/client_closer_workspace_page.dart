@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/helpers/map_launcher_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/product_image_widget.dart';
@@ -616,11 +617,12 @@ class ClientCloserWorkspacePage extends ConsumerWidget {
 
               // WhatsApp
               OutlinedButton.icon(
-                onPressed: () async {
-                  final cleanPhone = lead.customerPhone.replaceAll(RegExp(r'[^\d]'), '');
-                  final waPhone = cleanPhone.startsWith('0') ? '234${cleanPhone.substring(1)}' : cleanPhone;
-                  final uri = Uri.parse('https://wa.me/$waPhone?text=Hello%20${Uri.encodeComponent(lead.customerName)},%20regarding%20your%20order%20for%20${Uri.encodeComponent(lead.productInterest)}');
-                  if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                onPressed: () {
+                  MapLauncherHelper.launchWhatsApp(
+                    context: context,
+                    customerPhone: lead.customerPhone,
+                    message: 'Hello ${lead.customerName}, regarding your order for ${lead.productInterest}',
+                  );
                 },
                 icon: const Icon(Icons.chat_rounded, size: 15, color: Color(0xFF10B981)),
                 label: Text(

@@ -10,6 +10,11 @@ import '../../../dc_console/presentation/widgets/dc_staff_profile_settings_tab.d
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 import '../../domain/entities/upg_request.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../../notifications/presentation/widgets/notifications_modal.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
+import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
+import '../../../users/presentation/widgets/edit_profile_modal.dart';
 import '../providers/client_portal_provider.dart';
 import '../providers/sales_supervisor_provider.dart';
 import '../widgets/client_create_order_modal.dart';
@@ -52,6 +57,7 @@ class _MerchantSalesSupervisorPageState
     final clientId = user?.clientId;
     ref.read(salesSupervisorProvider.notifier).loadSupervisorData(clientId: clientId);
     ref.read(clientPortalProvider.notifier).loadClientData();
+    ref.read(pipelineChatProvider.notifier).loadScopedConversations();
   }
 
   Future<void> _makePhoneCall(String? phone) async {
@@ -74,6 +80,23 @@ class _MerchantSalesSupervisorPageState
     return DateFormat('MMM d').format(dt);
   }
 
+  String _getTabTitle(int tab) {
+    switch (tab) {
+      case 0:
+        return 'UPG Clearance Queue';
+      case 1:
+        return 'Order Pipeline Chats';
+      case 2:
+        return 'Closers Leaderboard';
+      case 3:
+        return 'Orders & Telesales Desk';
+      case 4:
+        return 'Supervisor Profile';
+      default:
+        return 'Supervisor Console';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeProvider);
@@ -85,37 +108,130 @@ class _MerchantSalesSupervisorPageState
     final user = ref.watch(authProvider).user;
     final pendingUpgCount = supervisorState.pendingUpgRequests.length;
     final closersCount = supervisorState.closers.length;
+    final unreadNotificationCount = ref.watch(notificationsProvider.select((s) => s.unreadCount));
+    final unreadChatCount = ref.watch(pipelineChatProvider.select((s) => s.getUnreadCountForRole('closer_supervisor')));
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         elevation: 0.5,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        titleSpacing: 10,
+        title: Row(
           children: [
-            Text(
-              'Sales Rep Supervisor Console',
-              style: GoogleFonts.inter(fontSize: 16.5, fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              '${user?.clientCompanyName ?? "Novacare"} • Closers Team & UPG Approval',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                color: const Color(0xFFF37021),
-                fontWeight: FontWeight.w600,
+            GestureDetector(
+              onTap: () {
+                if (user != null) {
+                  EditProfileModal.show(context, user);
+                }
+              },
+              child: Stack(
+                children: [
+                  UserAvatarWidget(
+                    fullName: user?.fullName ?? 'Supervisor',
+                    avatarUrl: user?.avatarUrl,
+                    radius: 17,
+                    backgroundColor: const Color(0xFFF37021),
+                    textColor: Colors.white,
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    user?.fullName ?? 'Sales Rep Supervisor',
+                    style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '${user?.clientCompanyName ?? "Novacare"} • ${_getTabTitle(_activeTab)}',
+                    style: GoogleFonts.inter(
+                      fontSize: 10.5,
+                      color: const Color(0xFFF37021),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
+          // Notifications Bell
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                tooltip: 'Notifications',
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(3),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: Icon(
+                  unreadNotificationCount > 0 ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                  size: 18,
+                  color: unreadNotificationCount > 0 ? const Color(0xFFF37021) : const Color(0xFF94A3B8),
+                ),
+                onPressed: () => NotificationsModal.show(context),
+              ),
+              if (unreadNotificationCount > 0)
+                Positioned(
+                  top: 5,
+                  right: 5,
+                  child: Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 13, minHeight: 13),
+                    child: Text(
+                      unreadNotificationCount > 9 ? '9+' : '$unreadNotificationCount',
+                      style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           IconButton(
-            tooltip: 'Refresh Operations',
-            icon: const Icon(Icons.refresh_rounded, size: 21),
+            tooltip: 'Toggle Theme',
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.all(3),
+            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              size: 17,
+              color: const Color(0xFF94A3B8),
+            ),
+            onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
+          ),
+          IconButton(
+            tooltip: 'Refresh Desk Data',
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.all(3),
+            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+            icon: const Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF94A3B8)),
             onPressed: _loadData,
           ),
           const SizedBox(width: 4),
@@ -155,6 +271,15 @@ class _MerchantSalesSupervisorPageState
               ),
               BottomNavigationBarItem(
                 icon: Badge(
+                  isLabelVisible: unreadChatCount > 0,
+                  label: Text('$unreadChatCount'),
+                  backgroundColor: const Color(0xFFEF4444),
+                  child: const Icon(Icons.forum_rounded),
+                ),
+                label: 'Order Chat',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
                   isLabelVisible: closersCount > 0,
                   label: Text('$closersCount'),
                   backgroundColor: const Color(0xFF2563EB),
@@ -163,7 +288,7 @@ class _MerchantSalesSupervisorPageState
                 label: 'Leaderboard',
               ),
               const BottomNavigationBarItem(
-                icon: Icon(Icons.headset_mic_rounded),
+                icon: Icon(Icons.local_shipping_rounded),
                 label: 'Orders Desk',
               ),
               const BottomNavigationBarItem(
@@ -177,15 +302,7 @@ class _MerchantSalesSupervisorPageState
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
-          child: Column(
-            children: [
-              if (_activeTab != 3)
-                _buildKpiGrid(supervisorState, isDark),
-              Expanded(
-                child: _buildActiveTabBody(supervisorState, isDark),
-              ),
-            ],
-          ),
+          child: _buildActiveTabBody(supervisorState, isDark),
         ),
       ),
     );
@@ -361,10 +478,12 @@ class _MerchantSalesSupervisorPageState
       case 0:
         return _buildUpgQueueTab(state, isDark);
       case 1:
-        return _buildLeaderboardTab(state, isDark);
+        return const ConversationListModal(isEmbeddedTab: true);
       case 2:
-        return _buildOrdersDeskTab(state, isDark);
+        return _buildLeaderboardTab(state, isDark);
       case 3:
+        return _buildOrdersDeskTab(state, isDark);
+      case 4:
         return DCStaffProfileSettingsTab(
           roleBadgeTitle: 'Novacare Closers Supervisor',
           departmentLabel: 'TELESALES CLOSERS & UPG GOVERNANCE',
@@ -802,13 +921,16 @@ class _MerchantSalesSupervisorPageState
   }
 
   // ==========================================
-  // TAB 1: SUPERVISEES LEADERBOARD (CLOSERS)
+  // TAB 2: SUPERVISEES LEADERBOARD (CLOSERS)
   // ==========================================
   Widget _buildLeaderboardTab(SalesSupervisorState state, bool isDark) {
     final ranked = state.rankedSupervisees;
 
     return Column(
       children: [
+        // Minimized Single-Row Responsive KPI Strip
+        _buildLeaderboardKpiStrip(state, isDark),
+
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
@@ -885,6 +1007,116 @@ class _MerchantSalesSupervisorPageState
             color: isSelected ? Colors.white : const Color(0xFF64748B),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLeaderboardKpiStrip(SalesSupervisorState state, bool isDark) {
+    final pendingCount = state.pendingUpgRequests.length;
+    final approvedToday = state.approvedTodayCount;
+    final totalUpsell = state.totalUpsellValueApproved;
+    final activeSupervisees = state.closers.length;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildMicroKpiTile(
+              label: 'UPG Queue',
+              value: '$pendingCount',
+              color: const Color(0xFFF37021),
+              icon: Icons.bolt_rounded,
+              isDark: isDark,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _buildMicroKpiTile(
+              label: 'Approved',
+              value: '$approvedToday',
+              color: const Color(0xFF10B981),
+              icon: Icons.check_circle_rounded,
+              isDark: isDark,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _buildMicroKpiTile(
+              label: 'Upsell',
+              value: _currency.format(totalUpsell),
+              color: const Color(0xFF2563EB),
+              icon: Icons.trending_up_rounded,
+              isDark: isDark,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _buildMicroKpiTile(
+              label: 'Closers',
+              value: '$activeSupervisees',
+              color: const Color(0xFF8B5CF6),
+              icon: Icons.people_rounded,
+              isDark: isDark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMicroKpiTile({
+    required String label,
+    required String value,
+    required Color color,
+    required IconData icon,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 10, color: color),
+              const SizedBox(width: 3),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 1),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1194,38 +1426,66 @@ class _MerchantSalesSupervisorPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 6,
+            runSpacing: 5,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '#${order.orderNumber}',
-                      style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                    ),
-                  ),
-                  if (hasUpg) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'UPG (+${_currency.format(order.upsellAmount)})',
-                        style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
-                      ),
-                    ),
-                  ],
-                ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '#${order.orderNumber}',
+                  style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                ),
               ),
+              if (ref.watch(salesSupervisorProvider).pendingUpgRequests.any(
+                    (u) => u.orderId == order.id || u.orderNumber == order.orderNumber,
+                  ))
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF37021),
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF37021).withValues(alpha: 0.35),
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.bolt_rounded, size: 10, color: Colors.white),
+                      const SizedBox(width: 2),
+                      Text(
+                        'UPG PENDING',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (hasUpg)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'UPG (+${_currency.format(order.upsellAmount)})',
+                    style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                  ),
+                ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(

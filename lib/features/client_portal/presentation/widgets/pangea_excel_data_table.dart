@@ -198,6 +198,10 @@ class PangeaExcelDataTable<T> extends StatefulWidget {
   final bool showSettingsButton;
   final bool showTopToolbar;
 
+  /// Optional additional action/filter widgets rendered in the top toolbar
+  /// directly beside the Settings button (e.g. compact dropdowns, search boxes, action buttons).
+  final List<Widget>? topToolbarActions;
+
   /// Optional date extractor to enable built-in date filtering on in-memory items.
   /// If null, but one of [columns] has [ExcelColumnDef.dateValue], that will be used automatically.
   final DateTime? Function(T item)? dateExtractor;
@@ -241,6 +245,7 @@ class PangeaExcelDataTable<T> extends StatefulWidget {
     this.initialPageSize,
     this.showSettingsButton = true,
     this.showTopToolbar = true,
+    this.topToolbarActions,
     this.dateExtractor,
     this.initialDateRange,
     this.initialDatePreset,
@@ -584,7 +589,11 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final hasBoundedHeight = widget.tableHeight != null || constraints.maxHeight.isFinite;
-        final showTop = widget.showTopToolbar && (widget.enablePagination || widget.showSettingsButton);
+        final showTop = widget.showTopToolbar &&
+            (widget.enablePagination ||
+                widget.showSettingsButton ||
+                (widget.topToolbarActions != null &&
+                    widget.topToolbarActions!.isNotEmpty));
 
         final tableContent = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1096,7 +1105,7 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
                 : 'Showing all $totalCount rows'));
 
     return Container(
-      height: 44,
+      height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -1270,6 +1279,17 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
               ),
             ],
 
+            // Top Toolbar Actions & Filters (placed in the heading section alongside Settings)
+            if (widget.topToolbarActions != null && widget.topToolbarActions!.isNotEmpty) ...[
+              const SizedBox(width: 12),
+              Container(height: 16, width: 1, color: borderColor),
+              const SizedBox(width: 12),
+              for (int i = 0; i < widget.topToolbarActions!.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                widget.topToolbarActions![i],
+              ],
+            ],
+
             if (widget.trailingFooterAction != null) ...[
               const SizedBox(width: 14),
               widget.trailingFooterAction!,
@@ -1423,7 +1443,7 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
                 : 'Showing all $totalCount rows'));
 
     return Container(
-      height: 44,
+      height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -1693,35 +1713,50 @@ class _PangeaExcelDataRowState<T> extends State<_PangeaExcelDataRow<T>> {
           decoration: BoxDecoration(
             color: rowBg,
             border: Border(
-              left: leftBorder ?? BorderSide.none,
               bottom: BorderSide(color: widget.borderColor, width: 0.8),
             ),
           ),
-          child: Row(
-            children: widget.columns.map((col) {
-              final width = widget.getColWidth(col.key);
+          child: Stack(
+            children: [
+              Row(
+                children: widget.columns.map((col) {
+                  final width = widget.getColWidth(col.key);
 
-              return Container(
-                width: width,
-                height: widget.rowHeight,
-                alignment: widget.getAlignment(col.align),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  border: widget.showVerticalGridlines
-                      ? Border(right: BorderSide(color: widget.borderColor, width: 0.8))
-                      : null,
-                ),
-                child: ClipRect(
-                  child: col.cellBuilder(
-                    context,
-                    widget.item,
-                    widget.rowNumber,
-                    widget.isDark,
-                    widget.brandPrimary,
+                  return Container(
+                    width: width,
+                    height: widget.rowHeight,
+                    alignment: widget.getAlignment(col.align),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      border: widget.showVerticalGridlines
+                          ? Border(right: BorderSide(color: widget.borderColor, width: 0.8))
+                          : null,
+                    ),
+                    child: ClipRect(
+                      child: col.cellBuilder(
+                        context,
+                        widget.item,
+                        widget.rowNumber,
+                        widget.isDark,
+                        widget.brandPrimary,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              if (leftBorder != null && leftBorder != BorderSide.none)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: leftBorder.width,
+                      color: leftBorder.color,
+                    ),
                   ),
                 ),
-              );
-            }).toList(),
+            ],
           ),
         ),
       ),

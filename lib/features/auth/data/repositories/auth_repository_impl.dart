@@ -157,4 +157,17 @@ class AuthRepositoryImpl implements AuthRepository {
       customFailedAttemptFee: customFailedAttemptFee,
     );
   }
+
+  @override
+  Future<bool> changePassword({
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    return await remoteDataSource.changePassword(
+      email: email,
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+  }
 }

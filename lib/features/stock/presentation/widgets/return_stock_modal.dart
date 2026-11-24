@@ -21,13 +21,14 @@ class ReturnStockDraftState {
   });
 
   ReturnStockDraftState copyWith({
-    StockItemEntity? Function()? selectedItem,
+    StockItemEntity? selectedItem,
+    bool clearSelectedItem = false,
     int? returnQuantity,
     String? returnReason,
     bool? isSubmitting,
   }) {
     return ReturnStockDraftState(
-      selectedItem: selectedItem != null ? selectedItem() : this.selectedItem,
+      selectedItem: clearSelectedItem ? null : (selectedItem ?? this.selectedItem),
       returnQuantity: returnQuantity ?? this.returnQuantity,
       returnReason: returnReason ?? this.returnReason,
       isSubmitting: isSubmitting ?? this.isSubmitting,
@@ -41,7 +42,8 @@ class ReturnStockDraftNotifier extends StateNotifier<ReturnStockDraftState> {
 
   void selectItem(StockItemEntity? item) {
     state = state.copyWith(
-      selectedItem: () => item,
+      selectedItem: item,
+      clearSelectedItem: item == null,
       returnQuantity: 1,
     );
   }
@@ -150,28 +152,51 @@ class _ReturnStockModalState extends ConsumerState<ReturnStockModal> {
     );
 
     final availableVehicleItems = stockState.stockItems.where((item) {
-      final alloc = riderAllocations.firstWhere(
+      final alloc = riderAllocations.where(
         (a) => a.productName.toLowerCase().trim() == item.name.toLowerCase().trim() ||
                a.productId == item.id,
-        orElse: () => riderAllocations.isNotEmpty ? riderAllocations.first : riderAllocations.first,
-      );
-      return alloc.inCustodyUnits > 0 || item.availableCount > 0;
+      ).firstOrNull;
+      return (alloc != null && alloc.inCustodyUnits > 0) || item.availableCount > 0;
     }).toList();
 
-    // Find active selection
+    // Deduplicate items by ID
+    final uniqueVehicleItems = <StockItemEntity>[];
+    final seenProductIds = <String>{};
+    for (final it in availableVehicleItems) {
+      if (it.id.isNotEmpty && seenProductIds.add(it.id)) {
+        uniqueVehicleItems.add(it);
+      }
+    }
+
+    // Find active selection safely matching uniqueVehicleItems
     StockItemEntity? currentItem = draft.selectedItem;
-    if (currentItem == null && availableVehicleItems.isNotEmpty) {
-      currentItem = widget.preselectedItem ?? availableVehicleItems.first;
+    if (uniqueVehicleItems.isNotEmpty) {
+      if (currentItem != null) {
+        currentItem = uniqueVehicleItems.firstWhere(
+          (i) => i.id == currentItem!.id,
+          orElse: () => uniqueVehicleItems.first,
+        );
+      } else {
+        currentItem = widget.preselectedItem != null
+            ? uniqueVehicleItems.firstWhere(
+                (i) => i.id == widget.preselectedItem!.id,
+                orElse: () => uniqueVehicleItems.first,
+              )
+            : uniqueVehicleItems.first;
+      }
+    } else {
+      currentItem = null;
     }
 
     int maxReturnUnits = 0;
     if (currentItem != null) {
-      final matchingAlloc = riderAllocations.firstWhere(
+      final matchingAlloc = riderAllocations.where(
         (a) => a.productName.toLowerCase().trim() == currentItem!.name.toLowerCase().trim() ||
                a.productId == currentItem.id,
-        orElse: () => riderAllocations.isNotEmpty ? riderAllocations.first : riderAllocations.first,
-      );
-      maxReturnUnits = matchingAlloc.inCustodyUnits > 0 ? matchingAlloc.inCustodyUnits : currentItem.availableCount;
+      ).firstOrNull;
+      maxReturnUnits = (matchingAlloc != null && matchingAlloc.inCustodyUnits > 0)
+          ? matchingAlloc.inCustodyUnits
+          : currentItem.availableCount;
     }
 
     return Container(
@@ -267,11 +292,12 @@ class _ReturnStockModalState extends ConsumerState<ReturnStockModal> {
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<StockItemEntity>(
-                              value: currentItem,
+                              value: currentItem != null && uniqueVehicleItems.any((i) => i.id == currentItem!.id)
+                                  ? uniqueVehicleItems.firstWhere((i) => i.id == currentItem!.id)
+                                  : (uniqueVehicleItems.isNotEmpty ? uniqueVehicleItems.first : null),
                               isExpanded: true,
                               dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                              items: (availableVehicleItems.isNotEmpty ? availableVehicleItems : (currentItem != null ? [currentItem] : <StockItemEntity>[]))
-                                  .map((item) {
+                              items: uniqueVehicleItems.map((item) {
                                 return DropdownMenuItem<StockItemEntity>(
                                   value: item,
                                   child: Row(

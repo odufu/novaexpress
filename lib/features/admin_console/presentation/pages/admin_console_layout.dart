@@ -6,13 +6,16 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/nova_tooltip.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/presentation/widgets/change_password_modal.dart';
 import '../providers/admin_console_provider.dart';
 import '../widgets/admin_dc_modal.dart';
 import '../widgets/admin_merchant_modal.dart';
 import '../widgets/admin_user_modal.dart';
+import 'tabs/admin_agents_tab.dart';
 import 'tabs/admin_app_settings_tab.dart';
 import 'tabs/admin_audit_logs_tab.dart';
 import 'tabs/admin_distribution_centers_tab.dart';
+import 'tabs/admin_global_stock_tab.dart';
 import 'tabs/admin_merchants_tab.dart';
 import 'tabs/admin_routing_tariffs_tab.dart';
 import 'tabs/admin_server_settings_tab.dart';
@@ -30,22 +33,34 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
 
   final List<Map<String, dynamic>> _navItems = const [
     {
+      'title': 'Agents & 3PLs',
+      'icon': Icons.local_shipping_outlined,
+      'activeIcon': Icons.local_shipping_rounded,
+      'tooltip': 'External logistics partners (NovaXpress Logistics, GIG, Speedaf), held stock custody & daily balancing',
+    },
+    {
+      'title': 'Multi-Hub Stock',
+      'icon': Icons.inventory_2_outlined,
+      'activeIcon': Icons.inventory_2_rounded,
+      'tooltip': 'Live inventory holding of all merchants across all distribution centers & agents',
+    },
+    {
+      'title': 'Merchants & Partners',
+      'icon': Icons.storefront_outlined,
+      'activeIcon': Icons.storefront_rounded,
+      'tooltip': 'Retail merchants (Novacare, Shop11), distributed products, chosen agents & daily remittances',
+    },
+    {
+      'title': 'Warehouses & Branches',
+      'icon': Icons.hub_outlined,
+      'activeIcon': Icons.hub_rounded,
+      'tooltip': 'Distribution Centers, regional hubs, branch creation (Lagos, Kano, Abuja) & working agents',
+    },
+    {
       'title': 'Users & RBAC',
       'icon': Icons.people_alt_outlined,
       'activeIcon': Icons.people_alt_rounded,
       'tooltip': 'Team members, role privileges, account suspension & onboarding',
-    },
-    {
-      'title': 'DC & Hubs',
-      'icon': Icons.hub_outlined,
-      'activeIcon': Icons.hub_rounded,
-      'tooltip': 'Distribution Centers, regional hubs, warehouse capacity & vaults',
-    },
-    {
-      'title': 'Merchants',
-      'icon': Icons.storefront_outlined,
-      'activeIcon': Icons.storefront_rounded,
-      'tooltip': 'E-commerce partners, closer allocation & COD remittance banks',
     },
     {
       'title': 'App Policies',
@@ -110,9 +125,11 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
                       : IndexedStack(
                           index: state.activeTab,
                           children: const [
-                            AdminUsersTab(),
-                            AdminDistributionCentersTab(),
+                            AdminAgentsTab(),
+                            AdminGlobalStockTab(),
                             AdminMerchantsTab(),
+                            AdminDistributionCentersTab(),
+                            AdminUsersTab(),
                             AdminAppSettingsTab(),
                             AdminServerSettingsTab(),
                             AdminRoutingTariffsTab(),
@@ -155,73 +172,219 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
 
-          // Active Tab Title
-          Text(
-            _navItems[state.activeTab]['title'] as String,
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : const Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(width: 10),
-
-          // Live Database Environment Pill
-          NovaTooltip(
-            message: 'Connected to live production Supabase instance (${state.serverSettings.lastPingMs}ms)',
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF10B981),
-                      shape: BoxShape.circle,
-                    ),
+          // Platform Badge & Title
+          Expanded(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.3)),
                   ),
-                  const SizedBox(width: 5),
-                  Text(
-                    'LIVE BACKEND',
+                  child: Text(
+                    'PLATFORM ADMIN',
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF10B981),
+                      color: const Color(0xFF2563EB),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _navItems[state.activeTab]['title'] as String,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Top Bar Right Actions & Switchers (Horizontally scrollable if cramped)
+          Flexible(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // DUAL CONSOLE TOGGLE: Warehouse Console <-> DC Logistics Console
+                  Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2563EB),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.warehouse_rounded, size: 14, color: Colors.white),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Warehouse Console',
+                                style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => context.go('/dc/dashboard'),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.local_shipping_outlined, size: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'DC Logistics Console',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // REGION SELECTOR: Overall Control vs. Station DCs
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: const ['all', 'DC-ABJ-01', 'DC-LAG-01'].contains(state.selectedRegion)
+                            ? state.selectedRegion
+                            : (state.selectedRegion.contains('ABJ') || state.selectedRegion.contains('2222')
+                                ? 'DC-ABJ-01'
+                                : (state.selectedRegion.contains('LAG') || state.selectedRegion.contains('7924')
+                                    ? 'DC-LAG-01'
+                                    : 'all')),
+                        dropdownColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                        icon: const Icon(Icons.arrow_drop_down_rounded, size: 20, color: Color(0xFF2563EB)),
+                        isDense: true,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'all',
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.public_rounded, size: 14, color: Color(0xFF38BDF8)),
+                                SizedBox(width: 6),
+                                Text('🌐 All Regions (Overall Control)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'DC-ABJ-01',
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.location_city_rounded, size: 14, color: Color(0xFF10B981)),
+                                SizedBox(width: 6),
+                                Text('🏛️ Abuja Central DC (North)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'DC-LAG-01',
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.apartment_rounded, size: 14, color: Color(0xFFF59E0B)),
+                                SizedBox(width: 6),
+                                Text('🏢 Lagos Central DC (South)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            notifier.setSelectedRegion(val);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Agent Daily Sales & Auto Stock Minus Console Shortcut
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF97316),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.point_of_sale_rounded, size: 14),
+                    label: Text(
+                      'Daily Sales',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () => context.push('/agent-daily-sales'),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Quick Create Resource Menu
+                  _buildQuickAddMenu(context, isDark),
+                  const SizedBox(width: 4),
+
+                  // Refresh Button
+                  NovaTooltip(
+                    message: 'Synchronize live data with database',
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      onPressed: () => notifier.loadAll(),
+                    ),
+                  ),
+
+                  // Theme Switcher
+                  NovaTooltip(
+                    message: isDark ? 'Switch to light interface' : 'Switch to dark interface',
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded, size: 18),
+                      onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
-
-          const Spacer(),
-
-          // Quick Create Resource Menu
-          _buildQuickAddMenu(context, isDark),
-          const SizedBox(width: 8),
-
-          // Refresh Button
-          NovaTooltip(
-            message: 'Synchronize live data with database',
-            child: IconButton(
-              icon: const Icon(Icons.refresh_rounded, size: 20),
-              onPressed: () => notifier.loadAll(),
-            ),
-          ),
-
-          // Theme Switcher
-          NovaTooltip(
-            message: isDark ? 'Switch to light interface' : 'Switch to dark interface',
-            child: IconButton(
-              icon: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded, size: 20),
-              onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
             ),
           ),
         ],
@@ -244,7 +407,7 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
             builder: (context) => AdminUserModal(
               distributionCenters: state.distributionCenters,
               merchants: state.merchants,
-              onSave: notifier.saveUser,
+              onSave: (user, password) => notifier.saveUser(user, password),
             ),
           );
         } else if (val == 'hub') {
@@ -261,16 +424,30 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
               onSave: notifier.saveMerchant,
             ),
           );
+        } else if (val == 'agent') {
+          notifier.setActiveTab(0);
+        } else if (val == 'daily_sales') {
+          context.push('/agent-daily-sales');
         }
       },
       itemBuilder: (context) => [
         PopupMenuItem(
-          value: 'user',
+          value: 'daily_sales',
           child: Row(
             children: [
-              const Icon(Icons.person_add_outlined, size: 16, color: Color(0xFF3B82F6)),
+              const Icon(Icons.point_of_sale_rounded, size: 16, color: Color(0xFFF97316)),
               const SizedBox(width: 8),
-              Text('Onboard User', style: GoogleFonts.inter(fontSize: 13)),
+              Text('Log Agent Daily Sales', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'agent',
+          child: Row(
+            children: [
+              const Icon(Icons.local_shipping_outlined, size: 16, color: Color(0xFF0284C7)),
+              const SizedBox(width: 8),
+              Text('Register Agent & Fee', style: GoogleFonts.inter(fontSize: 13)),
             ],
           ),
         ),
@@ -280,7 +457,7 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
             children: [
               const Icon(Icons.add_business_outlined, size: 16, color: AppColors.orange),
               const SizedBox(width: 8),
-              Text('New DC / Hub', style: GoogleFonts.inter(fontSize: 13)),
+              Text('New DC Branch / Hub', style: GoogleFonts.inter(fontSize: 13)),
             ],
           ),
         ),
@@ -291,6 +468,16 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
               const Icon(Icons.storefront_outlined, size: 16, color: Color(0xFF10B981)),
               const SizedBox(width: 8),
               Text('Onboard Merchant', style: GoogleFonts.inter(fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'user',
+          child: Row(
+            children: [
+              const Icon(Icons.person_add_outlined, size: 16, color: Color(0xFF3B82F6)),
+              const SizedBox(width: 8),
+              Text('Onboard User', style: GoogleFonts.inter(fontSize: 13)),
             ],
           ),
         ),
@@ -341,26 +528,32 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
                   child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 20),
                 ),
                 const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'NovaXpress',
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'NovaXpress',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    Text(
-                      'Command Console',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.orange,
+                      Text(
+                        'Command Console',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.orange,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -412,14 +605,18 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
                                   : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                             ),
                             const SizedBox(width: 12),
-                            Text(
-                              item['title'] as String,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                color: isSelected
-                                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            Expanded(
+                              child: Text(
+                                item['title'] as String,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                  color: isSelected
+                                      ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -446,9 +643,13 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
                   children: [
                     const Icon(Icons.warehouse_rounded, size: 16, color: Color(0xFF64748B)),
                     const SizedBox(width: 8),
-                    Text(
-                      'Switch to DC Operations',
-                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                    Expanded(
+                      child: Text(
+                        'Switch to DC Operations',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -488,6 +689,13 @@ class _AdminConsoleLayoutState extends ConsumerState<AdminConsoleLayout> {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.key_rounded, size: 17, color: Color(0xFF64748B)),
+                  tooltip: 'Change Password',
+                  onPressed: () {
+                    ChangePasswordModal.show(context, email: currentUser?.email);
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.logout_rounded, size: 17, color: Color(0xFFF43F5E)),

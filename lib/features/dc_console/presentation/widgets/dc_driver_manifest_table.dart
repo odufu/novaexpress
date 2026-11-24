@@ -421,15 +421,17 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                       label: 'MODEL',
                       defaultWidth: 140,
                       minWidth: 110,
-                      searchString: (d) => d.isPda ? 'PDA Agent' : 'In-House Fleet',
-                      sortValue: (d) => d.isPda ? 'PDA' : 'InHouse',
+                      searchString: (d) => d.isExternalPda ? 'External PDA Offline' : (d.isPda ? 'PDA Agent' : 'In-House Fleet'),
+                      sortValue: (d) => d.isExternalPda ? 'ExtPDA' : (d.isPda ? 'PDA' : 'InHouse'),
                       cellBuilder: (context, driver, row, isDark, brand) {
+                        final isExt = driver.isExternalPda;
+                        final color = isExt
+                            ? const Color(0xFFD97706)
+                            : (driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669));
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: driver.isPda
-                                ? const Color(0xFF2563EB).withValues(alpha: 0.12)
-                                : const Color(0xFF10B981).withValues(alpha: 0.12),
+                            color: color.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: FittedBox(
@@ -438,17 +440,19 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  driver.isPda ? Icons.phone_android_rounded : Icons.two_wheeler_rounded,
+                                  isExt
+                                      ? Icons.local_shipping_rounded
+                                      : (driver.isPda ? Icons.phone_android_rounded : Icons.two_wheeler_rounded),
                                   size: 12,
-                                  color: driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
+                                  color: color,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  driver.isPda ? 'PDA' : 'In-House',
+                                  isExt ? 'EXT PDA (Offline)' : (driver.isPda ? 'PDA' : 'In-House'),
                                   style: GoogleFonts.inter(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
+                                    color: color,
                                   ),
                                 ),
                               ],
@@ -523,8 +527,8 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                       key: 'status',
                       group: 'Assignment',
                       label: 'STATUS',
-                      defaultWidth: 130,
-                      minWidth: 100,
+                      defaultWidth: 165,
+                      minWidth: 125,
                       searchString: (d) => d.status,
                       sortValue: (d) => d.status,
                       cellBuilder: (context, driver, row, isDark, brand) {
@@ -564,14 +568,19 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  '$completedOrders/$totalOrders',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                Flexible(
+                                  child: Text(
+                                    '$completedOrders/$totalOrders',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                const SizedBox(width: 4),
                                 Text(
                                   '$progressPercent%',
                                   style: GoogleFonts.jetBrainsMono(
@@ -660,11 +669,12 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                       key: 'action',
                       group: 'Action',
                       label: 'ACTION',
-                      defaultWidth: 105,
-                      minWidth: 90,
+                      defaultWidth: 120,
+                      minWidth: 96,
                       cellBuilder: (context, driver, row, isDark, brand) {
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             NovaTooltip(
                               message: driver.isAvailable ? 'Deactivate Rider (Temporary Ban)' : 'Reactivate Rider (Restore Availability)',
@@ -682,6 +692,8 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                             IconButton(
                               icon: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Color(0xFF64748B)),
                               tooltip: 'Open Rider Financials & Order Breakdown',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                               onPressed: () => widget.onDriverTap?.call(driver),
                             ),
                           ],
@@ -1021,12 +1033,16 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
             ),
           ),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: fg,
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: fg,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

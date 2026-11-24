@@ -108,9 +108,9 @@ class ClientOrderTrackingModal extends ConsumerWidget {
         ),
         child: Column(
           children: [
-            // Modal Header
+            // Modal Header (Compact Single Line)
             Container(
-              padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 24, vertical: 16),
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 18, vertical: 10),
               decoration: const BoxDecoration(
                 color: Color(0xFF0F172A),
                 borderRadius: BorderRadius.only(
@@ -121,49 +121,55 @@ class ClientOrderTrackingModal extends ConsumerWidget {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0D9488).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Icon(Icons.track_changes_rounded, color: Color(0xFF2DD4BF), size: 22),
+                    child: const Icon(Icons.track_changes_rounded, color: Color(0xFF2DD4BF), size: 18),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 8,
-                          runSpacing: 4,
+                        Row(
                           children: [
-                            Text(
-                              'Order ${currentOrder.orderNumber}',
-                              style: GoogleFonts.inter(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                            Flexible(
+                              child: Text(
+                                'Order #${currentOrder.orderNumber}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: 6),
                             _buildStatusPill(currentOrder.status),
                           ],
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Created ${currentOrder.createdAt.toLocal().toString().substring(0, 16)} • ${currentOrder.deliveryCity}, ${currentOrder.deliveryState}',
+                          '${currentOrder.customerName.trim().isNotEmpty ? currentOrder.customerName : "Customer"} • ${currentOrder.createdAt.toLocal().toString().substring(0, 16)} • ${currentOrder.deliveryCity}',
                           style: GoogleFonts.inter(
-                            fontSize: 12,
+                            fontSize: 10.5,
                             color: const Color(0xFF94A3B8),
                           ),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 20),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -282,9 +288,9 @@ class ClientOrderTrackingModal extends ConsumerWidget {
               ),
             ),
 
-            // Modal Footer
+            // Modal Footer - Single Compact Row for Mobile
             Container(
-              padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 24, vertical: 12),
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 18, vertical: 8),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF151D36) : const Color(0xFFF8FAFC),
                 border: Border(top: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0))),
@@ -293,66 +299,58 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                   bottomRight: Radius.circular(16),
                 ),
               ),
-              child: Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 8,
+              child: Row(
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.business_rounded, size: 16, color: Color(0xFF64748B)),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Client: ${currentOrder.clientCompany}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                        ),
+                  const Icon(Icons.business_rounded, size: 14, color: Color(0xFF64748B)),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      'Client: ${currentOrder.clientCompany}',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                       ),
-                    ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    alignment: WrapAlignment.end,
-                    children: [
-                      if (ref.watch(authProvider).user?.isCloser == true) ...[
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF10B981),
-                            side: const BorderSide(color: Color(0xFF10B981)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          icon: const Icon(Icons.upgrade_rounded, size: 18),
-                          label: const Text('UPG'),
-                          onPressed: () {
-                            final currentUser = ref.read(authProvider).user;
-                            RequestUpgModal.show(
-                              context,
-                              order: currentOrder,
-                              closerId: currentUser?.id ?? '',
-                              closerName: currentUser?.fullName ?? 'Staff',
-                              closerCode: currentUser?.closerCode ?? 'REP',
-                              isSupervisor: currentUser?.isCloserSupervisor == true,
-                            );
-                          },
-                        ),
-                      ],
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0D9488),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Close Tracking'),
+                  const SizedBox(width: 8),
+                  if (ref.watch(authProvider).user?.isCloser == true) ...[
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: const Color(0xFF10B981),
+                        side: const BorderSide(color: Color(0xFF10B981), width: 1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                       ),
-                    ],
+                      icon: const Icon(Icons.upgrade_rounded, size: 15),
+                      label: const Text('UPG', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        final currentUser = ref.read(authProvider).user;
+                        RequestUpgModal.show(
+                          context,
+                          order: currentOrder,
+                          closerId: currentUser?.id ?? '',
+                          closerName: currentUser?.fullName ?? 'Staff',
+                          closerCode: currentUser?.closerCode ?? 'REP',
+                          isSupervisor: currentUser?.isCloserSupervisor == true,
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close Tracking', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),

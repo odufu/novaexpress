@@ -65,17 +65,17 @@ CREATE POLICY "Merchant BI Chats tenant isolation"
     FOR ALL
     TO authenticated
     USING (
-        client_id IN (
-            SELECT client_id FROM public.clients_users WHERE user_id = auth.uid()
+        client_id::text IN (
+            SELECT client_id::text FROM public.users WHERE id = auth.uid()
             UNION
-            SELECT id FROM public.clients WHERE id = auth.uid()
+            SELECT id::text FROM public.clients WHERE id = auth.uid()
         )
     )
     WITH CHECK (
-        client_id IN (
-            SELECT client_id FROM public.clients_users WHERE user_id = auth.uid()
+        client_id::text IN (
+            SELECT client_id::text FROM public.users WHERE id = auth.uid()
             UNION
-            SELECT id FROM public.clients WHERE id = auth.uid()
+            SELECT id::text FROM public.clients WHERE id = auth.uid()
         )
     );
 
@@ -84,17 +84,17 @@ CREATE POLICY "Merchant BI Messages tenant isolation"
     FOR ALL
     TO authenticated
     USING (
-        client_id IN (
-            SELECT client_id FROM public.clients_users WHERE user_id = auth.uid()
+        client_id::text IN (
+            SELECT client_id::text FROM public.users WHERE id = auth.uid()
             UNION
-            SELECT id FROM public.clients WHERE id = auth.uid()
+            SELECT id::text FROM public.clients WHERE id = auth.uid()
         )
     )
     WITH CHECK (
-        client_id IN (
-            SELECT client_id FROM public.clients_users WHERE user_id = auth.uid()
+        client_id::text IN (
+            SELECT client_id::text FROM public.users WHERE id = auth.uid()
             UNION
-            SELECT id FROM public.clients WHERE id = auth.uid()
+            SELECT id::text FROM public.clients WHERE id = auth.uid()
         )
     );
 
@@ -103,17 +103,17 @@ CREATE POLICY "Merchant BI Knowledge tenant isolation"
     FOR ALL
     TO authenticated
     USING (
-        client_id IN (
-            SELECT client_id FROM public.clients_users WHERE user_id = auth.uid()
+        client_id::text IN (
+            SELECT client_id::text FROM public.users WHERE id = auth.uid()
             UNION
-            SELECT id FROM public.clients WHERE id = auth.uid()
+            SELECT id::text FROM public.clients WHERE id = auth.uid()
         )
     )
     WITH CHECK (
-        client_id IN (
-            SELECT client_id FROM public.clients_users WHERE user_id = auth.uid()
+        client_id::text IN (
+            SELECT client_id::text FROM public.users WHERE id = auth.uid()
             UNION
-            SELECT id FROM public.clients WHERE id = auth.uid()
+            SELECT id::text FROM public.clients WHERE id = auth.uid()
         )
     );
 

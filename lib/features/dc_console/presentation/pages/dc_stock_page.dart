@@ -2649,7 +2649,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final targetDestDc = otherDcs.firstWhere((d) => d.id == selectedDestDcId, orElse: () => otherDcs.first);
+          final targetDestDc = otherDcs.where((d) => d.id == selectedDestDcId).firstOrNull ?? otherDcs.first;
 
           return AlertDialog(
             backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,

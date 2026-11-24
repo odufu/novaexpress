@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/widgets/nova_critical_action_confirmation_modal.dart';
 import '../../../../../core/widgets/nova_tooltip.dart';
+import '../../../../auth/presentation/providers/auth_provider.dart';
 import '../../../domain/entities/admin_models.dart';
 import '../../providers/admin_console_provider.dart';
 import '../../widgets/admin_filter_header.dart';
@@ -274,6 +276,45 @@ class AdminUsersTab extends ConsumerWidget {
                                           onPressed: () => _openUserModal(context, ref, user),
                                         ),
                                       ),
+                                      NovaTooltip(
+                                        message: 'Permanently delete user',
+                                        child: IconButton(
+                                          icon: const Icon(Icons.delete_outline_rounded, size: 17, color: Color(0xFFEF4444)),
+                                          onPressed: () async {
+                                            final currentAuth = ref.read(authProvider).user;
+                                            final confirmed = await NovaCriticalActionConfirmationModal.show(
+                                              context: context,
+                                              actionName: 'Permanently Delete User Account',
+                                              isDestructive: true,
+                                              operatorAccount: currentAuth?.email ?? 'operations@novaxpress.ng',
+                                              promptMessage:
+                                                  'Are you sure you want to permanently delete this user account from the system and Supabase Auth? This action is irreversible.',
+                                              valuesets: {
+                                                'Full Name': user.fullName,
+                                                'Email Address': user.email,
+                                                'Assigned Role': user.role,
+                                                'Branch / Hub': user.distributionCenterName ?? '—',
+                                              },
+                                            );
+
+                                            if (confirmed) {
+                                              final ok = await notifier.deleteUser(user.id);
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      ok
+                                                          ? 'User ${user.fullName} (${user.email}) permanently deleted.'
+                                                          : 'User deleted locally; database sync logged.',
+                                                    ),
+                                                    backgroundColor: const Color(0xFFEF4444),
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          },
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -445,7 +486,7 @@ class AdminUsersTab extends ConsumerWidget {
           initialUser: user,
           distributionCenters: state.distributionCenters,
           merchants: state.merchants,
-          onSave: notifier.saveUser,
+          onSave: (savedUser, password) => notifier.saveUser(savedUser, password),
         );
       },
     );

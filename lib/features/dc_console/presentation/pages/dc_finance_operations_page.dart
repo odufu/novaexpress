@@ -9,6 +9,7 @@ import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
+import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
@@ -94,9 +95,51 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
     bool isDark,
   ) {
     final allOrders = ref.read(ordersProvider).orders;
-    final riderOrders = allOrders.where((o) =>
-      o.deliveryAgentId == driver.id || o.deliveryAgentId == driver.driverCode
-    ).toList();
+    final financeSettings = ref.read(dcConsoleProvider).financeSettings;
+    final currentUser = ref.read(authProvider).user;
+    final canClearFinance = currentUser == null ||
+        currentUser.isDcFinanceAdmin ||
+        currentUser.isGeneralAccountant ||
+        currentUser.isDcManager;
+
+    final riderOrders = allOrders
+        .where(
+          (o) =>
+              o.deliveryAgentId == driver.id ||
+              o.deliveryAgentId == driver.driverCode ||
+              (driver.driverCode.isNotEmpty &&
+                  o.deliveryAgentCode == driver.driverCode),
+        )
+        .toList();
+
+    final requestedOrderIds = <String>{};
+    final requestedOrderNumbers = <String>{};
+    for (final r in riderPending) {
+      for (final ao in r.associatedOrders) {
+        if (ao.orderId.isNotEmpty) requestedOrderIds.add(ao.orderId);
+        if (ao.orderNumber.isNotEmpty) requestedOrderNumbers.add(ao.orderNumber);
+      }
+    }
+
+    final unrequestedCashOrders = riderOrders
+        .where(
+          (o) =>
+              (o.isDelivered || o.status.toLowerCase() == 'delivered') &&
+              !o.isDirectTransfer &&
+              !o.isRemitted &&
+              !o.isPendingClearance &&
+              !requestedOrderIds.contains(o.id) &&
+              !requestedOrderNumbers.contains(o.orderNumber),
+        )
+        .toList();
+
+    final pendingGrossSum = riderPending.fold<double>(
+      0.0,
+      (s, r) => s + (r.grossCollections > 0 ? r.grossCollections : r.amount),
+    );
+    final double? fallbackGrossOverride = unrequestedCashOrders.isEmpty
+        ? (grossCustody - pendingGrossSum).clamp(0.0, grossCustody)
+        : null;
 
     showModalBottomSheet(
       context: context,
@@ -180,9 +223,12 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                           children: [
                             const Icon(Icons.calculate_outlined, size: 16, color: Color(0xFF00522A)),
                             const SizedBox(width: 8),
-                            Text(
-                              'Remittance Calculation & Deductions',
-                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                            Expanded(
+                              child: Text(
+                                'Remittance Calculation & Deductions',
+                                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
@@ -210,22 +256,28 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                           isDeduction: true,
                         ),
                         const Divider(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Net Remittance Due to DC:',
-                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              CurrencyFormatter.formatNaira(unrequestedNet),
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: unrequestedNet > 0 ? const Color(0xFF00522A) : const Color(0xFF16A34A),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              Text(
+                                'Net Remittance Due to DC:',
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
                               ),
-                            ),
-                          ],
+                              Text(
+                                CurrencyFormatter.formatNaira(unrequestedNet),
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: unrequestedNet > 0 ? const Color(0xFF00522A) : const Color(0xFF16A34A),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -279,33 +331,39 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                CurrencyFormatter.formatNaira(rem.amount),
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF00522A),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEA580C).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '⏳ REQUESTED FOR CLEARANCE',
+                          SizedBox(
+                            width: double.infinity,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                Text(
+                                  CurrencyFormatter.formatNaira(rem.amount),
                                   style: GoogleFonts.jetBrainsMono(
-                                    fontSize: 9.5,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: const Color(0xFFEA580C),
+                                    color: const Color(0xFF00522A),
                                   ),
                                 ),
-                              ),
-                            ],
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEA580C).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '⏳ REQUESTED FOR CLEARANCE',
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFFEA580C),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
@@ -336,16 +394,27 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
 
                   const SizedBox(height: 20),
 
-                  // 3. Section: UNREQUESTED FOR CLEARANCE (FIELD CASH)
+                  // 3. Section: UNREQUESTED FIELD CASH (DIRECT CLEARABLE)
                   Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                          color: (unrequestedNet > 0
+                                  ? const Color(0xFFD97706)
+                                  : const Color(0xFF16A34A))
+                              .withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Icon(Icons.block_rounded, size: 16, color: Color(0xFFDC2626)),
+                        child: Icon(
+                          unrequestedNet > 0
+                              ? Icons.account_balance_wallet_rounded
+                              : Icons.verified_rounded,
+                          size: 16,
+                          color: unrequestedNet > 0
+                              ? const Color(0xFFD97706)
+                              : const Color(0xFF16A34A),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -362,47 +431,60 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: unrequestedNet > 0
-                          ? const Color(0xFFDC2626).withValues(alpha: isDark ? 0.12 : 0.05)
+                          ? const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.12 : 0.06)
                           : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: unrequestedNet > 0
-                            ? const Color(0xFFDC2626).withValues(alpha: 0.3)
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.35)
                             : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              CurrencyFormatter.formatNaira(unrequestedNet),
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: unrequestedNet > 0
-                                    ? const Color(0xFFDC2626)
-                                    : const Color(0xFF16A34A),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFDC2626).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '🛑 UNREQUESTED FOR CLEARANCE',
+                        SizedBox(
+                          width: double.infinity,
+                          child: Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              Text(
+                                CurrencyFormatter.formatNaira(unrequestedNet),
                                 style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFFDC2626),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: unrequestedNet > 0
+                                      ? const Color(0xFFD97706)
+                                      : const Color(0xFF16A34A),
                                 ),
                               ),
-                            ),
-                          ],
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: (unrequestedNet > 0
+                                          ? const Color(0xFFF59E0B)
+                                          : const Color(0xFF16A34A))
+                                      .withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  unrequestedNet > 0
+                                      ? '🟡 FIELD CASH • DIRECT CLEARABLE'
+                                      : '✅ FIELD CASH CLEARED',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: unrequestedNet > 0
+                                        ? const Color(0xFFB45309)
+                                        : const Color(0xFF16A34A),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 10),
                         Container(
@@ -412,7 +494,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            '⚠️ Accounts Policy: Finance staff can ONLY perform actions on remittances requested for clearance with bank proof. Since the rider has not submitted a remittance request for this cash, NO CLEARANCE ACTION is permitted for finance persons.',
+                            '⚡ Direct Treasury Clearance Enabled: Authorized Finance Operations, General Accountant, and DC Manager staff can verify cash handover, bank transfer, or POS settlement and clear this field cash balance directly without waiting for a rider request.',
                             style: GoogleFonts.inter(
                               fontSize: 11,
                               color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
@@ -422,17 +504,49 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                         ),
                         if (unrequestedNet > 0) ...[
                           const SizedBox(height: 14),
+                          if (canClearFinance) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF10B981),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 11),
+                                ),
+                                icon: const Icon(Icons.verified_rounded, size: 17),
+                                label: const Text(
+                                  'Clear Remittance Directly',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  DCRemittanceDetailModal.showUnrequestedRiderCash(
+                                    context,
+                                    driver,
+                                    unrequestedCashOrders,
+                                    financeSettings: financeSettings,
+                                    grossOverride: fallbackGrossOverride,
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFFDC2626),
-                                side: const BorderSide(color: Color(0xFFDC2626)),
+                                foregroundColor: const Color(0xFFD97706),
+                                side: const BorderSide(color: Color(0xFFF59E0B)),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                               ),
                               icon: const Icon(Icons.phone_in_talk_rounded, size: 16),
-                              label: const Text('Call Rider to Request Remittance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              label: const Text('Call Rider to Follow Up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                               onPressed: () => _callPhone(driver.phone),
                             ),
                           ),
@@ -442,16 +556,27 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                   ),
                   const SizedBox(height: 20),
 
-                  // 4. View Delivered Orders Button
-                  if (riderOrders.isNotEmpty)
+                  // 4. View Delivered Cash Orders Button
+                  if (unrequestedCashOrders.isNotEmpty || riderOrders.isNotEmpty)
                     SizedBox(
                       width: double.infinity,
                       child: TextButton.icon(
                         icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                        label: Text('View ${riderOrders.length} Assigned Orders in Hub', style: const TextStyle(fontSize: 12)),
+                        label: Text(
+                          unrequestedCashOrders.isNotEmpty
+                              ? 'Inspect ${unrequestedCashOrders.length} Unrequested Cash Orders'
+                              : 'Inspect Field Cash Ledger (${riderOrders.length} orders)',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         onPressed: () {
                           Navigator.pop(ctx);
-                          DCRemittanceDetailModal.showUnrequestedRiderCash(context, driver, riderOrders);
+                          DCRemittanceDetailModal.showUnrequestedRiderCash(
+                            context,
+                            driver,
+                            unrequestedCashOrders,
+                            financeSettings: financeSettings,
+                            grossOverride: fallbackGrossOverride,
+                          );
                         },
                       ),
                     ),
@@ -468,7 +593,15 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: GoogleFonts.jetBrainsMono(
@@ -524,20 +657,34 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
 
     // Calculate Gross and Net Field Liabilities accounting for Commissions, Fuel, and POS
     double totalNetFieldLiability = 0.0;
+    int driversHoldingCashCount = 0;
 
     for (final d in allDrivers) {
-      if (d.cashInCustody <= 0) continue;
-
-      final riderDelivered = allOrders.where((o) =>
-        (o.deliveryAgentId == d.id || o.deliveryAgentId == d.driverCode) && o.isDelivered
+      final riderUnremittedCash = allOrders.where((o) =>
+        (o.deliveryAgentId == d.id ||
+         o.deliveryAgentId == d.driverCode ||
+         (d.driverCode.isNotEmpty && o.deliveryAgentCode == d.driverCode)) &&
+        o.isDelivered &&
+        !o.isDirectTransfer &&
+        !o.isRemitted
       ).toList();
-      final count = riderDelivered.isNotEmpty ? riderDelivered.length : 1;
-      final commRate = d.commissionRate > 0 ? d.commissionRate : 1000.0;
-      final fuelRate = d.transportAllowance > 0 ? d.transportAllowance : 1500.0;
+      final double effectiveGross = d.cashInCustody > 0
+          ? d.cashInCustody
+          : riderUnremittedCash.fold<double>(0.0, (s, o) => s + o.totalAmount);
+      if (effectiveGross <= 0) continue;
+      driversHoldingCashCount++;
+
+      final count = riderUnremittedCash.isNotEmpty ? riderUnremittedCash.length : 1;
+      final commRate = d.commissionRate > 0
+          ? d.commissionRate
+          : dcState.financeSettings.defaultCommissionRate;
+      final fuelRate = d.transportAllowance > 0
+          ? d.transportAllowance
+          : dcState.financeSettings.defaultTransportAllowance;
       final comm = count * commRate;
       final fuel = count > 0 ? fuelRate : 0.0;
-      const pos = 350.0;
-      final net = (d.cashInCustody - comm - fuel - pos).clamp(0.0, double.infinity);
+      final pos = dcState.financeSettings.computePosFee(effectiveGross);
+      final net = (effectiveGross - comm - fuel - pos).clamp(0.0, double.infinity);
       totalNetFieldLiability += net;
     }
 
@@ -766,7 +913,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
       bottomNavigationBar: _buildCustomBottomNav(
         isDark,
         pendingRemittances.length,
-        allDrivers.where((d) => d.cashInCustody > 0).length,
+        driversHoldingCashCount,
       ),
       floatingActionButton: const PipelineChatFloatingActionButton(),
       floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
@@ -975,7 +1122,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
     List<RemittanceEntity> pendingRemittances,
     List<DCFleetDriver> allDrivers,
     List<RemittanceEntity> approvedRemittances,
-    List<dynamic> allOrders,
+    List<OrderEntity> allOrders,
     DistributionCenter? currentDc,
     bool isDark,
   ) {
@@ -1478,17 +1625,32 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
   Widget _buildRiderLiabilitiesView(
     List<DCFleetDriver> drivers,
     List<RemittanceEntity> pendingRemittances,
-    List<dynamic> allOrders,
+    List<OrderEntity> allOrders,
     bool isDark,
   ) {
-    var filtered = drivers;
-    if (_riderLiabilityFilter == 'holding_cash') {
-      filtered = drivers.where((d) => d.cashInCustody > 0).toList();
-    } else if (_riderLiabilityFilter == 'high_balance') {
-      filtered = drivers.where((d) => d.cashInCustody >= 50000).toList();
+    final financeSettings = ref.watch(dcConsoleProvider).financeSettings;
+
+    double effectiveDriverGross(DCFleetDriver d) {
+      if (d.cashInCustody > 0) return d.cashInCustody;
+      final riderCash = allOrders.where((o) =>
+        (o.deliveryAgentId == d.id ||
+         o.deliveryAgentId == d.driverCode ||
+         (d.driverCode.isNotEmpty && o.deliveryAgentCode == d.driverCode)) &&
+        o.isDelivered &&
+        !o.isDirectTransfer &&
+        !o.isRemitted
+      );
+      return riderCash.fold<double>(0.0, (s, o) => s + o.totalAmount);
     }
 
-    final holdingCount = drivers.where((d) => d.cashInCustody > 0).length;
+    var filtered = drivers;
+    if (_riderLiabilityFilter == 'holding_cash') {
+      filtered = drivers.where((d) => effectiveDriverGross(d) > 0).toList();
+    } else if (_riderLiabilityFilter == 'high_balance') {
+      filtered = drivers.where((d) => effectiveDriverGross(d) >= 50000).toList();
+    }
+
+    final holdingCount = drivers.where((d) => effectiveDriverGross(d) > 0).length;
 
     return Column(
       children: [
@@ -1536,7 +1698,8 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final d = filtered[index];
-              final hasLiability = d.cashInCustody > 0;
+              final double driverGrossCustody = effectiveDriverGross(d);
+              final hasLiability = driverGrossCustody > 0;
 
               // Check if rider has active clearance requests
               final riderPending = pendingRemittances.where((r) =>
@@ -1544,19 +1707,26 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
               ).toList();
               final double requestedAmount = riderPending.fold(0.0, (s, r) => s + r.amount);
 
-              // Calculate Deductions (Commission, Fuel & POS Fee)
+              // Calculate Deductions (Commission, Fuel & POS Fee) from unremitted Cash POD orders
               final riderDelivered = allOrders.where((o) =>
-                (o.deliveryAgentId == d.id || o.deliveryAgentId == d.driverCode) && o.isDelivered
+                (o.deliveryAgentId == d.id ||
+                 o.deliveryAgentId == d.driverCode ||
+                 (d.driverCode.isNotEmpty && o.deliveryAgentCode == d.driverCode)) &&
+                o.isDelivered &&
+                !o.isDirectTransfer &&
+                !o.isRemitted
               ).toList();
               final orderCount = riderDelivered.isNotEmpty ? riderDelivered.length : (hasLiability ? 1 : 0);
-              final commRate = d.commissionRate > 0 ? d.commissionRate : 1000.0;
-              final fuelRate = d.transportAllowance > 0 ? d.transportAllowance : 1500.0;
+              final commRate = d.commissionRate > 0 ? d.commissionRate : financeSettings.defaultCommissionRate;
+              final fuelRate = d.transportAllowance > 0 ? d.transportAllowance : financeSettings.defaultTransportAllowance;
               final commDeduction = orderCount * commRate;
               final fuelDeduction = orderCount > 0 ? fuelRate : 0.0;
-              final posDeduction = d.cashInCustody > 0 ? 350.0 : 0.0;
+              final posDeduction = driverGrossCustody > 0
+                  ? financeSettings.computePosFee(driverGrossCustody)
+                  : 0.0;
               final double totalDeductions = commDeduction + fuelDeduction + posDeduction;
 
-              final double netRemittable = (d.cashInCustody - totalDeductions).clamp(0.0, double.infinity);
+              final double netRemittable = (driverGrossCustody - totalDeductions).clamp(0.0, double.infinity);
               final double unrequestedNet = (netRemittable - requestedAmount).clamp(0.0, double.infinity);
 
               return Material(
@@ -1567,7 +1737,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                     context,
                     d,
                     riderPending,
-                    d.cashInCustody,
+                    driverGrossCustody,
                     unrequestedNet,
                     commDeduction,
                     fuelDeduction,
@@ -1664,7 +1834,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '${d.phone.isNotEmpty ? d.phone : "No Phone"} • Gross: ${CurrencyFormatter.formatNaira(d.cashInCustody)}',
+                                    '${d.phone.isNotEmpty ? d.phone : "No Phone"} • Gross: ${CurrencyFormatter.formatNaira(driverGrossCustody)}',
                                     style: GoogleFonts.inter(
                                       fontSize: 11.5,
                                       color: const Color(0xFF94A3B8),
@@ -1766,7 +1936,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                                       Flexible(
                                         child: Text(
                                           unrequestedNet > 0
-                                              ? '${CurrencyFormatter.formatNaira(unrequestedNet)} Unrequested'
+                                              ? '${CurrencyFormatter.formatNaira(unrequestedNet)} Direct Clearable'
                                               : '${CurrencyFormatter.formatNaira(requestedAmount)} Requested',
                                           style: GoogleFonts.jetBrainsMono(
                                             fontSize: 10.5,

@@ -71,16 +71,40 @@ class _ShareStockWithRiderModalState extends ConsumerState<ShareStockWithRiderMo
     final currentUser = ref.watch(authProvider).user;
     final currentRiderId = currentUser?.deliveryAgentId ?? currentUser?.id ?? '';
 
-    // Filter available stock items that rider has in custody
-    final availableItems = stockState.stockItems.where((i) => i.availableCount > 0 || i.totalInCustody > 0).toList();
-    _selectedItem ??= availableItems.isNotEmpty ? availableItems.first : null;
+    // Filter available stock items that rider has in custody, deduplicated by ID
+    final rawAvailableItems = stockState.stockItems.where((i) => i.availableCount > 0 || i.totalInCustody > 0).toList();
+    final availableItems = <StockItemEntity>[];
+    final seenProductIds = <String>{};
+    for (final it in rawAvailableItems) {
+      if (it.id.isNotEmpty && seenProductIds.add(it.id)) {
+        availableItems.add(it);
+      }
+    }
+
+    if (_selectedItem != null && availableItems.isNotEmpty) {
+      _selectedItem = availableItems.firstWhere((i) => i.id == _selectedItem!.id, orElse: () => availableItems.first);
+    } else {
+      _selectedItem = availableItems.isNotEmpty ? availableItems.first : null;
+    }
 
     final maxUnits = _selectedItem != null
         ? (_selectedItem!.availableCount > 0 ? _selectedItem!.availableCount : _selectedItem!.totalInCustody)
         : 0;
 
-    // Filter drivers to other active fleet riders (excluding self)
-    final otherDrivers = dcState.drivers.where((d) => d.id != currentRiderId && d.driverCode != currentUser?.closerCode).toList();
+    // Filter drivers to other active fleet riders (excluding self), deduplicated by ID
+    final rawOtherDrivers = dcState.drivers.where((d) => d.id != currentRiderId && d.driverCode != currentUser?.closerCode).toList();
+    final otherDrivers = <DCFleetDriver>[];
+    final seenDriverIds = <String>{};
+    for (final d in rawOtherDrivers) {
+      if (d.id.isNotEmpty && seenDriverIds.add(d.id)) {
+        otherDrivers.add(d);
+      }
+    }
+    if (_selectedRecipientDriver != null && otherDrivers.isNotEmpty) {
+      _selectedRecipientDriver = otherDrivers.firstWhere((d) => d.id == _selectedRecipientDriver!.id, orElse: () => otherDrivers.first);
+    } else if (otherDrivers.isNotEmpty && _selectedRecipientDriver == null) {
+      _selectedRecipientDriver = otherDrivers.first;
+    }
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -163,7 +187,9 @@ class _ShareStockWithRiderModalState extends ConsumerState<ShareStockWithRiderMo
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<StockItemEntity>(
-                          value: _selectedItem,
+                          value: _selectedItem != null && availableItems.any((i) => i.id == _selectedItem!.id)
+                              ? availableItems.firstWhere((i) => i.id == _selectedItem!.id)
+                              : (availableItems.isNotEmpty ? availableItems.first : null),
                           isExpanded: true,
                           dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                           items: availableItems.map((item) {
@@ -207,7 +233,9 @@ class _ShareStockWithRiderModalState extends ConsumerState<ShareStockWithRiderMo
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<DCFleetDriver>(
-                        value: _selectedRecipientDriver,
+                        value: _selectedRecipientDriver != null && otherDrivers.any((d) => d.id == _selectedRecipientDriver!.id)
+                            ? otherDrivers.firstWhere((d) => d.id == _selectedRecipientDriver!.id)
+                            : (otherDrivers.isNotEmpty ? otherDrivers.first : null),
                         hint: Text('Select recipient rider in fleet', style: GoogleFonts.inter(fontSize: 12.5)),
                         isExpanded: true,
                         dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,

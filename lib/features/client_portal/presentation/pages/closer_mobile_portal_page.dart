@@ -29,8 +29,10 @@ import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
-import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
-import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
+import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../../notifications/presentation/widgets/notifications_modal.dart';
 
 final closerActiveTabProvider = StateProvider.autoDispose<int>((ref) => 0);
 final closerOrderStatusFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
@@ -229,6 +231,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     final tabViews = [
       _buildDashboardTab(context, currentCloser, portalState, isDark, isWideScreen),
       _buildOrdersTab(context, currentCloser, portalState, isDark, isWideScreen),
+      const ConversationListModal(isEmbeddedTab: true),
       _buildProductsTab(context, portalState, isDark, isWideScreen),
       _buildLeadsTab(context, currentCloser, portalState, isDark, isWideScreen),
       _buildProfileTab(context, currentCloser, user, isDark, isWideScreen),
@@ -236,8 +239,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
 
     if (isWideScreen) {
       return Scaffold(
-        floatingActionButton: const PipelineChatFloatingActionButton(),
-        floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
+        floatingActionButton: null,
         backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
         body: SafeArea(
           child: Row(
@@ -246,7 +248,8 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
               Expanded(
                 child: Column(
                   children: [
-                    _buildCloserDesktopTopBar(context, currentCloser, user, isDark, activeTab),
+                    if (activeTab != 2)
+                      _buildCloserDesktopTopBar(context, currentCloser, user, isDark, activeTab),
                     Expanded(
                       child: IndexedStack(
                         index: activeTab,
@@ -263,10 +266,9 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     }
 
     return Scaffold(
-      floatingActionButton: const PipelineChatFloatingActionButton(),
-      floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
+      floatingActionButton: null,
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
-      appBar: _buildCloserAppBar(context, currentCloser, user, isDark),
+      appBar: activeTab == 2 ? null : _buildCloserAppBar(context, currentCloser, user, isDark),
       body: IndexedStack(
         index: activeTab,
         children: tabViews,
@@ -287,6 +289,26 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
             icon: const Icon(Icons.local_shipping_outlined),
             selectedIcon: Icon(Icons.local_shipping_rounded, color: portalState.clientProfile.brandPrimaryColor),
             label: 'Orders',
+          ),
+          NavigationDestination(
+            icon: Consumer(
+              builder: (context, ref, _) {
+                final unreadCount = ref.watch(
+                  pipelineChatProvider.select((s) => s.getUnreadCountForRole('sales_closer')),
+                );
+                return Badge(
+                  isLabelVisible: unreadCount > 0,
+                  label: Text(
+                    '$unreadCount',
+                    style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  backgroundColor: const Color(0xFFEF4444),
+                  child: const Icon(Icons.forum_outlined),
+                );
+              },
+            ),
+            selectedIcon: Icon(Icons.forum_rounded, color: portalState.clientProfile.brandPrimaryColor),
+            label: 'Chat',
           ),
           NavigationDestination(
             icon: const Icon(Icons.inventory_2_outlined),
@@ -327,10 +349,13 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     final effectiveFullName = (user != null && user.fullName.toString().trim().isNotEmpty)
         ? user.fullName.toString().trim()
         : closer.fullName;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final unreadNotificationCount = ref.watch(notificationsProvider.select((s) => s.unreadCount));
 
     return AppBar(
       backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
       elevation: 0.5,
+      centerTitle: false,
       titleSpacing: 8,
       title: Row(
         children: [
@@ -345,7 +370,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 UserAvatarWidget(
                   fullName: effectiveFullName,
                   avatarUrl: effectiveAvatarUrl,
-                  radius: 20,
+                  radius: 17,
                   backgroundColor: brandPrimary,
                   textColor: Colors.white,
                 ),
@@ -353,8 +378,8 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                   right: 0,
                   bottom: 0,
                   child: Container(
-                    width: 10,
-                    height: 10,
+                    width: 9,
+                    height: 9,
                     decoration: BoxDecoration(
                       color: const Color(0xFF10B981),
                       shape: BoxShape.circle,
@@ -365,15 +390,16 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   effectiveFullName,
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w700,
                     color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
@@ -381,29 +407,23 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                   overflow: TextOverflow.ellipsis,
                 ),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: brandPrimary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        closer.closerCode,
-                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: brandPrimary),
-                      ),
-                    ),
-                    if (companyName.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Flexible(
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: brandPrimary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                         child: Text(
-                          companyName,
-                          style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+                          closer.closerCode,
+                          style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: brandPrimary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ],
@@ -412,15 +432,15 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
         ],
       ),
       actions: [
-        // Branded Merchant Badge
+        // Branded Merchant Badge (Compact & Responsive)
         if (brandLogo != null && brandLogo.trim().isNotEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 2),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: brandPrimary.withValues(alpha: 0.35)),
               ),
               child: Row(
@@ -429,47 +449,92 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                   ClientLogoWidget(
                     logoUrl: brandLogo,
                     companyName: companyName,
-                    size: 18,
-                    borderRadius: 4,
+                    size: 15,
+                    borderRadius: 3,
                     borderWidth: 1.0,
                     brandColor: brandPrimary,
                     isCloser: true,
                   ),
-                  const SizedBox(width: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 100),
-                    child: Text(
-                      companyName,
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  if (screenWidth >= 360) ...[
+                    const SizedBox(width: 4),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 52),
+                      child: Text(
+                        companyName,
+                        style: GoogleFonts.inter(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
           ),
+        // Notifications Bell
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              tooltip: 'Notifications',
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.all(3),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              icon: Icon(
+                unreadNotificationCount > 0 ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                size: 18,
+                color: unreadNotificationCount > 0 ? const Color(0xFFF37021) : const Color(0xFF94A3B8),
+              ),
+              onPressed: () => NotificationsModal.show(context),
+            ),
+            if (unreadNotificationCount > 0)
+              Positioned(
+                top: 5,
+                right: 5,
+                child: Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEF4444),
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(minWidth: 13, minHeight: 13),
+                  child: Text(
+                    unreadNotificationCount > 9 ? '9+' : '$unreadNotificationCount',
+                    style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
         IconButton(
           tooltip: 'Toggle Theme',
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.all(3),
+          constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
           icon: Icon(
             isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-            size: 20,
+            size: 17,
             color: const Color(0xFF94A3B8),
           ),
           onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
         ),
         IconButton(
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh_rounded, size: 20, color: Color(0xFF94A3B8)),
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.all(3),
+          constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+          icon: const Icon(Icons.refresh_rounded, size: 17, color: Color(0xFF94A3B8)),
           onPressed: () async {
             await ref.read(authProvider.notifier).checkCurrentUser();
             await ref.read(clientPortalProvider.notifier).loadClientData();
           },
         ),
+        const SizedBox(width: 2),
       ],
     );
   }
@@ -745,9 +810,10 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 children: [
                   _buildSidebarNavItem(0, 'Dashboard', Icons.dashboard_rounded, activeTab == 0, isCollapsed),
                   _buildSidebarNavItem(1, 'Orders & Dispatch', Icons.local_shipping_rounded, activeTab == 1, isCollapsed),
-                  _buildSidebarNavItem(2, 'Products & Deals', Icons.inventory_2_rounded, activeTab == 2, isCollapsed),
-                  _buildSidebarNavItem(3, 'Assigned Leads', Icons.headset_mic_rounded, activeTab == 3, isCollapsed),
-                  _buildSidebarNavItem(4, 'Closer Profile', Icons.person_rounded, activeTab == 4, isCollapsed),
+                  _buildSidebarNavItem(2, 'Pipeline Chats', Icons.forum_rounded, activeTab == 2, isCollapsed),
+                  _buildSidebarNavItem(3, 'Products & Deals', Icons.inventory_2_rounded, activeTab == 3, isCollapsed),
+                  _buildSidebarNavItem(4, 'Assigned Leads', Icons.headset_mic_rounded, activeTab == 4, isCollapsed),
+                  _buildSidebarNavItem(5, 'Closer Profile', Icons.person_rounded, activeTab == 5, isCollapsed),
                 ],
               ),
             ),
@@ -908,14 +974,18 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
         sectionSubtitle = 'Track bookings, delivery riders & customer communication';
         break;
       case 2:
+        sectionTitle = 'Order Pipeline Chats';
+        sectionSubtitle = 'Live order communication and coordination with riders, DC & customers';
+        break;
+      case 3:
         sectionTitle = 'Commercial Products & Bundles';
         sectionSubtitle = 'Active merchant stock, bundles & pricing deals';
         break;
-      case 3:
+      case 4:
         sectionTitle = 'Assigned Customer Leads';
         sectionSubtitle = 'Telesales outbound dialer & conversion desk';
         break;
-      case 4:
+      case 5:
         sectionTitle = 'Closer Profile & Security';
         sectionSubtitle = 'Account preferences, credentials & theme controls';
         break;
@@ -1007,6 +1077,45 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 ),
               ),
               const SizedBox(width: 12),
+
+              // Notifications Bell with Badge
+              Builder(
+                builder: (context) {
+                  final unreadCount = ref.watch(notificationsProvider.select((s) => s.unreadCount));
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IconButton(
+                        tooltip: 'Notifications',
+                        icon: Icon(
+                          unreadCount > 0 ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                          size: 20,
+                          color: unreadCount > 0 ? const Color(0xFFF37021) : const Color(0xFF94A3B8),
+                        ),
+                        onPressed: () => NotificationsModal.show(context),
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444),
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                            child: Text(
+                              unreadCount > 9 ? '9+' : '$unreadCount',
+                              style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
 
               // Refresh Button
               IconButton(

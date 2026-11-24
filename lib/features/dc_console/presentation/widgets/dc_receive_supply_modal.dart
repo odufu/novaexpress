@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../stock/domain/entities/stock_transfer_record.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
+import '../../../client_portal/presentation/providers/merchant_inventory_provider.dart';
 import '../providers/dc_console_provider.dart';
 
 class DcReceiveSupplyModal extends ConsumerStatefulWidget {
@@ -37,10 +38,21 @@ class DcReceiveSupplyModal extends ConsumerStatefulWidget {
 }
 
 class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
+  static const List<String> _defectCategories = [
+    'Broken Tamper Seal',
+    'Color Dilation Defect',
+    'Texture / Grind Coarseness',
+    'Punctured Packaging / Leakage',
+    'Expired / Near-Expiry Lot',
+    'Transit Crushed Packaging',
+  ];
+
   final Map<String, TextEditingController> _receivedControllers = {};
   final Map<String, TextEditingController> _damagedControllers = {};
   final Map<String, TextEditingController> _missingControllers = {};
   final Map<String, TextEditingController> _itemNoteControllers = {};
+  final Map<String, Map<String, TextEditingController>> _defectControllers = {};
+  final Map<String, bool> _defectSectionExpanded = {};
 
   final TextEditingController _carrierDriverCtrl = TextEditingController();
   final TextEditingController _carrierPhoneCtrl = TextEditingController();
@@ -65,10 +77,25 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
       _damagedControllers[item.id] = TextEditingController(text: '0');
       _missingControllers[item.id] = TextEditingController(text: '0');
       _itemNoteControllers[item.id] = TextEditingController(text: '');
+      _defectSectionExpanded[item.id] = false;
+
+      _defectControllers[item.id] = {
+        for (final cat in _defectCategories) cat: TextEditingController(text: '0'),
+      };
 
       _receivedControllers[item.id]!.addListener(() => setState(() {}));
-      _damagedControllers[item.id]!.addListener(() => setState(() {}));
+      _damagedControllers[item.id]!.addListener(() {
+        final damVal = int.tryParse(_damagedControllers[item.id]?.text.trim() ?? '') ?? 0;
+        if (damVal > 0 && !(_defectSectionExpanded[item.id] ?? false)) {
+          _defectSectionExpanded[item.id] = true;
+        }
+        setState(() {});
+      });
       _missingControllers[item.id]!.addListener(() => setState(() {}));
+
+      for (final ctrl in _defectControllers[item.id]!.values) {
+        ctrl.addListener(() => setState(() {}));
+      }
     }
   }
 
@@ -85,6 +112,11 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
     }
     for (final c in _itemNoteControllers.values) {
       c.dispose();
+    }
+    for (final m in _defectControllers.values) {
+      for (final c in m.values) {
+        c.dispose();
+      }
     }
     _carrierDriverCtrl.dispose();
     _carrierPhoneCtrl.dispose();
@@ -134,14 +166,42 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
         final rec = (rawRec != null && rawRec >= 0) ? rawRec : ((dam == 0 && mis == 0) ? shipped : (rawRec ?? shipped));
         final note = _itemNoteControllers[item.id]?.text.trim() ?? '';
 
+        final defectList = <String>[];
+        final defectMap = <String, int>{};
+        final itemDefects = _defectControllers[item.id];
+        if (itemDefects != null && dam > 0) {
+          itemDefects.forEach((cat, c) {
+            final q = int.tryParse(c.text.trim()) ?? 0;
+            if (q > 0) {
+              defectList.add('$cat: $q');
+              defectMap[cat] = q;
+            }
+          });
+        }
+        final defectStr = defectList.isNotEmpty ? '[QC DEFECTS: ${defectList.join(', ')}]' : '';
+        final fullNote = [defectStr, note.isNotEmpty ? note : item.itemNotes].where((s) => s != null && s.isNotEmpty).join(' • ');
+
         verifiedItems.add({
           'item_id': item.id,
           'product_id': item.productId,
           'quantity_received': rec,
           'quantity_damaged': dam,
           'quantity_missing': mis,
-          'notes': note.isNotEmpty ? note : item.itemNotes,
+          'notes': fullNote,
         });
+
+        // Also sync into merchant inventory state
+        try {
+          ref.read(merchantInventoryProvider.notifier).processDcConsignmentReception(
+                shipmentId: widget.transfer.id,
+                acceptedQuantity: rec,
+                spoiltQuantity: dam,
+                defectBreakdown: defectMap,
+                dcInspectorName: supervisorName,
+                stagingBay: _destinationBinCtrl.text.trim(),
+                notes: fullNote,
+              );
+        } catch (_) {}
       }
 
       final res = await ref.read(stockProvider.notifier).receiveSupplyConsignmentHandshake(
@@ -526,6 +586,80 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
                             ),
                           ],
                         ),
+                        if (currentDam > 0 || (_defectSectionExpanded[item.id] ?? false)) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.35)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.biotech_rounded, size: 16, color: Color(0xFFEF4444)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'QC Defect Categorization ($currentDam units)',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFFB91C1C),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      'Damaged: $currentDam units',
+                                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFEF4444)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                ..._defectCategories.map((cat) {
+                                  final ctrl = _defectControllers[item.id]![cat]!;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            cat,
+                                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 70,
+                                          height: 32,
+                                          child: TextField(
+                                            controller: ctrl,
+                                            keyboardType: TextInputType.number,
+                                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                                            textAlign: TextAlign.center,
+                                            decoration: InputDecoration(
+                                              contentPadding: EdgeInsets.zero,
+                                              isDense: true,
+                                              filled: true,
+                                              fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 8),
                         TextField(
                           controller: noteCtrl,

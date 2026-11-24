@@ -27,8 +27,8 @@ class SmartOrderPasteModal extends ConsumerStatefulWidget {
     this.initialText,
   });
 
-  static Future<void> show(BuildContext context, {String? initialText}) {
-    return showDialog<void>(
+  static Future<OrderEntity?> show(BuildContext context, {String? initialText}) {
+    return showDialog<OrderEntity?>(
       context: context,
       barrierDismissible: false,
       builder: (context) => SmartOrderPasteModal(initialText: initialText),
@@ -276,7 +276,7 @@ Closer phone: 08160322891''';
       );
 
       if (mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(createdOrder);
         final successMsg = createdOrder.deliveryAgentName != null
             ? 'Order ${createdOrder.orderNumber} created & auto-assigned live to ${createdOrder.deliveryAgentName} (${createdOrder.deliveryLga})!'
             : 'Order ${createdOrder.orderNumber} created & sent live to ${createdOrder.distributionCenterName ?? "DC Hub"} unassigned pool for rider dispatch!';

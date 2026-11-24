@@ -1,0 +1,114 @@
+code,name,contact_person,phone,location,hub,source,bank_name,account_number,account_name
+NX-ABJ-01,NovaXpress Logistics (Internal Fleet),Engr. Tunde Adeleke,+234 803 111 2233,Abuja (FCT),Abuja Central DC,Internal Fleet,Zenith Bank,1019283746,NovaXpress Logistics Operations
+AG-001,Msuega Terlanga Japhet Logistics,Msuega Terlanga Japhet,+234 802 782 3043,Benue,Abuja Central DC,Both (CRM + State Arranged),GTBank,0010000017,Msuega Terlanga Japhet Logistics Remittance Trust
+AG-002,Raphael Michael Logistics,Raphael Logistics Manager,+234 907 827 1360,Bauchi,Abuja Central DC,Both (CRM + State Arranged),Access Bank,0020000034,Raphael Michael Logistics Remittance Trust
+AG-003,RAPH XPRESS LOGISTICS,Raph Lagos,+234 8013 151 1093,Lagos,Lagos Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0030000051,RAPH XPRESS LOGISTICS Remittance Trust
+AG-004,ATP Logistics,ATP Logistics Manager,+234 703 662 8887,Edo (Benin),Lagos Central DC,Both (CRM + State Arranged),UBA,0040000068,ATP Logistics Remittance Trust
+AG-005,Olaseni Adewumi James Logistics,Olaseni Logistics Manager,+234 8015 185 1155,Ekiti,Lagos Central DC,Both (CRM + State Arranged),Fidelity Bank,0050000085,Olaseni Adewumi James Logistics Remittance Trust
+AG-006,GINIKA ANAMBRA,Ginika Anambra,+234 916 648 5004,Anambra,Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0060000102,GINIKA ANAMBRA Remittance Trust
+AG-007,Tajudeen A Ayetigbo LOGISTICS,Tajudeen Logistics Manager,+234 803 597 9005,Sokoto,Abuja Central DC,Both (CRM + State Arranged),Zenith Bank,0070000119,Tajudeen A Ayetigbo LOGISTICS Remittance Trust
+AG-008,Alatiya Absalom Emmanuel Logistics,Alatiya Logistics Manager,+234 8018 236 1248,Adamawa,Abuja Central DC,Both (CRM + State Arranged),GTBank,0080000136,Alatiya Absalom Emmanuel Logistics Remittance Trust
+AG-009,Arinze Esther Logistics,Arinze Logistics Manager,+234 8019 253 1279,Anambra,Lagos Central DC,Both (CRM + State Arranged),Access Bank,0090000153,Arinze Esther Logistics Remittance Trust
+AG-010,Velocita Logistics,Velocita Logistics Manager,+234 817 633 5060,Rivers (Port Harcourt),Lagos Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0100000170,Velocita Logistics Remittance Trust
+AG-011,Fomax Logistics,Fomax Logistics Manager,+234 8021 287 1341,Lagos,Lagos Central DC,Both (CRM + State Arranged),UBA,0110000187,Fomax Logistics Remittance Trust
+AG-012,Spotnaire Logistics Ebonyi,Spotnaire Logistics Manager,+234 805 884 3338,Ebonyi,Lagos Central DC,Both (CRM + State Arranged),Fidelity Bank,0120000204,Spotnaire Logistics Ebonyi Remittance Trust
+AG-013,FOMAX PH. LOGISTICS,FOMAX Logistics Manager,+234 8023 321 1403,Rivers (Port Harcourt),Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0130000221,FOMAX PH. LOGISTICS Remittance Trust
+AG-014,ADICHA LOGISTICS,Adicha Israel,+234 8024 338 1434,Lagos,Lagos Central DC,Both (CRM + State Arranged),Zenith Bank,0140000238,ADICHA LOGISTICS Remittance Trust
+AG-015,AB LOGISTICS KADUNA,AB Logistics Manager,+234 813 737 0623,Kaduna,Abuja Central DC,Both (CRM + State Arranged),GTBank,0150000255,AB LOGISTICS KADUNA Remittance Trust
+AG-016,byke messengers logistic,Byke Messenger,+234 912 967 9193,Imo,Lagos Central DC,Both (CRM + State Arranged),Access Bank,0160000272,byke messengers logistic Remittance Trust
+AG-017,SOLOPEE LOGISTCS,SOLOPEE Logistics Manager,+234 706 379 7354,Plateau (Jos),Abuja Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0170000289,SOLOPEE LOGISTCS Remittance Trust
+AG-018,ug express logistic ebonyi,UG Exp Enugu,+234 8028 406 1558,Enugu,Lagos Central DC,Both (CRM + State Arranged),UBA,0180000306,ug express logistic ebonyi Remittance Trust
+AG-019,Ibitoye adewale Logistics,Ibitoye Logistics Manager,+234 8029 423 1589,Lagos,Lagos Central DC,Both (CRM + State Arranged),Fidelity Bank,0190000323,Ibitoye adewale Logistics Remittance Trust
+AG-020,TEMIBASH Logistics,TEMIBASH Logistics Manager,+234 8030 440 1620,Ondo,Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0200000340,TEMIBASH Logistics Remittance Trust
+AG-021,Adekunle Logistic,Adekunle Logistics Manager,+234 8031 457 1651,Lagos,Lagos Central DC,Both (CRM + State Arranged),Zenith Bank,0210000357,Adekunle Logistic Remittance Trust
+AG-022,Toheeb Biola Popoola Logistics,Toheeb Logistics Manager,+234 8032 474 1682,Oyo (Ibadan),Lagos Central DC,Both (CRM + State Arranged),GTBank,0220000374,Toheeb Biola Popoola Logistics Remittance Trust
+AG-023,Ezekiel Ameh Logistics,Ezekiel Logistics Manager,+234 704 488 5789,Kano,Abuja Central DC,Both (CRM + State Arranged),Access Bank,0230000391,Ezekiel Ameh Logistics Remittance Trust
+AG-024,George O.O LOGISTICS,George Logistics Manager,+234 902 350 7405,Rivers (Port Harcourt),Lagos Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0240000408,George O.O LOGISTICS Remittance Trust
+AG-025,Gimway Concept,Gimway Concept,+234 8035 525 1775,Lagos,Lagos Central DC,Both (CRM + State Arranged),UBA,0250000425,Gimway Concept Remittance Trust
+AG-026,Ola Cash,Ola Cash,+234 8036 542 1806,Ondo,Lagos Central DC,Both (CRM + State Arranged),Fidelity Bank,0260000442,Ola Cash Remittance Trust
+AG-027,Anthony Ezekiel Logistics,Anthony Logistics Manager,+234 806 912 9741,Kano,Abuja Central DC,Both (CRM + State Arranged),Stanbic IBTC,0270000459,Anthony Ezekiel Logistics Remittance Trust
+AG-028,milly logistics,milly Logistics Manager,+234 8038 576 1868,Imo,Lagos Central DC,Both (CRM + State Arranged),Zenith Bank,0280000476,milly logistics Remittance Trust
+AG-029,Olagunju Damilola Logistics,Olagunju Logistics Manager,+234 8039 593 1899,Lagos,Lagos Central DC,Both (CRM + State Arranged),GTBank,0290000493,Olagunju Damilola Logistics Remittance Trust
+AG-030,APPLE ANAMBRA DELIVERY SERVICES,APPLE Logistics Manager,+234 8040 610 1930,Anambra,Lagos Central DC,Both (CRM + State Arranged),Access Bank,0300000510,APPLE ANAMBRA DELIVERY SERVICES Remittance Trust
+AG-031,Okolie Anthony ogorchukwu Logistics,Okolie Anthony Ogorchukwu,+234 704 723 7264,Delta,Lagos Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0310000527,Okolie Anthony ogorchukwu Logistics Remittance Trust
+AG-032,smart Logistics,smart Logistics Manager,+234 816 625 2391,Bayelsa,Lagos Central DC,Both (CRM + State Arranged),UBA,0320000544,smart Logistics Remittance Trust
+AG-033,SAGE LOGISTICS,SAGE Logistics Manager,+234 705 975 6806,Rivers (Port Harcourt),Lagos Central DC,Both (CRM + State Arranged),Fidelity Bank,0330000561,SAGE LOGISTICS Remittance Trust
+AG-034,imole logistics,imole Logistics Manager,+234 8044 678 2054,Osun,Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0340000578,imole logistics Remittance Trust
+AG-035,Olawale Olusola Logistics,Olawale Logistics Manager,+234 8045 695 2085,Ogun,Lagos Central DC,Both (CRM + State Arranged),Zenith Bank,0350000595,Olawale Olusola Logistics Remittance Trust
+AG-036,Sabi logistics,Sabi Logistics Manager,+234 8046 712 2116,Kwara (Ilorin),Lagos Central DC,Both (CRM + State Arranged),GTBank,0360000612,Sabi logistics Remittance Trust
+AG-037,Solomon Uduak Ikpembe,Solomon Uduak (Ikpembe),+234 8047 729 2147,Lagos,Lagos Central DC,Both (CRM + State Arranged),Access Bank,0370000629,Solomon Uduak Ikpembe Remittance Trust
+AG-038,Abdulsalam Abubakar Logistics,Abdulsalam Abubakar,+234 8048 746 2178,Niger (Minna),Abuja Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0380000646,Abdulsalam Abubakar Logistics Remittance Trust
+AG-039,Akanimo Edet Akpan Logistics,Akanimo Edet Akpan,+234 704 448 8802,Cross River (Calabar),Lagos Central DC,Both (CRM + State Arranged),UBA,0390000663,Akanimo Edet Akpan Logistics Remittance Trust
+AG-040,Enny Logistics,Enny Logistics Manager,+234 8050 780 2240,Oyo (Ibadan),Lagos Central DC,Both (CRM + State Arranged),Fidelity Bank,0400000680,Enny Logistics Remittance Trust
+AG-041,Etimbuk Gregory Logistics,Etimbuk Logistics Manager,+234 8051 797 2271,Lagos,Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0410000697,Etimbuk Gregory Logistics Remittance Trust
+AG-042,groza logistics ltd,groza Logistics Manager,+234 8052 814 2302,Lagos,Lagos Central DC,Both (CRM + State Arranged),Zenith Bank,0420000714,groza logistics ltd Remittance Trust
+AG-043,HOG Logistics,HOG Logistics Manager,+234 8053 831 2333,Ogun,Lagos Central DC,Both (CRM + State Arranged),GTBank,0430000731,HOG Logistics Remittance Trust
+AG-044,Sheriff Adesola Raifu Logistics,Sheriff Logistics Manager,+234 8054 848 2364,Osun,Lagos Central DC,Both (CRM + State Arranged),Access Bank,0440000748,Sheriff Adesola Raifu Logistics Remittance Trust
+AG-045,Ibrahim Abdulrashid Logistics,Ibrahim Logistics Manager,+234 810 425 4606,Zamfara,Abuja Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0450000765,Ibrahim Abdulrashid Logistics Remittance Trust
+AG-046,Okoli Nnaemeka Augustine Logistics,Okoli Nnaemeka Augustine,+234 706 328 0237,Maiduguri (Borno),Abuja Central DC,Both (CRM + State Arranged),UBA,0460000782,Okoli Nnaemeka Augustine Logistics Remittance Trust
+AG-047,Oluwadamilare Emmanuel Logistics,Oluwadamilare Emmanuel,+234 8057 899 2457,Anambra,Lagos Central DC,Both (CRM + State Arranged),Fidelity Bank,0470000799,Oluwadamilare Emmanuel Logistics Remittance Trust
+AG-048,Olufunke Babalola Logistics,Olufunke Logistics Manager,+234 8058 916 2488,Oyo (Ibadan),Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0480000816,Olufunke Babalola Logistics Remittance Trust
+AG-049,PEAKLINK LOGISTICS LTD,PEAKLINK Logistics Manager,+234 815 292 4060,Rivers (Port Harcourt),Lagos Central DC,Both (CRM + State Arranged),Zenith Bank,0490000833,PEAKLINK LOGISTICS LTD Remittance Trust
+AG-050,Smart move Logistics LOGISTICS,Smart Logistics Manager,+234 902 530 3337,Nasarawa,Abuja Central DC,Both (CRM + State Arranged),GTBank,0500000850,Smart move Logistics LOGISTICS Remittance Trust
+AG-051,Victor Ogbenyi Logistics,Victor Logistics Manager,+234 8061 967 2581,Lagos,Lagos Central DC,Both (CRM + State Arranged),Access Bank,0510000867,Victor Ogbenyi Logistics Remittance Trust
+AG-052,Yohanna Vanduna Logistics,Yohanna Logistics Manager,+234 8062 984 2612,Plateau (Jos),Abuja Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0520000884,Yohanna Vanduna Logistics Remittance Trust
+AG-053,yusuf joy,Yusuf Joy,+234 8063 101 2643,Niger (Minna),Abuja Central DC,Both (CRM + State Arranged),UBA,0530000901,yusuf joy Remittance Trust
+AG-054,ZIBRA & CO LTD LOGISTICS,ZIBRA Logistics Manager,+234 816 929 3676,Rivers (Port Harcourt),Lagos Central DC,Both (CRM + State Arranged),Fidelity Bank,0540000918,ZIBRA & CO LTD LOGISTICS Remittance Trust
+AG-055,Safehands logistics,Safehands Logistics Manager,+234 080124131591,Cross River (Calabar),Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0550000935,Safehands logistics Remittance Trust
+AG-056,Elite Logistics,Elite Logistics Manager,+234 816 444 4477,Nasarawa,Abuja Central DC,Both (CRM + State Arranged),Zenith Bank,0560000952,Elite Logistics Remittance Trust
+AG-057,Usiju Ladu Logistics,Usiju Logistics Manager,+234 8067 169 2767,Borno (Maiduguri),Abuja Central DC,Both (CRM + State Arranged),GTBank,0570000969,Usiju Ladu Logistics Remittance Trust
+AG-058,FOMAX ASABA (DELTA) LOGISTICS,FOMAX Logistics Manager,+234 8068 186 2798,Delta,Lagos Central DC,Both (CRM + State Arranged),Access Bank,0580000986,FOMAX ASABA (DELTA) LOGISTICS Remittance Trust
+AG-059,APPLE ABIA TAZE LOGISTICS SERVICES,APPLE Logistics Manager,+234 806 550 4752,Abia,Lagos Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0590001003,APPLE ABIA TAZE LOGISTICS SERVICES Remittance Trust
+AG-060,Aruoriwo Adhuze,Aruw... Adhuze,+234 8070 220 2860,Ondo,Lagos Central DC,Both (CRM + State Arranged),UBA,0600001020,Aruoriwo Adhuze Remittance Trust
+AG-061,De Wealthz Logistics,De Logistics Manager,+234 8071 237 2891,Akwa Ibom,Lagos Central DC,Both (CRM + State Arranged),Fidelity Bank,0610001037,De Wealthz Logistics Remittance Trust
+AG-062,ATOMIC LOGISTICS EDO,ATOMIC Logistics Manager,+234 705 543 7356,Edo (Benin),Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0620001054,ATOMIC LOGISTICS EDO Remittance Trust
+AG-063,DASHGO DELIVERY CALABAR,DASHGO Logistics Manager,+234 912 529 5092,Cross River (Calabar),Lagos Central DC,Both (CRM + State Arranged),Zenith Bank,0630001071,DASHGO DELIVERY CALABAR Remittance Trust
+AG-064,ANIEADOLF CREATIONS,ANIEADOLF Logistics Manager,+234 8074 288 2984,Lagos,Lagos Central DC,Both (CRM + State Arranged),GTBank,0640001088,ANIEADOLF CREATIONS Remittance Trust
+AG-065,Adetola Sam Adewuyi LOGISTICS,Adetola Sam Adeyemi (Sam KJ),+234 907 676 7680,Kaduna,Abuja Central DC,Both (CRM + State Arranged),Access Bank,0650001105,Adetola Sam Adewuyi LOGISTICS Remittance Trust
+AG-066,PRINCE LOGISTICS,PRINCE Logistics Manager,+234 8076 322 3046,Ogun,Lagos Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0660001122,PRINCE LOGISTICS Remittance Trust
+AG-067,Hambolu babatunde philips Logistics,Hambolu Babalola Philips,+234 8077 339 3077,Lagos,Lagos Central DC,Both (CRM + State Arranged),UBA,0670001139,Hambolu babatunde philips Logistics Remittance Trust
+AG-068,ISMAIL MUHAMMAD LIMAN,T.Smail Mohammed Liman,+234 813 326 7092,Nasarawa,Abuja Central DC,Both (CRM + State Arranged),Fidelity Bank,0680001156,ISMAIL MUHAMMAD LIMAN Remittance Trust
+AG-069,Teekina kuroakegha Gbeneteh Logistics,Teekina Kuroakegha Gbenete,+234 704 152 9732,Bayelsa,Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0690001173,Teekina kuroakegha Gbeneteh Logistics Remittance Trust
+AG-070,Threeple A Logistics,Threeple Ogun,+234 8080 390 3170,Ogun,Lagos Central DC,Both (CRM + State Arranged),Zenith Bank,0700001190,Threeple A Logistics Remittance Trust
+AG-071,BLUE AMAZON LOGISTICS LTD LOGISTICS,Akpan Blue Amazon,+234 807 920 7156,Imo,Lagos Central DC,Both (CRM + State Arranged),GTBank,0710001207,BLUE AMAZON LOGISTICS LTD LOGISTICS Remittance Trust
+AG-072,Chidi Godstime Egege Logistics,Chidi Godstime,+234 706 425 0735,Abia,Lagos Central DC,Both (CRM + State Arranged),Access Bank,0720001224,Chidi Godstime Egege Logistics Remittance Trust
+AG-073,Emmanuel Nnamdi Ugwu Logistics,Emmanuel Nnamdi Ugwui,+234 813 310 1091,Enugu,Lagos Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0730001241,Emmanuel Nnamdi Ugwu Logistics Remittance Trust
+AG-074,KENNEDY OROWO EDEYE Logistics,Kennedy Orowo Edoye,+234 703 672 6872,Delta (Warri),Lagos Central DC,Both (CRM + State Arranged),UBA,0740001258,KENNEDY OROWO EDEYE Logistics Remittance Trust
+AG-075,Mavicaon Logistics,Mavicaon Logistics Manager,+234 8085 475 3325,Zamfara,Abuja Central DC,Both (CRM + State Arranged),Fidelity Bank,0750001275,Mavicaon Logistics Remittance Trust
+AG-076,Omoga Victor Ohe-obe Logistics,Omoga Logistics Manager,+234 070 703 9598,Kwara (Ilorin),Lagos Central DC,Both (CRM + State Arranged),Stanbic IBTC,0760001292,Omoga Victor Ohe-obe Logistics Remittance Trust
+AG-077,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS,PELICAN Logistics Manager,+234 8087 509 3387,Anambra,Lagos Central DC,Both (CRM + State Arranged),Zenith Bank,0770001309,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS Remittance Trust
+AG-078,presteveGo logistics,presteveGo Logistics Manager,+234 805 648 1426,Kogi,Abuja Central DC,Both (CRM + State Arranged),GTBank,0780001326,presteveGo logistics Remittance Trust
+AG-079,Shittu Adebamke Yusuff Logistics,Shittu-Aleebanke Yusuf,+234 8089 543 3449,Ogun,Lagos Central DC,Both (CRM + State Arranged),Access Bank,0790001343,Shittu Adebamke Yusuff Logistics Remittance Trust
+AG-080,Durojaiye Ilashe Joseph Logistics,Durojaiye Illashe Joseph,+234 813 342 8138,Kogi,Abuja Central DC,Both (CRM + State Arranged),First Bank of Nigeria,0800001360,Durojaiye Ilashe Joseph Logistics Remittance Trust
+AG-081,"Express Logistics, Ebonyi LOGISTICS",UG Exp Ebonyi,+234 816 115 2615,Ebonyi,Lagos Central DC,Both (CRM + State Arranged),UBA,0810001377,"Express Logistics, Ebonyi LOGISTICS Remittance Trust"
+AG-082,TRUST LOGISTICS PDA,TRUST Logistics Manager,+234 8012 594 3542,Benue,Abuja Central DC,Both (CRM + State Arranged),Fidelity Bank,0820001394,TRUST LOGISTICS PDA Remittance Trust
+AG-083,Iby Logistics,Iby Logistics Manager,+234 706 936 5882,Akwa Ibom,Lagos Central DC,Agents_Arranged_by_State Only,Stanbic IBTC,0830001411,Iby Logistics Remittance Trust
+AG-084,Laboratory Landmark Logistics,Laboratory Logistics Manager,+234 806 423 5815,Delta,Lagos Central DC,Agents_Arranged_by_State Only,Zenith Bank,0840001428,Laboratory Landmark Logistics Remittance Trust
+AG-085,3twelve logistics Services,3twelve Logistics Manager,+234 8015 645 3635,Lagos,Lagos Central DC,CRM_Sheet1 Only,GTBank,0850001445,3twelve logistics Services Remittance Trust
+AG-086,Abutu Emmanuel,Abutu Logistics Manager,+234 8016 662 3666,Niger (Minna),Abuja Central DC,CRM_Sheet1 Only,Access Bank,0860001462,Abutu Emmanuel Remittance Trust
+AG-087,Bloomish Logistics,Bloomish Logistics Manager,+234 8017 679 3697,Lagos,Lagos Central DC,CRM_Sheet1 Only,First Bank of Nigeria,0870001479,Bloomish Logistics Remittance Trust
+AG-088,BTOP LOGISTICS,BTOP Logistics Manager,+234 8018 696 3728,Lagos,Lagos Central DC,CRM_Sheet1 Only,UBA,0880001496,BTOP LOGISTICS Remittance Trust
+AG-089,Connect Logistics,Connect Logistics Manager,+234 8019 713 3759,Nasarawa,Abuja Central DC,CRM_Sheet1 Only,Fidelity Bank,0890001513,Connect Logistics Remittance Trust
+AG-090,Daniel Ekpo,Daniel Logistics Manager,+234 8020 730 3790,Abia,Lagos Central DC,CRM_Sheet1 Only,Stanbic IBTC,0900001530,Daniel Ekpo Remittance Trust
+AG-091,Davtom Logistics,Davtom Logistics Manager,+234 8021 747 3821,Ekiti,Lagos Central DC,CRM_Sheet1 Only,Zenith Bank,0910001547,Davtom Logistics Remittance Trust
+AG-092,Deiwa logistics,Deiwa Logistics Manager,+234 8022 764 3852,Lagos,Lagos Central DC,CRM_Sheet1 Only,GTBank,0920001564,Deiwa logistics Remittance Trust
+AG-093,Eagles Frontier Logistics,Eagles Logistics Manager,+234 8023 781 3883,Lagos,Lagos Central DC,CRM_Sheet1 Only,Access Bank,0930001581,Eagles Frontier Logistics Remittance Trust
+AG-094,Elizabeth Anietie-Okon,Elizabeth Logistics Manager,+234 8024 798 3914,Rivers (Port Harcourt),Lagos Central DC,CRM_Sheet1 Only,First Bank of Nigeria,0940001598,Elizabeth Anietie-Okon Remittance Trust
+AG-095,Fabulous Logistics,Fabulous Logistics Manager,+234 8025 815 3945,Lagos,Lagos Central DC,CRM_Sheet1 Only,UBA,0950001615,Fabulous Logistics Remittance Trust
+AG-096,Global Debbie scents,Global Logistics Manager,+234 8026 832 3976,Lagos,Lagos Central DC,CRM_Sheet1 Only,Fidelity Bank,0960001632,Global Debbie scents Remittance Trust
+AG-097,GOLFDLONA GLOBAL LOGISTICS,GOLFDLONA Logistics Manager,+234 8027 849 4007,EDO,Lagos Central DC,CRM_Sheet1 Only,Stanbic IBTC,0970001649,GOLFDLONA GLOBAL LOGISTICS Remittance Trust
+AG-098,Ibylogistics Limited LOGISTICS,Ibylogistics Logistics Manager,+234 8028 866 4038,Akwa Ibom,Lagos Central DC,CRM_Sheet1 Only,Zenith Bank,0980001666,Ibylogistics Limited LOGISTICS Remittance Trust
+AG-099,John Hamza shuaibu Logistics,John Logistics Manager,+234 8029 883 4069,ABUJA,Abuja Central DC,CRM_Sheet1 Only,GTBank,0990001683,John Hamza shuaibu Logistics Remittance Trust
+AG-100,John Peter Adamawa,John Logistics Manager,+234 8030 900 4100,Adamawa,Abuja Central DC,CRM_Sheet1 Only,Access Bank,01000001700,John Peter Adamawa Remittance Trust
+AG-101,KUSFAT LOGISTICS,KUSFAT Logistics Manager,+234 8031 917 4131,Kwara (Ilorin),Lagos Central DC,CRM_Sheet1 Only,First Bank of Nigeria,01010001717,KUSFAT LOGISTICS Remittance Trust
+AG-102,MELLUX LOGISTICS,MELLUX Logistics Manager,+234 8032 934 4162,Lagos,Lagos Central DC,CRM_Sheet1 Only,UBA,01020001734,MELLUX LOGISTICS Remittance Trust
+AG-103,Nobelia logistics,Nobelia Logistics Manager,+234 8033 951 4193,Lagos,Lagos Central DC,CRM_Sheet1 Only,Fidelity Bank,01030001751,Nobelia logistics Remittance Trust
+AG-104,Oluwatobi Femi-Fasan,Oluwatobi Logistics Manager,+234 8034 968 4224,Ondo,Lagos Central DC,CRM_Sheet1 Only,Stanbic IBTC,01040001768,Oluwatobi Femi-Fasan Remittance Trust
+AG-105,Rapid moves logistics,Rapid Logistics Manager,+234 8035 985 4255,Lagos,Lagos Central DC,CRM_Sheet1 Only,Zenith Bank,01050001785,Rapid moves logistics Remittance Trust
+AG-106,SendMe Logistics,SendMe Logistics Manager,+234 8036 102 4286,Ogun,Lagos Central DC,CRM_Sheet1 Only,GTBank,01060001802,SendMe Logistics Remittance Trust
+AG-107,Steve temienor,Steve Logistics Manager,+234 8037 119 4317,Delta,Lagos Central DC,CRM_Sheet1 Only,Access Bank,01070001819,Steve temienor Remittance Trust
+AG-108,Tagwaye Logistics,Tagwaye Logistics Manager,+234 8038 136 4348,Lagos,Lagos Central DC,CRM_Sheet1 Only,First Bank of Nigeria,01080001836,Tagwaye Logistics Remittance Trust
+AG-109,Tajudeen Logistics,Tajudeen Logistics Manager,+234 8039 153 4379,Sokoto,Abuja Central DC,CRM_Sheet1 Only,UBA,01090001853,Tajudeen Logistics Remittance Trust
+AG-110,TIMAGISTICS LOGISTICS,TIMAGISTICS Logistics Manager,+234 8040 170 4410,Cross River (Calabar),Lagos Central DC,CRM_Sheet1 Only,Fidelity Bank,01100001870,TIMAGISTICS LOGISTICS Remittance Trust
+AG-111,ug express logistics ltd,ug Logistics Manager,+234 8041 187 4441,Ebonyi,Lagos Central DC,CRM_Sheet1 Only,Stanbic IBTC,01110001887,ug express logistics ltd Remittance Trust
+AG-112,UGH LOGISTICS,UGH Logistics Manager,+234 8042 204 4472,Delta,Lagos Central DC,CRM_Sheet1 Only,Zenith Bank,01120001904,UGH LOGISTICS Remittance Trust

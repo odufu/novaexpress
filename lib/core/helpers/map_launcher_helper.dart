@@ -131,30 +131,50 @@ class MapLauncherHelper {
     // Tier 3: wa.me short link
     final Uri shortWaUri = Uri.parse('https://wa.me/$formattedPhone?text=$encodedMsg');
 
-    // 1. Try Native WhatsApp App Intent first
-    try {
-      final launchedNative = await launchUrl(nativeWaUri, mode: LaunchMode.externalNonBrowserApplication);
-      if (launchedNative) return;
-    } catch (_) {
-      // Fall through
-    }
-
-    try {
-      final launchedNative2 = await launchUrl(nativeWaUri, mode: LaunchMode.externalApplication);
-      if (launchedNative2) return;
-    } catch (_) {
-      // Fall through
-    }
-
-    // 2. Try Web API with In-App Browser to isolate from third-party app hijackers
-    try {
-      final launchedInApp = await launchUrl(webWaUri, mode: LaunchMode.inAppBrowserView);
-      if (launchedInApp) return;
-    } catch (_) {
+    if (kIsWeb) {
       try {
-        final launchedShort = await launchUrl(shortWaUri, mode: LaunchMode.inAppBrowserView);
+        final launched = await launchUrl(
+          shortWaUri,
+          mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_blank',
+        );
+        if (launched) return;
+      } catch (_) {
+        try {
+          final launchedWeb = await launchUrl(
+            webWaUri,
+            mode: LaunchMode.platformDefault,
+            webOnlyWindowName: '_blank',
+          );
+          if (launchedWeb) return;
+        } catch (_) {}
+      }
+    } else {
+      // 1. Try Native WhatsApp App Intent first on mobile
+      try {
+        final launchedNative = await launchUrl(nativeWaUri, mode: LaunchMode.externalNonBrowserApplication);
+        if (launchedNative) return;
+      } catch (_) {
+        // Fall through
+      }
+
+      try {
+        final launchedNative2 = await launchUrl(nativeWaUri, mode: LaunchMode.externalApplication);
+        if (launchedNative2) return;
+      } catch (_) {
+        // Fall through
+      }
+
+      // 2. Try external application with short link (wa.me) or web API
+      try {
+        final launchedShort = await launchUrl(shortWaUri, mode: LaunchMode.externalApplication);
         if (launchedShort) return;
-      } catch (_) {}
+      } catch (_) {
+        try {
+          final launchedWeb = await launchUrl(webWaUri, mode: LaunchMode.externalApplication);
+          if (launchedWeb) return;
+        } catch (_) {}
+      }
     }
 
     // 3. Fallback: Copy message to clipboard and display helpful notification

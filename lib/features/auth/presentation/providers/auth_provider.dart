@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/services/local_storage_service.dart';
+import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
+import '../../data/datasources/open_registration_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/models/user_model.dart';
+import '../../domain/entities/registration_lookups.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/get_current_user.dart';
@@ -17,6 +20,19 @@ final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
     return AuthRemoteDataSourceImpl(Supabase.instance.client);
   } catch (_) {
     return MockAuthRemoteDataSource();
+  }
+});
+
+final openRegistrationDataSourceProvider =
+    Provider<OpenRegistrationDataSource>((ref) {
+  final authDs = ref.watch(authRemoteDataSourceProvider);
+  if (authDs is MockAuthRemoteDataSource) {
+    return MockOpenRegistrationDataSource();
+  }
+  try {
+    return OpenRegistrationDataSourceImpl(Supabase.instance.client, authDs);
+  } catch (_) {
+    return MockOpenRegistrationDataSource();
   }
 });
 
@@ -72,6 +88,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final GetCurrentUserUseCase getCurrentUserUseCase;
   final AuthRepository? authRepository;
   final LocalStorageService? localStorageService;
+  final OpenRegistrationDataSource? openRegistrationDataSource;
+  MockOpenRegistrationDataSource? _fallbackMockOpenRegDs;
 
   AuthNotifier({
     UserEntity? initialUser,
@@ -80,11 +98,91 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required this.getCurrentUserUseCase,
     this.authRepository,
     this.localStorageService,
+    this.openRegistrationDataSource,
   }) : super(AuthState(
           user: initialUser,
           isInitialized: initialUser != null,
         )) {
     checkCurrentUser();
+  }
+
+  OpenRegistrationDataSource get _effectiveOpenRegDataSource =>
+      openRegistrationDataSource ??
+      (_fallbackMockOpenRegDs ??= MockOpenRegistrationDataSource());
+
+  Future<List<RegistrationMerchantOption>> fetchRegistrationMerchants() async {
+    return await _effectiveOpenRegDataSource.fetchRegistrationMerchants();
+  }
+
+  Future<List<DistributionCenter>> fetchRegistrationDistributionCenters() async {
+    return await _effectiveOpenRegDataSource
+        .fetchRegistrationDistributionCenters();
+  }
+
+  Future<List<RegistrationSupervisorOption>> fetchMerchantSupervisors(
+    String clientId, {
+    bool isMarketer = false,
+  }) async {
+    return await _effectiveOpenRegDataSource.fetchMerchantSupervisors(
+      clientId,
+      isMarketer: isMarketer,
+    );
+  }
+
+  Future<bool> checkRegistrationEmailExists(String email) async {
+    return await _effectiveOpenRegDataSource.checkEmailExists(email);
+  }
+
+  Future<bool> checkRegistrationPhoneExists(String phone) async {
+    return await _effectiveOpenRegDataSource.checkPhoneExists(phone);
+  }
+
+  Future<UserEntity> completeOpenRegistration(
+    OpenRegistrationRequest request, {
+    bool autoSignIn = true,
+  }) async {
+    if (mounted) {
+      state = state.copyWith(isLoading: true, errorMessage: null);
+    }
+    try {
+      final createdUser =
+          await _effectiveOpenRegDataSource.registerOpenAccount(request);
+
+      if (autoSignIn) {
+        if (_effectiveOpenRegDataSource is OpenRegistrationDataSourceImpl) {
+          try {
+            await Supabase.instance.client.auth.signInWithPassword(
+              email: createdUser.email,
+              password: request.password,
+            );
+          } catch (e) {
+            debugPrint(
+                '[AUTH_PROVIDER] ℹ️ Post-signup session sync notice: $e');
+          }
+        }
+        try {
+          await localStorageService?.cacheUserProfile(createdUser.toJson());
+        } catch (_) {}
+        if (mounted) {
+          state = state.copyWith(
+            isLoading: false,
+            user: createdUser,
+            isInitialized: true,
+            errorMessage: null,
+          );
+        }
+      } else if (mounted) {
+        state = state.copyWith(isLoading: false, errorMessage: null);
+      }
+
+      return createdUser;
+    } catch (e) {
+      final cleanErr = e.toString().replaceFirst('Exception: ', '');
+      if (mounted) {
+        state = state.copyWith(isLoading: false, errorMessage: cleanErr);
+      }
+      rethrow;
+    }
   }
 
   Future<UserEntity> registerDistributionCenterSupervisor({
@@ -624,44 +722,74 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<Map<String, dynamic>> changePassword({
-    required String oldPassword,
+    String? oldPassword,
+    String? currentPassword,
     required String newPassword,
+    String? email,
   }) async {
     debugPrint('[AUTH_PROVIDER] 🔐 Attempting password update...');
     try {
-      final currentUser = state.user;
-      if (currentUser == null) {
+      final userEmail = email ?? state.user?.email;
+      if (userEmail == null || userEmail.trim().isEmpty) {
         return {'success': false, 'error': 'No active user session found.'};
       }
 
-      // 1. Update Supabase Auth user password
+      final cleanEmail = userEmail.trim().toLowerCase();
+      final effectiveCurrentPass = (currentPassword ?? oldPassword ?? '').trim();
+
+      // 1. Delegate through authRepository if available (which validates currentPassword)
+      if (authRepository != null) {
+        try {
+          await authRepository!.changePassword(
+            email: cleanEmail,
+            currentPassword: effectiveCurrentPass,
+            newPassword: newPassword,
+          );
+        } catch (repoErr) {
+          final cleanErr = repoErr.toString().replaceFirst('Exception: ', '').replaceFirst('AppAuthException: ', '');
+          return {'success': false, 'error': cleanErr};
+        }
+      } else {
+        final expectedPass = AuthRemoteDataSourceImpl.getUserPassword(cleanEmail);
+        if (expectedPass != null && effectiveCurrentPass.isNotEmpty && expectedPass != effectiveCurrentPass) {
+          return {'success': false, 'error': 'Current password does not match. Please verify your current password.'};
+        }
+        AuthRemoteDataSourceImpl.setUserPassword(cleanEmail, newPassword);
+      }
+
+      // 2. Update Supabase Auth user password
       try {
         await Supabase.instance.client.auth.updateUser(
           UserAttributes(password: newPassword),
         );
-        debugPrint('[AUTH_PROVIDER] ✅ Password updated in Supabase Auth for ${currentUser.email}');
+        debugPrint('[AUTH_PROVIDER] ✅ Password updated in Supabase Auth for $cleanEmail');
       } catch (authErr) {
         debugPrint('[AUTH_PROVIDER] ℹ️ Supabase auth updateUser notice ($authErr)');
       }
 
-      // 2. Admin API fallback
+      // 3. Admin API fallback
       try {
         final serviceDb = SupabaseClient(
           SupabaseConstants.supabaseUrl,
           SupabaseConstants.supabaseServiceRoleKey,
           authOptions: const AuthClientOptions(autoRefreshToken: false),
         );
-        final targetAuthId = currentUser.authUserId ?? currentUser.id;
-        await serviceDb.auth.admin.updateUserById(
-          targetAuthId,
-          attributes: AdminUserAttributes(password: newPassword),
-        );
+        final targetAuthId = state.user?.authUserId ?? state.user?.id;
+        if (targetAuthId != null) {
+          await serviceDb.auth.admin.updateUserById(
+            targetAuthId,
+            attributes: AdminUserAttributes(password: newPassword),
+          );
+        }
         serviceDb.dispose();
       } catch (_) {}
 
-      // 3. Update in-memory registry for seamless test/offline continuity
+      // 4. Update in-memory registry for seamless test/offline continuity
+      final currentUser = state.user;
       if (currentUser is UserModel) {
         AuthRemoteDataSourceImpl.registerUserInMemory(currentUser, newPassword);
+      } else {
+        AuthRemoteDataSourceImpl.setUserPassword(cleanEmail, newPassword);
       }
 
       return {'success': true, 'message': 'Password changed successfully!'};
@@ -683,5 +811,6 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
     getCurrentUserUseCase: ref.watch(getCurrentUserUseCaseProvider),
     authRepository: ref.watch(authRepositoryProvider),
     localStorageService: ref.watch(localStorageServiceProvider),
+    openRegistrationDataSource: ref.watch(openRegistrationDataSourceProvider),
   );
 });

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/helpers/map_launcher_helper.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/payout_receipt_preview_dialog.dart';
 import '../../../../core/widgets/product_image_widget.dart';
@@ -1425,19 +1426,21 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 3,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         order.orderNumber,
                         style: GoogleFonts.inter(
-                          fontSize: 13,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w800,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                         decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
@@ -1445,10 +1448,11 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                         child: Text(
                           statusLabel,
                           style: GoogleFonts.inter(
-                            fontSize: 9,
+                            fontSize: 8.5,
                             fontWeight: FontWeight.w700,
                             color: statusColor,
                           ),
+                          maxLines: 1,
                         ),
                       ),
                     ],
@@ -1743,11 +1747,12 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                 icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: Color(0xFF10B981)),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                onPressed: () async {
-                  final clean = lead.customerPhone.replaceAll(RegExp(r'[^\d]'), '');
-                  final phone = clean.startsWith('0') ? '234${clean.substring(1)}' : clean;
-                  final uri = Uri.parse('https://wa.me/$phone');
-                  if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                onPressed: () {
+                  MapLauncherHelper.launchWhatsApp(
+                    context: context,
+                    customerPhone: lead.customerPhone,
+                    message: 'Hello ${lead.customerName}, regarding your inquiry for ${lead.productInterest}.',
+                  );
                 },
               ),
               const SizedBox(width: 12),

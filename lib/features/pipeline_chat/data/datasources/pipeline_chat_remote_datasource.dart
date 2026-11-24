@@ -102,7 +102,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
           : await query.eq('order_number', cleanId).maybeSingle();
 
       if (res != null) {
-        return OrderConversationModel.fromJson(res);
+        return OrderConversationModel.fromJson(Map<String, dynamic>.from(res as Map));
       }
 
       // Auto-initialize conversation if the order exists in orders table
@@ -162,7 +162,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
         }).select('*,client_closers(avatar_url,full_name),client_marketers(avatar_url,full_name)').maybeSingle();
 
         if (newConv != null) {
-          return OrderConversationModel.fromJson(newConv);
+          return OrderConversationModel.fromJson(Map<String, dynamic>.from(newConv as Map));
         }
       }
       return null;
@@ -194,7 +194,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
 
       final res = await query.order('last_message_at', ascending: false);
       return (res as List)
-          .map((e) => OrderConversationModel.fromJson(e as Map<String, dynamic>))
+          .map((e) => OrderConversationModel.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } catch (e) {
       debugPrint('[PIPELINE_CHAT] Error fetching conversations: $e');
@@ -231,19 +231,33 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
         } else {
           return [];
         }
+      } else if (r.contains('supervisor')) {
+        // Sales Rep Supervisor: view conversations across the supervised client/company
+        final targetClientId = (clientId != null && clientId.isNotEmpty)
+            ? clientId
+            : '00000000-0000-4000-8000-791731264594';
+        query = query.eq('client_id', targetClientId);
       } else if (r.contains('closer')) {
         final targetCloserId = (closerId != null && closerId.isNotEmpty) ? closerId : userId;
         if (targetCloserId.isNotEmpty) {
-          if (closerId != null && closerId.isNotEmpty && closerId != userId) {
-            query = query.or('closer_id.eq.$closerId,closer_id.eq.$userId');
-          } else {
-            query = query.eq('closer_id', targetCloserId);
+          final orFilters = <String>[];
+          orFilters.add('closer_id.eq.$targetCloserId');
+          if (userId.isNotEmpty && userId != targetCloserId) {
+            orFilters.add('closer_id.eq.$userId');
           }
+          if (clientId != null && clientId.isNotEmpty) {
+            orFilters.add('client_id.eq.$clientId');
+          }
+          query = query.or(orFilters.join(','));
+        } else if (clientId != null && clientId.isNotEmpty) {
+          query = query.eq('client_id', clientId);
         } else {
           return [];
         }
       } else if (r.contains('client') || r.contains('merchant')) {
-        final targetClientId = (clientId != null && clientId.isNotEmpty) ? clientId : userId;
+        final targetClientId = (clientId != null && clientId.isNotEmpty)
+            ? clientId
+            : (userId.isNotEmpty ? userId : '00000000-0000-4000-8000-791731264594');
         query = query.eq('client_id', targetClientId);
       } else if (r.contains('dc') ||
           r.contains('manager') ||
@@ -279,7 +293,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
 
       final res = await query.order('last_message_at', ascending: false);
       return (res as List)
-          .map((e) => OrderConversationModel.fromJson(e as Map<String, dynamic>))
+          .map((e) => OrderConversationModel.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } catch (e) {
       debugPrint('[PIPELINE_CHAT] Error fetching scoped conversations: $e');
@@ -336,7 +350,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
           .order('created_at', ascending: true);
 
       final list = (res as List)
-          .map((e) => OrderConversationMessageModel.fromJson(e as Map<String, dynamic>))
+          .map((e) => OrderConversationMessageModel.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
 
       if (list.isEmpty) {
@@ -400,7 +414,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
         .eq('conversation_id', conversationId)
         .order('created_at', ascending: true)
         .map((data) => data
-            .map((json) => OrderConversationMessageModel.fromJson(json))
+            .map((json) => OrderConversationMessageModel.fromJson(Map<String, dynamic>.from(json)))
             .toList());
   }
 
@@ -446,6 +460,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
       case ChatMessageType.voiceNote:
       case ChatMessageType.fileAttachment:
       case ChatMessageType.image:
+      case ChatMessageType.sticker:
         tStr = 'text';
         break;
       case ChatMessageType.statusChange:
@@ -498,7 +513,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
     // Note: trg_on_order_message_inserted automatically updates order_conversations preview
     // and increments unread counters for recipients!
 
-    final model = OrderConversationMessageModel.fromJson(res);
+    final model = OrderConversationMessageModel.fromJson(Map<String, dynamic>.from(res as Map));
     if (clientMessageId != null && clientMessageId.isNotEmpty) {
       return model.copyWith(clientMessageId: clientMessageId, sendState: 'sent');
     }
@@ -560,7 +575,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
   }) async {
     final db = _getAdminClient();
     final res = await db.from('order_conversation_messages').select().eq('id', messageId).single();
-    final model = OrderConversationMessageModel.fromJson(res);
+    final model = OrderConversationMessageModel.fromJson(Map<String, dynamic>.from(res as Map));
     final currentMeta = Map<String, dynamic>.from(model.metadata);
     final rawReactions = currentMeta['reactions'] as List? ?? [];
     final reactions = rawReactions.map((r) => Map<String, dynamic>.from(r as Map)).toList();
@@ -593,6 +608,6 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
         .select()
         .single();
 
-    return OrderConversationMessageModel.fromJson(updated);
+    return OrderConversationMessageModel.fromJson(Map<String, dynamic>.from(updated as Map));
   }
 }

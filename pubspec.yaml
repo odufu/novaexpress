@@ -42,6 +42,7 @@ flutter:
     - assets/images/logo/
     - assets/images/products/
     - assets/branding/
+    - assets/stickers/
     - assets/backgrounds/
     - assets/core/
     - assets/platforms/

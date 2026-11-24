@@ -22,25 +22,47 @@ import '../../domain/entities/dc_transaction_record.dart';
 import '../../domain/entities/distribution_center.dart';
 
 final List<DistributionCenter> defaultDistributionCenters = [
-  // 1. Grand DC (Apex Central DC - Central Command Distribution Center)
+  // 1. Abuja Central DC (Central Command - Apex Distribution Center)
   DistributionCenter(
     id: '22222222-2222-4222-8222-222222222222',
     companyId: '11111111-1111-4111-8111-111111111111',
-    name: 'Central Command Distribution Center',
-    code: 'DC-CMD-01',
+    name: 'Abuja Central DC',
+    code: 'DC-ABJ-01',
     state: 'Federal Capital Territory',
-    city: 'Central Command Hub',
-    address: 'Plot 100 Command Boulevard, Central District',
+    city: 'Abuja Municipal (AMAC)',
+    address: 'Plot 402 Aminu Kano Crescent, Wuse 2, Abuja',
     contactPhone: '+2348023456789',
-    contactEmail: 'dc.supervisor@novaxpress.ng',
+    contactEmail: 'abuja.dc@novaxpress.ng',
     managerName: 'Ahmed Bello',
     isGrandDc: true,
     isHub: true,
     isActive: true,
     operatingZones: const ['Central Business District', 'Abuja Municipal (AMAC)', 'AMAC', 'Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
     storageCapacityUnits: 25000,
-    totalAssignedRiders: 0,
-    activeInventoryBatches: 0,
+    totalAssignedRiders: 22,
+    activeInventoryBatches: 5,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+  ),
+  // 2. Lagos Central DC (Autonomous Commercial Hub)
+  DistributionCenter(
+    id: '33333333-3333-4333-8333-333333333333',
+    companyId: '11111111-1111-4111-8111-111111111111',
+    name: 'Lagos Central DC',
+    code: 'DC-LAG-01',
+    state: 'Lagos',
+    city: 'Ikeja',
+    address: 'Plot 14, Commercial Avenue, Ikeja Logistics Corridor, Lagos',
+    contactPhone: '+2348052223344',
+    contactEmail: 'lagos.dc@novaxpress.ng',
+    managerName: 'Babatunde Adeleke',
+    isGrandDc: false,
+    isHub: true,
+    isActive: true,
+    operatingZones: const ['Ikeja', 'Oshodi-Isolo', 'Alimosho', 'Surulere', 'Lagos Mainland', 'Lagos Island', 'Eti-Osa', 'Kosofe'],
+    storageCapacityUnits: 30000,
+    totalAssignedRiders: 48,
+    activeInventoryBatches: 8,
     createdAt: DateTime(2026, 1, 1),
     updatedAt: DateTime(2026, 1, 1),
   ),
@@ -67,6 +89,69 @@ final List<DCFleetDriver> defaultFleetDrivers = [
     cashInCustody: 0.0,
     itemsInCustody: 0,
     personnelType: 'pda',
+  ),
+  const DCFleetDriver(
+    id: 'b2222222-2222-4222-8222-222222222222',
+    driverCode: 'DRV-001',
+    name: 'Musa Rider',
+    phone: '08023456789',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    vehicleModel: 'Bajaj Boxer BM150',
+    vehiclePlate: 'ABJ-456-XY',
+    vehicleType: 'Motorcycle',
+    status: 'active',
+    assignedZone: 'Abuja Municipal (AMAC)',
+    distributionCenterId: '22222222-2222-4222-8222-222222222222',
+    coveredLgas: ['Abuja Municipal (AMAC)', 'Wuse II', 'Maitama', 'Garki'],
+    totalAssignedOrders: 0,
+    completedOrders: 0,
+    routeProgressPercent: 0.0,
+    efficiencyRating: 99.0,
+    cashInCustody: 0.0,
+    itemsInCustody: 0,
+    personnelType: 'in_house_rider',
+  ),
+  const DCFleetDriver(
+    id: 'b3333333-3333-4333-8333-333333333333',
+    driverCode: 'EXT-PDA-001',
+    name: 'Suleiman External Courier',
+    phone: '08034567890',
+    avatarUrl: '',
+    vehicleModel: 'Delivery Van',
+    vehiclePlate: 'ABJ-123-EXT',
+    vehicleType: 'Van',
+    status: 'active',
+    assignedZone: 'Abuja Municipal (AMAC)',
+    distributionCenterId: '22222222-2222-4222-8222-222222222222',
+    coveredLgas: ['Abuja Municipal (AMAC)', 'Bwari', 'Gwagwalada', 'Kuje'],
+    totalAssignedOrders: 0,
+    completedOrders: 0,
+    routeProgressPercent: 0.0,
+    efficiencyRating: 97.5,
+    cashInCustody: 0.0,
+    itemsInCustody: 0,
+    personnelType: 'external_pda',
+  ),
+  const DCFleetDriver(
+    id: 'b4444444-4444-4444-8444-444444444444',
+    driverCode: 'DIST-001',
+    name: 'Abuja Regional Offline Distributor',
+    phone: '08045678901',
+    avatarUrl: '',
+    vehicleModel: 'Commercial Truck',
+    vehiclePlate: 'ABJ-999-DST',
+    vehicleType: 'Truck',
+    status: 'active',
+    assignedZone: 'Abuja Municipal (AMAC)',
+    distributionCenterId: '22222222-2222-4222-8222-222222222222',
+    coveredLgas: ['Abuja Municipal (AMAC)', 'Bwari', 'Gwagwalada', 'Kuje', 'Kwali'],
+    totalAssignedOrders: 0,
+    completedOrders: 0,
+    routeProgressPercent: 0.0,
+    efficiencyRating: 98.0,
+    cashInCustody: 0.0,
+    itemsInCustody: 0,
+    personnelType: 'distributor',
   ),
 ];
 
@@ -481,6 +566,8 @@ class DCConsoleState {
 
   List<DCFleetDriver> get dcDrivers {
     return drivers.where((d) {
+      // Strictly exclude NovaXpress platform 3PL agents & master agency entries from the NovaXpress Logistics rider roster
+      if (d.isPlatformAgent) return false;
       if (isCurrentHubGrandDc && selectedDcId == null) {
         return true;
       }
@@ -631,7 +718,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
     state = state.copyWith(
       distributionCenters: (cachedDcs != null && cachedDcs.isNotEmpty) ? cachedDcs : defaultDistributionCenters,
-      drivers: cached ?? state.drivers,
+      drivers: cached != null ? cached.where((d) => !d.isPlatformAgent).toList() : state.drivers,
       operationsOfficers: cachedOps ?? state.operationsOfficers,
       financeSettings: cachedFinance ?? state.financeSettings,
       warehouseBatches: cachedBatches ?? state.warehouseBatches,
@@ -1766,6 +1853,9 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         final Map<String, DCFleetDriver> mergedByKey = {};
 
         for (final dbD in dbDrivers) {
+          // Strictly exclude NovaXpress platform 3PL agents & master agency entries from the NovaXpress Logistics rider roster
+          if (dbD.isPlatformAgent) continue;
+
           final emailKey = dbD.email.isNotEmpty ? dbD.email.toLowerCase() : '';
           final codeKey = dbD.driverCode.isNotEmpty ? dbD.driverCode.toLowerCase() : '';
           final idKey = dbD.id.isNotEmpty ? dbD.id.toLowerCase() : '';
@@ -2312,6 +2402,36 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       dcId: state.activeDcId,
       clientId: clientId,
     );
+  }
+
+  /// Synchronously reconciles a rider's in-memory `cashInCustody` after
+  /// direct finance clearance or approved remittance so KPIs and rider lists
+  /// reflect the cleared balance immediately.
+  void reconcileDriverCashCustody(
+    String driverIdOrCode, {
+    required double clearedGross,
+    required double clearedNet,
+    bool allOrdersCleared = false,
+  }) {
+    final targetKey = driverIdOrCode.trim().toLowerCase();
+    if (targetKey.isEmpty) return;
+
+    final updatedDrivers = state.drivers.map((d) {
+      final matches = d.id.toLowerCase() == targetKey ||
+          d.driverCode.toLowerCase() == targetKey;
+      if (!matches) return d;
+
+      if (allOrdersCleared) {
+        return d.copyWith(cashInCustody: 0.0);
+      }
+      final double decrement =
+          (d.cashInCustody - clearedGross).abs() <= 1.0 ? clearedGross : clearedNet;
+      final double nextCash =
+          (d.cashInCustody - decrement).clamp(0.0, double.infinity);
+      return d.copyWith(cashInCustody: nextCash);
+    }).toList();
+
+    state = state.copyWith(drivers: updatedDrivers);
   }
 }
 

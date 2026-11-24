@@ -21,6 +21,7 @@ class StockItemModel extends StockItemEntity {
     required super.availableCount,
     required super.returnedCount,
     super.awaitingReturnCount = 0,
+    super.complaintCount = 0,
     super.lowStockThreshold = 3,
     super.reorderLevel = 5,
     required super.category,
@@ -109,6 +110,7 @@ class StockItemModel extends StockItemEntity {
     final barcode = json['barcode']?.toString();
     final weightKg = (json['weight_kg'] as num?)?.toDouble() ?? 0.5;
     final damagedCount = (json['damaged_count'] as num?)?.toInt() ?? 0;
+    final complaintCount = (json['complaint_count'] as num?)?.toInt() ?? damagedCount;
 
     return StockItemModel(
       id: json['id']?.toString() ?? '',
@@ -119,7 +121,7 @@ class StockItemModel extends StockItemEntity {
       costPrice: costPrice,
       barcode: barcode,
       weightKg: weightKg,
-      damagedCount: damagedCount,
+      damagedCount: damagedCount < 0 ? 0 : damagedCount,
       clientId: clientId,
       ownerName: ownerName,
       inventoryType: invType,
@@ -130,6 +132,7 @@ class StockItemModel extends StockItemEntity {
       availableCount: available < 0 ? 0 : available,
       returnedCount: returned < 0 ? 0 : returned,
       awaitingReturnCount: awaitingReturn < 0 ? 0 : awaitingReturn,
+      complaintCount: complaintCount < 0 ? 0 : complaintCount,
       lowStockThreshold: lowThreshold,
       reorderLevel: reorderLvl,
       category: json['category']?.toString() ?? 'General',
@@ -161,6 +164,7 @@ class StockItemModel extends StockItemEntity {
       'available_count': availableCount,
       'returned_count': returnedCount,
       'awaiting_return_count': awaitingReturnCount,
+      'complaint_count': complaintCount,
       'low_stock_threshold': lowStockThreshold,
       'reorder_level': reorderLevel,
       'category': category,

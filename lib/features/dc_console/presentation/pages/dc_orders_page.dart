@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../../core/widgets/nova_tooltip.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
@@ -16,8 +17,10 @@ import '../widgets/dc_create_order_modal.dart';
 import '../widgets/dc_order_detail_modal.dart';
 import '../widgets/dc_csv_order_import_modal.dart';
 import '../widgets/dc_assign_order_modal.dart';
+import '../widgets/mark_order_delivered_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 import '../../../orders/presentation/widgets/active_follow_up_reminder_banner.dart';
+import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 import '../../../client_portal/presentation/widgets/pangea_date_range_picker_modal.dart';
 
@@ -1071,6 +1074,24 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
             runSpacing: 8,
             children: [
               NovaTooltip(
+                message: 'Paste orders copied from WhatsApp or CRM chat to auto-generate system orders',
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final created = await SmartOrderPasteModal.show(context);
+                    if (created != null && context.mounted) {
+                      ref.read(ordersProvider.notifier).loadOrders();
+                    }
+                  },
+                  icon: const Icon(Icons.content_paste_go_rounded, size: 16, color: Colors.white),
+                  label: const Text('Paste WhatsApp Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00A884),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              NovaTooltip(
                 message: 'Create and book a new delivery consignment order',
                 child: ElevatedButton.icon(
                   onPressed: () {
@@ -1995,15 +2016,39 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                   sortValue: (o) => o.deliveryAgentName ?? o.deliveryAgentCode ?? '',
                   cellBuilder: (context, order, row, isDark, brand) {
                     final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
-                    return Text(
-                      isUnassigned ? 'Unassigned' : (order.deliveryAgentName ?? order.deliveryAgentCode ?? 'Assigned'),
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                        color: isUnassigned ? const Color(0xFFEA580C) : const Color(0xFF2563EB),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    final isExt = !isUnassigned &&
+                        (order.deliveryAgentCode?.toUpperCase().startsWith('EXT-') == true ||
+                            (order.deliveryAgentName?.toLowerCase().contains('external') == true));
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isExt) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            margin: const EdgeInsets.only(right: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.3)),
+                            ),
+                            child: const Text('EXT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
+                          ),
+                        ],
+                        Flexible(
+                          child: Text(
+                            isUnassigned ? 'Unassigned' : (order.deliveryAgentName ?? order.deliveryAgentCode ?? 'Assigned'),
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: isExt ? FontWeight.bold : FontWeight.w500,
+                              color: isUnassigned
+                                  ? const Color(0xFFEA580C)
+                                  : (isExt ? const Color(0xFFD97706) : const Color(0xFF2563EB)),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -2013,8 +2058,8 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                   key: 'status',
                   group: 'Fulfillment',
                   label: 'STATUS',
-                  defaultWidth: 140,
-                  minWidth: 110,
+                  defaultWidth: 185,
+                  minWidth: 130,
                   align: TextAlign.center,
                   searchString: (o) => o.status,
                   sortValue: (o) => o.status,
@@ -2028,14 +2073,20 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                   key: 'actions',
                   group: 'Actions',
                   label: 'ACTIONS',
-                  defaultWidth: 215,
-                  minWidth: 160,
+                  defaultWidth: 265,
+                  minWidth: 195,
                   align: TextAlign.center,
                   cellBuilder: (context, order, row, isDark, brand) {
                     final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
-                    final isDelivered = order.status == 'delivered';
+                    final isDelivered = order.isDelivered;
                     final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
                     final isReturned = order.status == 'returned';
+                    final authUser = ref.watch(authProvider).user;
+                    final canDispatchDeliver = authUser != null &&
+                        (authUser.isDcOrdersAdmin || authUser.isDcManager) &&
+                        !isDelivered &&
+                        !order.isCancelled &&
+                        !isReturned;
 
                     return Row(
                       mainAxisSize: MainAxisSize.min,
@@ -2057,6 +2108,21 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                             ),
                           ),
                           const SizedBox(width: 4),
+                        ],
+                        if (canDispatchDeliver) ...[
+                          ElevatedButton.icon(
+                            onPressed: () => MarkOrderDeliveredModal.show(context, order),
+                            icon: const Icon(Icons.check_circle_outline_rounded, size: 12, color: Colors.white),
+                            label: const Text('Deliver', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
                         ],
                         IconButton(
                           visualDensity: VisualDensity.compact,
@@ -2168,7 +2234,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
 
         Widget buildOrderCard(OrderEntity order) {
           final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
-          final isDelivered = order.status == 'delivered';
+          final isDelivered = order.isDelivered;
           final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
 
           return InkWell(
@@ -2188,7 +2254,15 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('#${order.orderNumber}', style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                      Expanded(
+                        child: Text(
+                          '#${order.orderNumber}',
+                          style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       _buildOrderStatusBadge(order),
                     ],
                   ),
@@ -2243,6 +2317,21 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                               ),
                               child: const Text('Assign', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ),
+                          if (!isDelivered &&
+                              !order.isCancelled &&
+                              order.status != 'returned' &&
+                              (ref.watch(authProvider).user?.isDcOrdersAdmin == true ||
+                                  ref.watch(authProvider).user?.isDcManager == true))
+                            ElevatedButton.icon(
+                              onPressed: () => MarkOrderDeliveredModal.show(context, order),
+                              icon: const Icon(Icons.check_circle_outline_rounded, size: 13, color: Colors.white),
+                              label: const Text('Mark Delivered', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
                             ),
                           OutlinedButton.icon(
                             onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
@@ -2376,9 +2465,13 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
               children: [
                 const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
                 const SizedBox(width: 4),
-                Text(
-                  'COMPLETED ✓',
-                  style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF10B981), letterSpacing: 0.3),
+                Flexible(
+                  child: Text(
+                    'COMPLETED ✓',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF10B981), letterSpacing: 0.3),
+                  ),
                 ),
               ],
             ),
@@ -2394,6 +2487,8 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
               ),
               child: Text(
                 'AWAITING REMITTANCE',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.jetBrainsMono(fontSize: 8, fontWeight: FontWeight.bold, color: const Color(0xFFB45309)),
               ),
             ),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/helpers/map_launcher_helper.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../domain/entities/client_accountant.dart';
 
@@ -91,36 +92,12 @@ $companyName Finance Team''';
   }
 
   Future<void> _sendViaWhatsApp(String companyName) async {
-    final phone = _formatPhoneNumber(widget.accountant.phone);
     final message = _buildInviteMessage(companyName);
-    final encoded = Uri.encodeComponent(message);
-    final uri = Uri.parse('https://wa.me/$phone?text=$encoded');
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await Clipboard.setData(ClipboardData(text: message));
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('WhatsApp link could not open. Invite copied to clipboard!'),
-              backgroundColor: Color(0xFF10B981),
-            ),
-          );
-        }
-      }
-    } catch (_) {
-      await Clipboard.setData(ClipboardData(text: message));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invite copied to clipboard!'),
-            backgroundColor: Color(0xFF10B981),
-          ),
-        );
-      }
-    }
+    await MapLauncherHelper.launchWhatsApp(
+      context: context,
+      customerPhone: widget.accountant.phone,
+      message: message,
+    );
   }
 
   void _copyAllCredentials(String companyName) async {

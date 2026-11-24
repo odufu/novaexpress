@@ -1,5 +1,12 @@
 import '../../../client_portal/presentation/widgets/request_upg_modal.dart';
+import '../../../client_portal/presentation/providers/client_portal_provider.dart';
+import '../../../client_portal/presentation/providers/sales_supervisor_provider.dart';
+import '../../../client_portal/presentation/widgets/supervisor_reassign_order_modal.dart';
+import '../../../orders/presentation/widgets/reschedule_callback_modal.dart';
+import '../../../client_portal/presentation/widgets/client_edit_order_modal.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../dc_console/presentation/providers/dc_console_provider.dart';
+import '../../../dc_console/presentation/widgets/mark_order_delivered_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -121,6 +128,11 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   String _mentionQuery = '';
   int _mentionStartIndex = -1;
 
+  bool _isInternalNoteMode = false;
+  bool _showCannedReplies = false;
+  String _cannedQuery = '';
+  bool _showJumpToBottom = false;
+
   late final VoiceNoteRecorder _voiceRecorder;
   bool _isRecordingVoice = false;
   Duration _recordingDuration = Duration.zero;
@@ -141,6 +153,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
       CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOut),
     );
 
+    _scrollController.addListener(_onScroll);
     _msgController.addListener(_onTextChanged);
     _voiceRecorder = VoiceNoteRecorder();
     _recordingSub = _voiceRecorder.durationStream.listen((dur) {
@@ -164,11 +177,20 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     _recordingSub?.cancel();
     _voiceRecorder.dispose();
     _shimmerController.dispose();
+    _scrollController.removeListener(_onScroll);
     _msgController.removeListener(_onTextChanged);
     _msgController.dispose();
     _scrollController.dispose();
     _msgFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final shouldShow = _scrollController.offset > 240;
+    if (shouldShow != _showJumpToBottom && mounted) {
+      setState(() => _showJumpToBottom = shouldShow);
+    }
   }
 
   void _onTextChanged() {
@@ -183,10 +205,28 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
     final selection = _msgController.selection;
     if (selection.baseOffset < 0) {
-      if (_showMentionSuggestions) {
-        setState(() => _showMentionSuggestions = false);
+      if (_showMentionSuggestions || _showCannedReplies) {
+        setState(() {
+          _showMentionSuggestions = false;
+          _showCannedReplies = false;
+        });
       }
       return;
+    }
+
+    // Detect slash '/' for canned responses
+    if (text.startsWith('/')) {
+      final query = text.substring(1).trim().toLowerCase();
+      if (!_showCannedReplies || _cannedQuery != query) {
+        setState(() {
+          _showCannedReplies = true;
+          _cannedQuery = query;
+          _showMentionSuggestions = false;
+        });
+      }
+      return;
+    } else if (_showCannedReplies) {
+      setState(() => _showCannedReplies = false);
     }
 
     final cursorPos = selection.baseOffset;
@@ -380,18 +420,57 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     }
   }
 
+  void _openReassignModal(BuildContext context, OrderConversationEntity? conv) {
+    final orders = ref.read(ordersProvider).orders;
+    final currentOrder = orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderNumber).firstOrNull ??
+        OrderEntity(
+          id: widget.orderId,
+          orderNumber: widget.orderNumber,
+          customerName: conv?.customerName ?? widget.customerName,
+          customerPhone: conv?.customerPhone ?? widget.customerPhone ?? '',
+          deliveryAddress: 'Customer Delivery Address',
+          deliveryCity: 'City',
+          deliveryState: 'State',
+          productName: conv?.currentProductName ?? 'Current Product',
+          packageDealName: conv?.currentPackageName,
+          quantity: 1,
+          basePrice: conv?.currentTotalAmount ?? 0.0,
+          upsellAmount: 0.0,
+          totalAmount: conv?.currentTotalAmount ?? 0.0,
+          paymentType: 'pay_on_delivery',
+          paymentStatus: 'pending',
+          status: 'booked',
+          clientName: conv?.clientName ?? '',
+          clientCompany: conv?.clientName ?? '',
+          createdAt: DateTime.now(),
+          closerId: conv?.closerId,
+          closerName: conv?.closerName,
+        );
+
+    final supervisorClosers = ref.read(salesSupervisorProvider).closers;
+    final clientClosers = ref.read(clientPortalProvider).closers;
+    final allClosers = supervisorClosers.isNotEmpty ? supervisorClosers : clientClosers;
+    final authUser = ref.read(authProvider).user;
+
+    SupervisorReassignOrderModal.show(
+      context,
+      order: currentOrder,
+      availableClosers: allClosers,
+      supervisorName: authUser?.fullName ?? 'Supervisor',
+    );
+  }
+
   void _scrollToBottom({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      final target = _scrollController.position.maxScrollExtent;
       if (animate) {
         _scrollController.animateTo(
-          target,
-          duration: const Duration(milliseconds: 250),
+          0.0,
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
         );
       } else {
-        _scrollController.jumpTo(target);
+        _scrollController.jumpTo(0.0);
       }
     });
   }
@@ -566,6 +645,14 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           }
         : null;
 
+    final Map<String, dynamic> combinedMeta = {
+      if (replyMeta != null) ...replyMeta,
+      if (_isInternalNoteMode) ...{
+        'is_internal_note': true,
+        'type': 'internal_note',
+      },
+    };
+
     if (_stagedAttachment != null) {
       final attachment = _stagedAttachment!;
       final caption = _msgController.text.trim();
@@ -574,6 +661,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         _stagedAttachment = null;
         _replyingToMessage = null;
         _showMentionSuggestions = false;
+        _showCannedReplies = false;
       });
 
       final ok = await ref.read(pipelineChatProvider.notifier).sendFileAttachment(
@@ -582,10 +670,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             mimeType: attachment.mimeType,
             caption: caption.isNotEmpty ? caption : null,
             isImage: attachment.isImage,
-            metadata: replyMeta,
+            metadata: combinedMeta.isNotEmpty ? combinedMeta : null,
           );
       if (ok) {
-        Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+        _scrollToBottom(animate: false);
       }
       return;
     }
@@ -596,11 +684,15 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     _msgController.clear();
     setState(() {
       _showMentionSuggestions = false;
+      _showCannedReplies = false;
       _replyingToMessage = null;
     });
-    final ok = await ref.read(pipelineChatProvider.notifier).sendTextMessage(text, metadata: replyMeta);
+    final ok = await ref.read(pipelineChatProvider.notifier).sendTextMessage(
+          text,
+          metadata: combinedMeta.isNotEmpty ? combinedMeta : null,
+        );
     if (ok) {
-      Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+      _scrollToBottom(animate: false);
     }
   }
 
@@ -698,10 +790,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
       final avatarUrl = matchedProfile?['avatarUrl'] as String?;
 
       // Calculate initials (e.g. "Oladele Omowaye" -> "OO")
-      final nameParts = displayName.trim().split(RegExp(r'\s+'));
+      final nameParts = displayName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
       final initials = nameParts.length >= 2
-          ? '\${nameParts[0][0]}\${nameParts[1][0]}'.toUpperCase()
-          : (nameParts.isNotEmpty && nameParts[0].isNotEmpty ? nameParts[0][0].toUpperCase() : '@');
+          ? '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase()
+          : (nameParts.isNotEmpty ? nameParts[0][0].toUpperCase() : '@');
 
       // WhatsApp deep green colors
       final deepGreen = isDark ? const Color(0xFF25D366) : const Color(0xFF008069);
@@ -803,7 +895,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         ? chatState.messages
         : chatState.getMessagesForOrder(widget.orderId);
 
-    // Auto-scroll to bottom immediately whenever new incoming or outgoing messages are dropped
+    // In reverse: true ListView, offset 0 is naturally the latest message at the bottom
     if (orderMessages.isNotEmpty) {
       final lastId = orderMessages.last.id;
       if (orderMessages.length != _prevMessageCount || lastId != _prevLastMessageId) {
@@ -811,9 +903,13 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         _prevMessageCount = orderMessages.length;
         _prevLastMessageId = lastId;
 
-        _scrollToBottom(animate: !isFirst);
+        if (!isFirst && _scrollController.hasClients && _scrollController.offset < 100) {
+          _scrollToBottom(animate: true);
+        }
       }
     }
+
+    final reversedMessages = orderMessages.reversed.toList();
 
     return Container(
       width: double.infinity,
@@ -824,49 +920,106 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           // WhatsApp Header / App Bar
           _buildHeader(context, conv, isDark),
 
-          // Pinned Order Info & Active Participants Bar (WhatsApp Group Context)
+          // Pinned Order Info & Role-Contextual Quick Actions Bar
           if (conv != null) _buildOrderInfoBanner(context, conv, isDark),
-          if (conv != null) _buildParticipantsBar(context, conv, isDark),
+          _buildContextualLogisticsChips(context, isDark, conv),
 
             // Chat Messages Body with WhatsApp Doodle Wallpaper
             Expanded(
-              child: CustomPaint(
-                painter: WhatsAppWallpaperPainter(isDark: isDark),
-                child: (orderMessages.isEmpty && chatState.isLoading)
-                    ? _buildSkeletalChatMessages(isDark)
-                    : chatState.errorMessage != null && conv == null && orderMessages.isEmpty
-                        ? _buildAccessRestrictedState(chatState.errorMessage!, isDark)
-                        : orderMessages.isEmpty
-                            ? _buildEmptyState(isDark)
-                            : ListView.builder(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                itemCount: orderMessages.length,
-                                itemBuilder: (context, index) {
-                                  final msg = orderMessages[index];
-                                  final bool showDateSeparator = (index == 0) ||
-                                      (msg.createdAt.year != orderMessages[index - 1].createdAt.year ||
-                                          msg.createdAt.month != orderMessages[index - 1].createdAt.month ||
-                                          msg.createdAt.day != orderMessages[index - 1].createdAt.day);
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: WhatsAppWallpaperPainter(isDark: isDark),
+                      child: (orderMessages.isEmpty && chatState.isLoading)
+                          ? _buildSkeletalChatMessages(isDark)
+                          : chatState.errorMessage != null && conv == null && orderMessages.isEmpty
+                              ? _buildAccessRestrictedState(chatState.errorMessage!, isDark)
+                              : orderMessages.isEmpty
+                                  ? _buildEmptyState(isDark)
+                                  : ListView.builder(
+                                      controller: _scrollController,
+                                      reverse: true,
+                                      cacheExtent: 1200.0,
+                                      addAutomaticKeepAlives: true,
+                                      addRepaintBoundaries: true,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      itemCount: reversedMessages.length,
+                                      itemBuilder: (context, index) {
+                                        final msg = reversedMessages[index];
+                                        final bool showDateSeparator = (index == reversedMessages.length - 1) ||
+                                            (msg.createdAt.year != reversedMessages[index + 1].createdAt.year ||
+                                                msg.createdAt.month != reversedMessages[index + 1].createdAt.month ||
+                                                msg.createdAt.day != reversedMessages[index + 1].createdAt.day);
 
-                                  final messageWidget = _buildMessageItem(msg, isDark, conv);
+                                        final messageWidget = _buildMessageItem(msg, isDark, conv);
 
-                                  if (showDateSeparator) {
-                                    return Column(
-                                      key: _getKeyForMessage(msg.id),
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        _buildDateSeparator(msg.createdAt, isDark),
-                                        messageWidget,
-                                      ],
-                                    );
-                                  }
-                                  return KeyedSubtree(
-                                    key: _getKeyForMessage(msg.id),
-                                    child: messageWidget,
-                                  );
-                                },
+                                        if (showDateSeparator) {
+                                          return RepaintBoundary(
+                                            key: _getKeyForMessage(msg.id),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                _buildDateSeparator(msg.createdAt, isDark),
+                                                messageWidget,
+                                              ],
+                                            ),
+                                          );
+                                        }
+                                        return RepaintBoundary(
+                                          key: _getKeyForMessage(msg.id),
+                                          child: messageWidget,
+                                        );
+                                      },
+                                    ),
+                    ),
+                  ),
+
+                  // Floating WhatsApp Jump to Bottom Button
+                  if (_showJumpToBottom)
+                    Positioned(
+                      right: 14,
+                      bottom: 14,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            _scrollController.animateTo(
+                              0.0,
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeOutCubic,
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF202C33) : Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.15),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF2A3942) : const Color(0xFFE2E8F0),
+                                width: 0.8,
                               ),
+                            ),
+                            child: Icon(
+                              Icons.keyboard_double_arrow_down_rounded,
+                              color: isDark ? const Color(0xFF00A884) : const Color(0xFF008069),
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
 
@@ -1025,11 +1178,30 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         ? conv.customerName.trim()
         : widget.customerName.trim();
     final receiverPhone = widget.customerPhone ?? conv?.customerPhone;
+    final courierName = conv?.deliveryAgentName;
+    final courierPhone = () {
+      if (conv?.deliveryAgentId != null && conv!.deliveryAgentId!.isNotEmpty) {
+        final drivers = ref.watch(dcConsoleProvider).drivers;
+        final d = drivers.where((dr) => dr.id == conv.deliveryAgentId).firstOrNull;
+        if (d != null && d.phone.trim().isNotEmpty) return d.phone.trim();
+      }
+      final orders = ref.watch(ordersProvider).orders;
+      final o = orders.where((ord) => ord.id == widget.orderId || ord.orderNumber == widget.orderNumber).firstOrNull;
+      if (o?.deliveryAgentPhone != null && o!.deliveryAgentPhone!.trim().isNotEmpty) {
+        return o.deliveryAgentPhone!.trim();
+      }
+      return null;
+    }();
 
     // Classic WhatsApp App Bar Colors: Deep Teal-Green in Light, Dark Teal-Slate in Dark
     final headerBg = isDark ? const Color(0xFF1F2C34) : const Color(0xFF008069);
     final presence = ref.watch(pipelineChatProvider).activePresence;
     final isPresenceActive = presence != null && presence.isActive;
+    final authUser = ref.watch(authProvider).user;
+    final isSupervisor = authUser?.isCloserSupervisor == true ||
+        authUser?.isSupervisor == true ||
+        (authUser?.role ?? '').toLowerCase().contains('supervisor') ||
+        (authUser?.role ?? '').toLowerCase().contains('admin');
 
     return Container(
       color: headerBg,
@@ -1096,69 +1268,97 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                       ),
                     ),
                     const SizedBox(height: 1.5),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.orderNumber,
-                          style: GoogleFonts.inter(
-                            fontSize: 11.5,
-                            color: Colors.white.withOpacity(0.9),
-                            fontWeight: FontWeight.w500,
+                    if (isPresenceActive)
+                      Row(
+                        children: [
+                          Icon(
+                            presence.isRecording ? Icons.mic_rounded : Icons.edit_note_rounded,
+                            size: 13,
+                            color: presence.isRecording ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
                           ),
-                        ),
-                        if (isPresenceActive)
-                          Flexible(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(' • ', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                                Icon(
-                                  presence.isRecording ? Icons.mic_rounded : Icons.edit_note_rounded,
-                                  size: 13,
-                                  color: presence.isRecording ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
-                                ),
-                                const SizedBox(width: 3),
-                                Flexible(
-                                  child: Text(
-                                    presence.displayLabel,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11.5,
-                                      fontStyle: FontStyle.italic,
-                                      fontWeight: FontWeight.w600,
-                                      color: presence.isRecording ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          Flexible(
+                          const SizedBox(width: 3),
+                          Expanded(
                             child: Text(
-                              ' • ${_getWhatsAppSubtitle(conv)}',
+                              '${widget.orderNumber} • ${presence.displayLabel}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
                                 fontSize: 11.5,
-                                color: Colors.white.withOpacity(0.85),
+                                fontStyle: FontStyle.italic,
+                                fontWeight: FontWeight.w600,
+                                color: presence.isRecording ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
                               ),
                             ),
                           ),
-                      ],
-                    ),
+                        ],
+                      )
+                    else
+                      Text(
+                        '${widget.orderNumber} • ${_getWhatsAppSubtitle(conv)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          color: Colors.white.withOpacity(0.9),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
 
-            // Direct Call Action
+            // Supervisor Reassign Order Button
+            if (isSupervisor)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Tooltip(
+                  message: 'Reassign Closer',
+                  child: InkWell(
+                    onTap: () => _openReassignModal(context, conv),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.swap_horiz_rounded, size: 14, color: Colors.white),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Reassign',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Direct Call Courier Action (For DC Staff, Stock Keeper, Dispatcher)
+            if (courierPhone != null && courierPhone.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 21),
+                tooltip: 'Call Courier: ${courierName ?? "Rider"} ($courierPhone)',
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                onPressed: () => _callNumber(context, courierPhone),
+              ),
+
+            // Direct Call Customer Action
             if (receiverPhone != null && receiverPhone.trim().isNotEmpty)
               IconButton(
                 icon: const Icon(Icons.call_rounded, color: Colors.white, size: 20),
-                tooltip: 'Call $receiverName',
+                tooltip: 'Call Customer: $receiverName',
                 padding: const EdgeInsets.all(6),
                 constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                 onPressed: () => _callNumber(context, receiverPhone),
@@ -1224,6 +1424,13 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final currency = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
     final authUser = ref.watch(authProvider).user;
     final isCloser = authUser?.isCloser == true;
+    final isSupervisor = authUser?.isCloserSupervisor == true || (authUser?.role ?? '').toLowerCase().contains('supervisor');
+
+    // Check if there is an active pending UPG request for this order
+    final supervisorState = ref.watch(salesSupervisorProvider);
+    final pendingUpg = supervisorState.upgRequests
+        .where((r) => (r.orderId == widget.orderId || r.orderNumber == widget.orderNumber) && r.isPending)
+        .firstOrNull;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -1269,8 +1476,113 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             ),
           ),
 
+          // Supervisor Action Buttons: Reassign & Pending UPG Authorize
+          if (isSupervisor) ...[
+            const SizedBox(width: 8),
+            if (pendingUpg != null) ...[
+              InkWell(
+                onTap: () {
+                  final orders = ref.read(ordersProvider).orders;
+                  final currentOrder = orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderNumber).firstOrNull ??
+                      OrderEntity(
+                        id: widget.orderId,
+                        orderNumber: widget.orderNumber,
+                        customerName: conv.customerName,
+                        customerPhone: conv.customerPhone ?? '',
+                        deliveryAddress: 'Customer Delivery Address',
+                        deliveryCity: 'City',
+                        deliveryState: 'State',
+                        productName: conv.currentProductName ?? 'Current Product',
+                        packageDealName: conv.currentPackageName,
+                        quantity: 1,
+                        basePrice: conv.currentTotalAmount,
+                        upsellAmount: 0.0,
+                        totalAmount: conv.currentTotalAmount,
+                        paymentType: 'pay_on_delivery',
+                        paymentStatus: 'pending',
+                        status: 'booked',
+                        clientName: conv.clientName,
+                        clientCompany: conv.clientName,
+                        createdAt: DateTime.now(),
+                        closerId: conv.closerId,
+                        closerName: conv.closerName,
+                      );
+
+                  RequestUpgModal.show(
+                    context,
+                    order: currentOrder,
+                    closerId: pendingUpg.closerId,
+                    closerName: pendingUpg.closerName,
+                    closerCode: authUser?.closerCode ?? 'CLS',
+                    isSupervisor: true,
+                  );
+                },
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF37021),
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF37021).withValues(alpha: 0.35),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.bolt_rounded, size: 13, color: Colors.white),
+                      const SizedBox(width: 3),
+                      Text(
+                        'UPG PENDING',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+
+            // Reassign Closer Button
+            InkWell(
+              onTap: () => _openReassignModal(context, conv),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.swap_horiz_rounded, size: 14, color: Color(0xFF8B5CF6)),
+                    const SizedBox(width: 3),
+                    Text(
+                      'Reassign',
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF8B5CF6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
           // UPG Request Button - strictly for Closers ONLY
-          if (isCloser) ...[
+          if (isCloser && !isSupervisor) ...[
             const SizedBox(width: 10),
             InkWell(
               onTap: () {
@@ -1348,158 +1660,6 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     );
   }
 
-  Widget _buildParticipantsBar(BuildContext context, OrderConversationEntity conv, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF182229) : const Color(0xFFF7F8FA),
-        border: Border(
-          bottom: BorderSide(
-            color: isDark ? const Color(0xFF222E35) : const Color(0xFFE9EDEF),
-            width: 1,
-          ),
-        ),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.hub_rounded, size: 12, color: Color(0xFF6366F1)),
-                const SizedBox(width: 4),
-                Text(
-                  'ACTIVE PIPELINE:',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 8),
-
-            // 1. DC Operations Chip (Always Connected)
-            _buildParticipantChip(
-              icon: Icons.corporate_fare_rounded,
-              label: 'DC Operations',
-              color: const Color(0xFF6366F1),
-              isDark: isDark,
-              hasBeacon: true,
-              onTap: () => _appendMentionTag('@Operations'),
-              tooltip: 'DC Operations Hub is actively in this room. Tap to tag @Operations',
-            ),
-            const SizedBox(width: 6),
-
-            // 2. Rider Chip
-            if (conv.deliveryAgentName != null && conv.deliveryAgentName!.trim().isNotEmpty) ...[
-              _buildParticipantChip(
-                icon: Icons.two_wheeler_rounded,
-                label: 'Rider: ${conv.deliveryAgentName!.trim()}',
-                color: const Color(0xFFF59E0B),
-                isDark: isDark,
-                onTap: () => _appendMentionTag('@${conv.deliveryAgentName!.trim()}'),
-                tooltip: 'Tap to tag rider @${conv.deliveryAgentName!.trim()}',
-              ),
-              const SizedBox(width: 6),
-            ] else ...[
-              _buildParticipantChip(
-                icon: Icons.two_wheeler_rounded,
-                label: 'Field Courier',
-                color: const Color(0xFFF59E0B),
-                isDark: isDark,
-                onTap: () => _appendMentionTag('@Rider'),
-                tooltip: 'Tap to tag @Rider',
-              ),
-              const SizedBox(width: 6),
-            ],
-
-            // 3. Closer Chip
-            if (conv.closerName != null && conv.closerName!.trim().isNotEmpty) ...[
-              _buildParticipantChip(
-                icon: Icons.headset_mic_rounded,
-                label: 'Closer: ${conv.closerName!.trim()}',
-                color: const Color(0xFF8B5CF6),
-                isDark: isDark,
-                onTap: () => _appendMentionTag('@${conv.closerName!.trim()}'),
-                tooltip: 'Tap to tag closer @${conv.closerName!.trim()}',
-              ),
-              const SizedBox(width: 6),
-            ],
-
-            // 4. Merchant Brand Chip
-            _buildParticipantChip(
-              icon: Icons.storefront_rounded,
-              label: 'Merchant: ${conv.clientName.trim()}',
-              color: const Color(0xFF0D9488),
-              isDark: isDark,
-              onTap: () => _appendMentionTag('@Client'),
-              tooltip: 'Tap to tag @Client (${conv.clientName.trim()})',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildParticipantChip({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required bool isDark,
-    bool hasBeacon = false,
-    required VoidCallback onTap,
-    required String tooltip,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: isDark ? 0.16 : 0.09),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: color.withValues(alpha: isDark ? 0.35 : 0.25),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (hasBeacon) ...[
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF10B981),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 5),
-              ],
-              Icon(icon, size: 12, color: color),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildMessageItem(OrderConversationMessageEntity msg, bool isDark, OrderConversationEntity? conv) {
     if (msg.isSystem || msg.isStatusEvent) {
       return _buildSystemMilestone(msg, isDark, conv);
@@ -1539,13 +1699,15 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final isHighlighted = _highlightedMessageId == msg.id;
 
     if (isMyMessage) {
-      // Outgoing WhatsApp Bubble (Green #D9FDD3 in light, #005C4B in dark)
-      final bubbleBg = isHighlighted
-          ? (isDark ? const Color(0xFF007A65) : const Color(0xFFA7EBB0))
-          : (isDark ? const Color(0xFF005C4B) : const Color(0xFFD9FDD3));
+      // Outgoing WhatsApp Bubble (Green #D9FDD3 in light, #005C4B in dark, or Amber for internal note)
+      final bubbleBg = msg.isInternalNote
+          ? (isDark ? const Color(0xFF382302) : const Color(0xFFFEF3C7))
+          : (isHighlighted
+              ? (isDark ? const Color(0xFF007A65) : const Color(0xFFA7EBB0))
+              : (isDark ? const Color(0xFF005C4B) : const Color(0xFFD9FDD3)));
 
       return Dismissible(
-        key: ValueKey('swipe_reply_\${msg.id}'),
+        key: ValueKey('swipe_reply_${msg.id}'),
         direction: DismissDirection.startToEnd,
         dismissThresholds: const {
           DismissDirection.startToEnd: 0.16,
@@ -1612,6 +1774,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                             bottomLeft: Radius.circular(12),
                             bottomRight: Radius.circular(2),
                           ),
+                          border: msg.isInternalNote
+                              ? Border.all(color: const Color(0xFFF59E0B), width: 1.2)
+                              : null,
                           boxShadow: isHighlighted
                               ? [
                                   BoxShadow(
@@ -1632,6 +1797,30 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                           crossAxisAlignment: CrossAxisAlignment.end,
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (msg.isInternalNote)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                margin: const EdgeInsets.only(bottom: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD97706).withOpacity(0.18),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.lock_rounded, size: 10, color: Color(0xFFD97706)),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'INTERNAL STAFF NOTE',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFFD97706),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             if (msg.metadata['reply_to_sender'] != null)
                               _buildQuotedReplyBox(msg, isDark, true),
                             _buildMessageContent(
@@ -1705,10 +1894,12 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     );
   }
 
-    // Incoming WhatsApp Bubble (White in light, #202C33 in dark)
-    final bubbleBg = isHighlighted
-        ? (isDark ? const Color(0xFF2A3942) : const Color(0xFFE2F7E4))
-        : (isDark ? const Color(0xFF202C33) : Colors.white);
+    // Incoming WhatsApp Bubble (White in light, #202C33 in dark, or Amber for internal note)
+    final bubbleBg = msg.isInternalNote
+        ? (isDark ? const Color(0xFF382302) : const Color(0xFFFEF3C7))
+        : (isHighlighted
+            ? (isDark ? const Color(0xFF2A3942) : const Color(0xFFE2F7E4))
+            : (isDark ? const Color(0xFF202C33) : Colors.white));
 
     return Dismissible(
       key: ValueKey('swipe_reply_${msg.id}'),
@@ -1799,6 +1990,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                         bottomLeft: Radius.circular(12),
                         bottomRight: Radius.circular(12),
                       ),
+                      border: msg.isInternalNote
+                          ? Border.all(color: const Color(0xFFF59E0B), width: 1.2)
+                          : null,
                       boxShadow: isHighlighted
                           ? [
                               BoxShadow(
@@ -1819,6 +2013,30 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (msg.isInternalNote)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            margin: const EdgeInsets.only(bottom: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD97706).withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.lock_rounded, size: 10, color: Color(0xFFD97706)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'INTERNAL STAFF NOTE',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFFD97706),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         // WhatsApp Group Sender Title
                         InkWell(
                           onTap: () {
@@ -2936,6 +3154,512 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
+  Widget _buildCannedRepliesOverlay(BuildContext context, bool isDark) {
+    final cannedList = [
+      {
+        'command': '/eta',
+        'title': 'Delivery ETA Query',
+        'text': 'Hello, please provide an estimated time of arrival (ETA) for order delivery.',
+        'icon': Icons.schedule_rounded,
+        'color': const Color(0xFF3B82F6),
+      },
+      {
+        'command': '/reschedule',
+        'title': 'Reschedule Request',
+        'text': 'Customer requested rescheduling of order delivery. Awaiting preferred delivery date and time window.',
+        'icon': Icons.event_repeat_rounded,
+        'color': const Color(0xFFF97316),
+      },
+      {
+        'command': '/bank',
+        'title': 'Remittance / Account Info',
+        'text': 'Please remit order collection via the approved company bank transfer channels.',
+        'icon': Icons.account_balance_rounded,
+        'color': const Color(0xFF10B981),
+      },
+      {
+        'command': '/unreachable',
+        'title': 'Customer Unreachable',
+        'text': 'Customer phone line is currently unreachable / switched off. Multiple call attempts made.',
+        'icon': Icons.phone_missed_rounded,
+        'color': const Color(0xFFEF4444),
+      },
+      {
+        'command': '/upg',
+        'title': 'Package Upgrade (UPG)',
+        'text': 'Customer confirmed package upgrade. UPG authorization requested.',
+        'icon': Icons.bolt_rounded,
+        'color': const Color(0xFF8B5CF6),
+      },
+      {
+        'command': '/directions',
+        'title': 'Landmark & Directions',
+        'text': 'Kindly confirm the closest prominent landmark or WhatsApp live GPS location pin to assist rider navigation.',
+        'icon': Icons.pin_drop_rounded,
+        'color': const Color(0xFF0D9488),
+      },
+      {
+        'command': '/delivered',
+        'title': 'Delivered & Paid',
+        'text': 'Order delivery successfully executed. Cash on delivery / POS payment received from customer.',
+        'icon': Icons.check_circle_rounded,
+        'color': const Color(0xFF16A34A),
+      },
+    ];
+
+    final filtered = _cannedQuery.isEmpty
+        ? cannedList
+        : cannedList.where((item) {
+            final cmd = (item['command'] as String).toLowerCase();
+            final title = (item['title'] as String).toLowerCase();
+            return cmd.contains(_cannedQuery) || title.contains(_cannedQuery);
+          }).toList();
+
+    if (filtered.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      constraints: const BoxConstraints(maxHeight: 180),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF202C33) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.14),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        itemCount: filtered.length,
+        separatorBuilder: (_, __) => Divider(
+          height: 1,
+          color: isDark ? const Color(0xFF2A3942) : const Color(0xFFF1F5F9),
+        ),
+        itemBuilder: (context, index) {
+          final item = filtered[index];
+          return InkWell(
+            onTap: () {
+              final replacementText = item['text'] as String;
+              _msgController.value = TextEditingValue(
+                text: replacementText,
+                selection: TextSelection.collapsed(offset: replacementText.length),
+              );
+              setState(() {
+                _showCannedReplies = false;
+                _cannedQuery = '';
+              });
+              _msgFocusNode.requestFocus();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: (item['color'] as Color).withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(item['icon'] as IconData, size: 16, color: item['color'] as Color),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              item['command'] as String,
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF00A884),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              item['title'] as String,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : const Color(0xFF111B21),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          item['text'] as String,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _triggerMentionComposer() {
+    final cur = _msgController.text;
+    final String nextText;
+    if (cur.isEmpty) {
+      nextText = '@';
+    } else if (cur.endsWith('@')) {
+      nextText = cur;
+    } else if (cur.endsWith(' ')) {
+      nextText = '$cur@';
+    } else {
+      nextText = '$cur @';
+    }
+    _msgController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextText.length),
+    );
+    _msgFocusNode.requestFocus();
+  }
+
+  Widget _buildContextualLogisticsChips(
+    BuildContext context,
+    bool isDark,
+    OrderConversationEntity? conv,
+  ) {
+    final authUser = ref.watch(authProvider).user;
+    final orders = ref.watch(ordersProvider).orders;
+    final currentOrder = orders
+        .where((o) => o.id == widget.orderId || o.orderNumber == widget.orderNumber)
+        .firstOrNull;
+
+    final courierPhone = () {
+      if (conv?.deliveryAgentId != null && conv!.deliveryAgentId!.isNotEmpty) {
+        final drivers = ref.watch(dcConsoleProvider).drivers;
+        final d = drivers.where((dr) => dr.id == conv.deliveryAgentId).firstOrNull;
+        if (d != null && d.phone.trim().isNotEmpty) return d.phone.trim();
+      }
+      if (currentOrder?.deliveryAgentPhone != null &&
+          currentOrder!.deliveryAgentPhone!.trim().isNotEmpty) {
+        return currentOrder.deliveryAgentPhone!.trim();
+      }
+      return null;
+    }();
+    final customerPhone = widget.customerPhone ?? conv?.customerPhone ?? currentOrder?.customerPhone;
+
+    Widget buildStaffNoteChip() => _buildChip(
+          icon: _isInternalNoteMode ? Icons.lock_rounded : Icons.lock_open_rounded,
+          label: _isInternalNoteMode ? 'Note Active' : 'Staff Note',
+          isActive: _isInternalNoteMode,
+          activeColor: const Color(0xFFD97706),
+          isDark: isDark,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            setState(() {
+              _isInternalNoteMode = !_isInternalNoteMode;
+            });
+          },
+        );
+
+    Widget buildCallRiderChip() => _buildChip(
+          icon: Icons.two_wheeler_rounded,
+          label: 'Call Rider',
+          isDark: isDark,
+          onTap: () {
+            if (courierPhone != null && courierPhone.isNotEmpty) {
+              _callNumber(context, courierPhone);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('No rider phone number assigned to this order yet.'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+        );
+
+    Widget buildCallCustomerChip() => _buildChip(
+          icon: Icons.call_rounded,
+          label: 'Call Customer',
+          isDark: isDark,
+          onTap: () {
+            if (customerPhone != null && customerPhone.trim().isNotEmpty) {
+              _callNumber(context, customerPhone.trim());
+            }
+          },
+        );
+
+    Widget buildStockCheckChip() => _buildChip(
+          icon: Icons.inventory_2_outlined,
+          label: 'Stock Check',
+          isDark: isDark,
+          onTap: () {
+            final prodName = conv?.currentProductName ?? currentOrder?.productName ?? 'product';
+            final prompt =
+                '@Rider @Operations Please confirm physical stock count & custody for Order #${widget.orderNumber} ($prodName).';
+            _msgController.value = TextEditingValue(
+              text: prompt,
+              selection: TextSelection.collapsed(offset: prompt.length),
+            );
+            _msgFocusNode.requestFocus();
+          },
+        );
+
+    Widget buildRescheduleChip() => _buildChip(
+          icon: Icons.event_repeat_rounded,
+          label: 'Reschedule',
+          isDark: isDark,
+          onTap: () {
+            if (currentOrder != null) {
+              RescheduleCallbackModal.show(
+                context: context,
+                orderId: currentOrder.id,
+                customerName: currentOrder.customerName,
+                onRescheduleConfirmed: (dt, note) async {
+                  final updated = currentOrder.copyWith(
+                    status: 'rescheduled',
+                    rescheduledDeliveryDate: dt,
+                    deliveryNotes: '${currentOrder.deliveryNotes ?? ""}\n[RESCHEDULED] $note',
+                  );
+                  await ref.read(ordersProvider.notifier).updateOrder(updated);
+                  await ref.read(pipelineChatProvider.notifier).sendTextMessage(
+                        '📅 Delivery rescheduled to ${dt.toLocal().toString().substring(0, 16)}. Reason: $note',
+                      );
+                },
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Order details are still syncing. Please retry shortly.'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+        );
+
+    Widget buildLocationChip({bool isRiderNavigate = false}) => _buildChip(
+          icon: isRiderNavigate ? Icons.navigation_rounded : Icons.pin_drop_rounded,
+          label: isRiderNavigate ? 'GPS Directions' : 'Location / Address',
+          isDark: isDark,
+          onTap: () async {
+            if (currentOrder == null) return;
+            if (isRiderNavigate) {
+              final uri = currentOrder.googleMapsWebDirectionsUri;
+              try {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (_) {}
+            } else {
+              ClientEditOrderModal.show(context, currentOrder);
+            }
+          },
+        );
+
+    Widget buildUnreachableChip() => _buildChip(
+          icon: Icons.phone_missed_rounded,
+          label: 'Unreachable',
+          isDark: isDark,
+          onTap: () async {
+            await ref.read(ordersProvider.notifier).updateOrderStatus(
+                  widget.orderId,
+                  'not_picking',
+                  notes: 'Marked unreachable via Order Pipeline Chat desk.',
+                );
+            await ref.read(pipelineChatProvider.notifier).sendTextMessage(
+                  '📞 Customer phone line is currently unreachable / switched off after multiple attempts.',
+                );
+          },
+        );
+
+    Widget buildMentionChip() => _buildChip(
+          icon: Icons.alternate_email_rounded,
+          label: 'Mention (@)',
+          isDark: isDark,
+          onTap: _triggerMentionComposer,
+        );
+
+    Widget buildQuickRepliesChip() => _buildChip(
+          icon: Icons.bolt_rounded,
+          label: 'Quick Replies (/)',
+          isActive: _showCannedReplies,
+          isDark: isDark,
+          onTap: () {
+            setState(() {
+              _showCannedReplies = !_showCannedReplies;
+              _cannedQuery = '';
+            });
+          },
+        );
+
+    Widget buildMarkDeliveredChip() => _buildChip(
+          icon: Icons.check_circle_outline_rounded,
+          label: 'Mark Delivered',
+          isActive: true,
+          activeColor: const Color(0xFF10B981),
+          isDark: isDark,
+          onTap: () async {
+            if (currentOrder == null) return;
+            final delivered = await MarkOrderDeliveredModal.show(context, currentOrder);
+            if (delivered == true && mounted) {
+              try {
+                await ref
+                    .read(pipelineChatProvider.notifier)
+                    .openOrderConversation(currentOrder.id);
+              } catch (_) {}
+            }
+          },
+        );
+
+    final List<Widget> actionChips;
+    if (authUser?.isDcStockAdmin == true) {
+      // Stock Keeper context: read chat, coordinate DC stock & call rider (NO delivery status mutations)
+      actionChips = [
+        buildStaffNoteChip(),
+        buildCallRiderChip(),
+        buildStockCheckChip(),
+        buildMentionChip(),
+        buildQuickRepliesChip(),
+      ];
+    } else if (authUser?.isRider == true) {
+      // Rider context: navigation, customer call, delivery coordination
+      actionChips = [
+        if (currentOrder != null) buildLocationChip(isRiderNavigate: true),
+        if (customerPhone != null && customerPhone.trim().isNotEmpty) buildCallCustomerChip(),
+        if (currentOrder != null) buildRescheduleChip(),
+        buildUnreachableChip(),
+        buildStaffNoteChip(),
+        buildMentionChip(),
+        buildQuickRepliesChip(),
+      ];
+    } else if (authUser?.isCloser == true) {
+      // Closer / Sales Supervisor context
+      actionChips = [
+        buildStaffNoteChip(),
+        buildRescheduleChip(),
+        buildLocationChip(),
+        buildUnreachableChip(),
+        if (courierPhone != null && courierPhone.isNotEmpty) buildCallRiderChip(),
+        buildMentionChip(),
+        buildQuickRepliesChip(),
+      ];
+    } else if (authUser != null && (authUser.isClientAdmin || authUser.isMarketer)) {
+      // Merchant / Marketer context (external partner — no internal Staff Note toggle)
+      actionChips = [
+        buildRescheduleChip(),
+        buildLocationChip(),
+        buildMentionChip(),
+        buildQuickRepliesChip(),
+      ];
+    } else {
+      // DC Manager, Orders Admin, Finance, SuperAdmin, or fallback
+      final canDispatchDeliver = currentOrder != null &&
+          !currentOrder.isDelivered &&
+          !currentOrder.isCancelled &&
+          authUser != null &&
+          (authUser.isDcOrdersAdmin || authUser.isDcManager);
+
+      actionChips = [
+        if (canDispatchDeliver) buildMarkDeliveredChip(),
+        buildStaffNoteChip(),
+        if ((courierPhone != null && courierPhone.isNotEmpty) ||
+            authUser?.isDcManager == true ||
+            authUser?.isDcOperations == true)
+          buildCallRiderChip(),
+        buildRescheduleChip(),
+        buildLocationChip(),
+        buildUnreachableChip(),
+        buildMentionChip(),
+        buildQuickRepliesChip(),
+      ];
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF182229) : const Color(0xFFF7F8FA),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF222E35) : const Color(0xFFE9EDEF),
+            width: 1,
+          ),
+        ),
+      ),
+      child: SizedBox(
+        height: 32,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          itemCount: actionChips.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 6),
+          itemBuilder: (_, index) => actionChips[index],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChip({
+    required IconData icon,
+    required String label,
+    required bool isDark,
+    required VoidCallback onTap,
+    bool isActive = false,
+    Color? activeColor,
+  }) {
+    final effectiveColor = isActive
+        ? (activeColor ?? const Color(0xFF00A884))
+        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569));
+    final bgColor = isActive
+        ? (activeColor ?? const Color(0xFF00A884)).withOpacity(0.18)
+        : (isDark ? const Color(0xFF202C33) : Colors.white);
+    final borderColor = isActive
+        ? (activeColor ?? const Color(0xFF00A884)).withOpacity(0.6)
+        : (isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0));
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor, width: 0.8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: effectiveColor),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: effectiveColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInputFooter(
     BuildContext context,
     bool isDark,
@@ -3090,6 +3814,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
               ),
             ),
 
+          // Canned Responses Overlay if active
+          if (_showCannedReplies)
+            _buildCannedRepliesOverlay(context, isDark),
+
           // WhatsApp Live Voice Recording Mode
           if (_isRecordingVoice)
             _buildWhatsAppVoiceRecordingBar(isDark, isSending)
@@ -3221,8 +3949,12 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     bool hasText,
     bool hasAttachment,
   ) {
-    final pillBg = isDark ? const Color(0xFF202C33) : Colors.white;
-    final iconColor = isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F);
+    final pillBg = _isInternalNoteMode
+        ? (isDark ? const Color(0xFF2E1C03) : const Color(0xFFFFFBEB))
+        : (isDark ? const Color(0xFF202C33) : Colors.white);
+    final iconColor = _isInternalNoteMode
+        ? const Color(0xFFD97706)
+        : (isDark ? const Color(0xFF8696A0) : const Color(0xFF54656F));
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -3233,6 +3965,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             decoration: BoxDecoration(
               color: pillBg,
               borderRadius: BorderRadius.circular(24),
+              border: _isInternalNoteMode
+                  ? Border.all(color: const Color(0xFFF59E0B), width: 1.5)
+                  : null,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.08),
@@ -3282,7 +4017,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                         minLines: 1,
                         maxLines: 5,
                         textCapitalization: TextCapitalization.sentences,
-                        cursorColor: const Color(0xFF00A884),
+                        cursorColor: _isInternalNoteMode ? const Color(0xFFD97706) : const Color(0xFF00A884),
                         cursorWidth: 2,
                         cursorRadius: const Radius.circular(2),
                         style: GoogleFonts.inter(
@@ -3291,12 +4026,16 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                           color: isDark ? const Color(0xFFE9EDEF) : const Color(0xFF111B21),
                         ),
                         decoration: InputDecoration(
-                          hintText: _stagedAttachment != null
-                              ? 'Add a caption...'
-                              : 'Message',
+                          hintText: _isInternalNoteMode
+                              ? '🔒 Staff Note (Team Only)...'
+                              : (_stagedAttachment != null
+                                  ? 'Add a caption...'
+                                  : 'Message'),
                           hintStyle: GoogleFonts.inter(
                             fontSize: 14.5,
-                            color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                            color: _isInternalNoteMode
+                                ? const Color(0xFFD97706)
+                                : (isDark ? const Color(0xFF8696A0) : const Color(0xFF667781)),
                           ),
                           isDense: true,
                           filled: false,
@@ -3354,11 +4093,16 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           width: 46,
           height: 46,
           decoration: BoxDecoration(
-            color: const Color(0xFF00A884), // WhatsApp Emerald
+            color: _isInternalNoteMode
+                ? const Color(0xFFD97706)
+                : const Color(0xFF00A884), // Amber for note, WhatsApp Emerald for normal
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF00A884).withOpacity(0.35),
+                color: (_isInternalNoteMode
+                        ? const Color(0xFFD97706)
+                        : const Color(0xFF00A884))
+                    .withOpacity(0.35),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -3385,7 +4129,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                       )
                     : Icon(
                         (hasText || hasAttachment)
-                            ? Icons.send_rounded
+                            ? (_isInternalNoteMode ? Icons.lock_outline_rounded : Icons.send_rounded)
                             : Icons.mic_rounded,
                         color: Colors.white,
                         size: (hasText || hasAttachment) ? 20 : 23,
@@ -3659,6 +4403,19 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   void _showOrderQuickDetailsModal(BuildContext context, OrderConversationEntity conv, bool isDark) {
     final currency = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
+    final courierPhone = () {
+      if (conv.deliveryAgentId != null && conv.deliveryAgentId!.isNotEmpty) {
+        final drivers = ref.read(dcConsoleProvider).drivers;
+        final d = drivers.where((dr) => dr.id == conv.deliveryAgentId).firstOrNull;
+        if (d != null && d.phone.trim().isNotEmpty) return d.phone.trim();
+      }
+      final orders = ref.read(ordersProvider).orders;
+      final o = orders.where((ord) => ord.id == conv.orderId || ord.orderNumber == conv.orderNumber).firstOrNull;
+      if (o?.deliveryAgentPhone != null && o!.deliveryAgentPhone!.trim().isNotEmpty) {
+        return o.deliveryAgentPhone!.trim();
+      }
+      return null;
+    }();
 
     showModalBottomSheet(
       context: context,
@@ -3738,7 +4495,63 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 _buildQuickDetailRow('Status', conv.orderStatus.toUpperCase(), isDark),
                 _buildQuickDetailRow('Distribution Center', conv.distributionCenterName ?? 'Central Command DC', isDark),
                 if (conv.deliveryAgentName != null && conv.deliveryAgentName!.isNotEmpty)
-                  _buildQuickDetailRow('Assigned Courier', conv.deliveryAgentName!, isDark),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Assigned Courier',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            color: isDark ? const Color(0xFF8696A0) : const Color(0xFF667781),
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              conv.deliveryAgentName!,
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : const Color(0xFF111B21),
+                              ),
+                            ),
+                            if (courierPhone != null && courierPhone.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () => _callNumber(context, courierPhone),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF00A884).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.phone, size: 11, color: Color(0xFF00A884)),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        'Call',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF00A884),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 if (conv.closerName != null && conv.closerName!.isNotEmpty)
                   _buildQuickDetailRow('Telesales Closer', conv.closerName!, isDark),
                 _buildQuickDetailRow('Merchant Brand', conv.clientName, isDark),

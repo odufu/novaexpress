@@ -103,8 +103,21 @@ class UserModel extends UserEntity {
           (isSupervisorRole
               ? 'SUP-CLS-01'
               : (json['role'] == 'closer' ? 'CLS-001' : null)),
-      marketerId: json['marketer_id'] ?? (json['role'] == 'marketer' ? json['id'] : null),
-      marketerCode: json['marketer_code'] ?? (json['role'] == 'marketer' ? 'MKT-001' : null),
+      marketerId: json['marketer_id'] ??
+          ((json['role'] == 'marketer' ||
+                  json['role'] == 'digital_marketer' ||
+                  json['role'] == 'marketing_supervisor' ||
+                  json['role'] == 'supervisor_marketer')
+              ? json['id']
+              : null),
+      marketerCode: json['marketer_code'] ??
+          (json['role'] == 'marketing_supervisor' ||
+                  json['role'] == 'supervisor_marketer'
+              ? 'MKT-SUP-001'
+              : ((json['role'] == 'marketer' ||
+                      json['role'] == 'digital_marketer')
+                  ? 'MKT-001'
+                  : null)),
       accountantId: json['accountant_id'] ??
           (json['role'] == 'merchant_accountant' || json['role'] == 'client_accountant' ? json['id'] : null),
       accountantCode: json['accountant_code'] ??
@@ -162,6 +175,7 @@ class UserModel extends UserEntity {
       'accountant_id': accountantId,
       'accountant_code': accountantCode,
       'avatar_url': avatarUrl,
+      'is_supervisor': isSupervisor,
     };
   }
 }

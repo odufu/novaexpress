@@ -163,12 +163,15 @@ class LoginPage extends StatelessWidget {
                                     ),
                                   ),
                                   const SizedBox(width: 6),
-                                  Text(
-                                    'Multi-Tenant Unified Sign-In',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF006C4C),
+                                  Flexible(
+                                    child: Text(
+                                      'Multi-Tenant Unified Sign-In',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF006C4C),
+                                      ),
                                     ),
                                   ),
                                 ],

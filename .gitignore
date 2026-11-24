@@ -51,6 +51,8 @@ supabase/.temp/
 .env*
 supabase_environments.md
 *.secret
+scratch/
+/*.csv
 
 # Android APK and Bundle Builds
 *.apk

@@ -66,4 +66,9 @@ abstract class AuthRepository {
     double? customPlatformFee,
     double? customFailedAttemptFee,
   });
+  Future<bool> changePassword({
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  });
 }

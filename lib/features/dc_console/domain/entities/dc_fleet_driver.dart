@@ -23,7 +23,7 @@ class DCFleetDriver {
   final List<String> coveredLgas;
 
   // Onboarding & Unique Compensation Agreement
-  final String personnelType; // 'pda' (Personal Distribution Agent) | 'in_house_rider' (Company Rider)
+  final String personnelType; // 'pda' (Personal Distribution Agent) | 'in_house_rider' (Company Rider) | 'external_pda' (External 3PL / Offline Courier)
   final String compensationType; // 'commission' | 'salary' | 'hybrid'
   final double commissionRate; // e.g. ₦1,000.00 (PDA) or ₦500.00 (In-House)
   final double transportAllowance; // e.g. ₦1,500.00 (PDA transport) or ₦800.00 (Fuel allowance)
@@ -84,9 +84,46 @@ class DCFleetDriver {
       status.toLowerCase() != 'banned' &&
       status.toLowerCase() != 'unavailable';
   bool get isUnavailable => !isAvailable;
-  bool get isPda => personnelType.toLowerCase() == 'pda';
-  bool get isInHouseRider => personnelType.toLowerCase() == 'in_house_rider';
+  bool get isExternalPda =>
+      personnelType.toLowerCase() == 'external_pda' ||
+      driverCode.toUpperCase().startsWith('EXT-');
+  bool get isDistributor =>
+      personnelType.toLowerCase() == 'distributor' ||
+      driverCode.toUpperCase().startsWith('DIST-');
+  bool get isPda =>
+      personnelType.toLowerCase() == 'pda' && !isExternalPda && !isDistributor;
+  bool get isInHouseRider =>
+      personnelType.toLowerCase() == 'in_house_rider';
   double get totalPerDeliveryEntitlement => commissionRate + transportAllowance;
+
+  /// True if this entry represents a NovaXpress Platform 3PL courier agent or partner agency
+  /// (e.g. AG-001, AG-002, or the top-level NovaXpress Logistics corporate entity itself),
+  /// rather than an individual rider, courier, or distributor working under NovaXpress Logistics.
+  bool get isPlatformAgent {
+    final code = driverCode.toUpperCase().trim();
+    if (code.startsWith('AG-') || code.startsWith('3PL-')) return true;
+    final n = name.toLowerCase().trim();
+    if (n.contains('internal fleet') ||
+        n.contains('adicha') ||
+        n.contains('victor ogbenyi') ||
+        n.contains('terlanga japhet') ||
+        n.contains('adesanmi logistics') ||
+        n.contains('novacare ltd - nl') ||
+        (n.contains('logistics') &&
+            !n.contains('rider') &&
+            !n.contains('driver') &&
+            !n.contains('courier') &&
+            !n.contains('distributor'))) {
+      return true;
+    }
+    return false;
+  }
+
+  /// True if this driver represents an active delivery workforce member under NovaXpress Logistics:
+  /// - In-House fleet rider (pda / in_house_rider)
+  /// - External PDA (offline 3PL courier)
+  /// - Offline non-app distributor
+  bool get isNovaXpressLogisticsRider => !isPlatformAgent;
 
   bool coversLga(String rawLga) {
     if (coveredLgas.isEmpty) {

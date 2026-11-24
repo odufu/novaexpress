@@ -76,12 +76,19 @@ abstract class AuthRemoteDataSource {
   });
   Future<bool> checkEmailExists(String email);
   Future<bool> checkPhoneExists(String phone);
+  Future<bool> changePassword({
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  });
 }
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   UserModel? _currentUser;
 
-  MockAuthRemoteDataSource([this._currentUser]);
+  MockAuthRemoteDataSource([this._currentUser]) {
+    AuthRemoteDataSourceImpl.seedDefaultDevelopmentAccounts();
+  }
 
   @override
   Future<UserModel> login(String email, String password) async {
@@ -95,6 +102,94 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
             'Invalid email or password. Please check your credentials.');
       }
       _currentUser = AuthRemoteDataSourceImpl._registeredUsers[clean];
+      return _currentUser!;
+    }
+
+    if (clean == 'chairmannovagroup@gmail.com') {
+      if (password != 'Nova2027' && password != 'Password123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: '2e0c27a2-9715-46a2-8e9c-08f54c66f45c',
+        email: 'chairmannovagroup@gmail.com',
+        firstName: 'Chairman',
+        lastName: 'Nova Group',
+        phone: '+234 800 000 0001',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-00',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Abuja Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      );
+      return _currentUser!;
+    }
+
+    if (clean == 'psolomonetuk95@gmail.com') {
+      if (password != '1FeJirO#' && password != 'Password123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: 'e9999999-9999-4999-8999-999999999999',
+        email: 'psolomonetuk95@gmail.com',
+        firstName: 'Precious',
+        lastName: 'Etuk',
+        phone: '07072756353',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-02',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Abuja Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      );
+      return _currentUser!;
+    }
+
+    if (clean == 'popoolabalikis37@gmail.com') {
+      if (password != '302382' && password != 'Password123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: '9178e457-75c4-433a-8833-3b0dce0b323a',
+        email: 'popoolabalikis37@gmail.com',
+        firstName: 'Balikis',
+        lastName: 'Popoola',
+        phone: '08000000000',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-03',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Abuja Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      );
+      return _currentUser!;
+    }
+
+    if (clean == 'damieajani@gmail.com') {
+      if (password != 'Password123!' && password != 'damieajani@gmail.com') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: '3be27458-e54e-4a99-83c8-73f0d0147e47',
+        email: 'damieajani@gmail.com',
+        firstName: 'Damilare',
+        lastName: 'Ajani',
+        phone: '07042266323',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-04',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Abuja Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      );
       return _currentUser!;
     }
 
@@ -318,6 +413,27 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       return _currentUser!;
     }
 
+    if (clean == 'aniwillisami22@gmail.com') {
+      if (password != 'password@123' && password != 'Password123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: '0af1a19a-0ecf-4690-ad07-a8ec2bea536e',
+        email: 'aniwillisami22@gmail.com',
+        firstName: 'Ani',
+        lastName: 'Willis Ami',
+        phone: '+234 809 876 5432',
+        role: 'dc_stock_admin',
+        deliveryAgentCode: 'STK-ABJ-02',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      );
+      return _currentUser!;
+    }
+
     if (clean == 'accountant@novaxpress.ng' || clean == 'finance.director@novaxpress.ng') {
       if (password != 'Password123!') {
         throw AppAuthException(
@@ -382,6 +498,29 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       return _currentUser!;
     }
 
+    if (clean == 'inventory@novacare.com' ||
+        clean == 'amaka.inventory@novacare.com' ||
+        clean.startsWith('stk-nova-')) {
+      if (password != 'Password123!' && password != 'InventoryPass123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: 'stk-88888888-8888-4888-8888-888888888888',
+        email: 'inventory@novacare.com',
+        firstName: 'Amaka',
+        lastName: 'Obi',
+        phone: '08033221100',
+        role: 'merchant_inventory_officer',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        deliveryAgentCode: 'STK-NOVACARE-01',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      );
+      return _currentUser!;
+    }
+
     throw AppAuthException(
         'Invalid email or password. Only registered accounts can log in.');
   }
@@ -416,7 +555,44 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     required String distributionCenterId,
     required String assignedZone,
   }) async {
-    return _currentUser!;
+    final cleanEmail = email.trim().toLowerCase();
+    final isExternalPda = personnelType.toLowerCase() == 'external_pda';
+    final isPda = personnelType.toLowerCase() == 'pda';
+    final randomSuffix =
+        (100 + (DateTime.now().millisecondsSinceEpoch % 899)).toString();
+    final agentCode = isExternalPda
+        ? 'EXT-PDA-$randomSuffix'
+        : (isPda ? 'PDA-7$randomSuffix' : 'RDR-$randomSuffix');
+    final uid = 'agt_${DateTime.now().millisecondsSinceEpoch}';
+    final user = UserModel(
+      id: uid,
+      email: cleanEmail,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone.trim(),
+      role: 'delivery_agent',
+      deliveryAgentId: uid,
+      deliveryAgentCode: agentCode,
+      distributionCenterId: distributionCenterId,
+      distributionCenterName: 'Distribution Hub',
+      personnelType: personnelType,
+      compensationType: compensationType,
+      commissionRate: commissionRate,
+      transportAllowance: transportAllowance,
+      fuelAllowance: fuelAllowance,
+      failedDeliveryAllowance: failedDeliveryAllowance,
+      baseSalary: baseSalary,
+      vehicleType: vehicleType,
+      vehiclePlateNumber: vehiclePlateNumber,
+      operatingState: 'Federal Capital Territory',
+      operatingCity: assignedZone.isNotEmpty ? assignedZone : 'Abuja',
+      bankName: bankName,
+      bankAccountNumber: bankAccountNumber,
+      bankAccountName: bankAccountName,
+    );
+    _currentUser = user;
+    AuthRemoteDataSourceImpl.registerUserInMemory(user, password);
+    return user;
   }
 
   @override
@@ -538,12 +714,41 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     final clean = phone.trim();
     return clean == '08012345678' || clean == '08085040146';
   }
+
+  @override
+  Future<bool> changePassword({
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final clean = email.trim().toLowerCase();
+    final expectedPass = AuthRemoteDataSourceImpl._registeredPasswords[clean];
+    if (expectedPass != null && expectedPass != currentPassword) {
+      throw AppAuthException('Current password does not match. Please verify your current password.');
+    }
+    AuthRemoteDataSourceImpl._registeredPasswords[clean] = newPassword;
+    return true;
+  }
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final SupabaseClient supabaseClient;
   static final Map<String, UserModel> _registeredUsers = {};
   static final Map<String, String> _registeredPasswords = {};
+  static const String _customAccountsStorageKey = 'novexps_custom_registered_accounts_v1';
+
+  static void setUserPassword(String email, String password) {
+    final clean = email.trim().toLowerCase();
+    _registeredPasswords[clean] = password;
+    final user = _registeredUsers[clean];
+    if (user != null) {
+      persistAccountToLocalStorage(user, password);
+    }
+  }
+
+  static String? getUserPassword(String email) {
+    return _registeredPasswords[email.trim().toLowerCase()];
+  }
 
   static void registerUserInMemory(UserModel user, [String? password]) {
     final cleanEmail = user.email.trim().toLowerCase();
@@ -551,6 +756,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       _registeredUsers[cleanEmail] = user;
       if (password != null && password.isNotEmpty) {
         _registeredPasswords[cleanEmail] = password;
+        persistAccountToLocalStorage(user, password);
       }
     }
     if (user.deliveryAgentCode != null && user.deliveryAgentCode!.isNotEmpty) {
@@ -558,8 +764,69 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
+  static Future<void> persistAccountToLocalStorage(UserModel user, String password) async {
+    try {
+      final storage = LocalStorageServiceImpl();
+      final existingMap = await storage.getJsonObject(_customAccountsStorageKey) ?? {};
+      final updatedMap = Map<String, dynamic>.from(existingMap);
+      final emailKey = user.email.trim().toLowerCase();
+      updatedMap[emailKey] = {
+        'password': password,
+        'user': user.toJson(),
+      };
+      await storage.saveJsonObject(_customAccountsStorageKey, updatedMap);
+      debugPrint('[AUTH_DATASOURCE] 💾 Persisted custom account $emailKey to local storage');
+    } catch (e) {
+      debugPrint('[AUTH_DATASOURCE] ⚠️ Failed to persist custom account to local storage: $e');
+    }
+  }
+
+  static Future<void> restoreCustomAccountsFromLocalStorage() async {
+    try {
+      final storage = LocalStorageServiceImpl();
+      final existingMap = await storage.getJsonObject(_customAccountsStorageKey);
+      if (existingMap != null && existingMap.isNotEmpty) {
+        for (final entry in existingMap.entries) {
+          final emailKey = entry.key.toLowerCase();
+          final data = entry.value;
+          if (data is Map) {
+            final pass = data['password'] as String?;
+            final userJson = data['user'];
+            if (userJson is Map) {
+              final userModel = UserModel.fromJson(Map<String, dynamic>.from(userJson));
+              _registeredUsers[emailKey] = userModel;
+              if (pass != null && pass.isNotEmpty) {
+                _registeredPasswords[emailKey] = pass;
+              }
+            }
+          }
+        }
+        debugPrint('[AUTH_DATASOURCE] 📦 Restored ${existingMap.length} custom accounts from local storage');
+      }
+    } catch (e) {
+      debugPrint('[AUTH_DATASOURCE] ⚠️ Notice restoring custom accounts from local storage: $e');
+    }
+  }
+
   static UserModel? getRegisteredUser(String key) {
     return _registeredUsers[key.toLowerCase()];
+  }
+
+  static bool hasEmailInMemory(String email) {
+    return _registeredUsers.containsKey(email.trim().toLowerCase());
+  }
+
+  static bool hasPhoneInMemory(Iterable<String> phoneVariants) {
+    final normalizedSet = phoneVariants
+        .map((p) => p.replaceAll(RegExp(r'[\s\-\(\)]'), '').trim())
+        .where((p) => p.isNotEmpty)
+        .toSet();
+    if (normalizedSet.isEmpty) return false;
+    for (final u in _registeredUsers.values) {
+      final existing = u.phone.replaceAll(RegExp(r'[\s\-\(\)]'), '').trim();
+      if (normalizedSet.contains(existing)) return true;
+    }
+    return false;
   }
 
   SupabaseClient? _cachedAdminClient;
@@ -572,7 +839,679 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     );
   }
 
-  AuthRemoteDataSourceImpl(this.supabaseClient);
+  static bool _devAccountsSeeded = false;
+
+  static void seedDefaultDevelopmentAccounts() {
+    if (_devAccountsSeeded) return;
+    _devAccountsSeeded = true;
+
+    // 0. Super Administrator (Onboarded): Precious Etuk
+    registerUserInMemory(
+      const UserModel(
+        id: 'e9999999-9999-4999-8999-999999999999',
+        email: 'psolomonetuk95@gmail.com',
+        firstName: 'Precious',
+        lastName: 'Etuk',
+        phone: '07072756353',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-02',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Abuja Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      ),
+      '1FeJirO#',
+    );
+
+    // 0b. Super Administrator: Balikis Popoola
+    registerUserInMemory(
+      const UserModel(
+        id: '9178e457-75c4-433a-8833-3b0dce0b323a',
+        email: 'popoolabalikis37@gmail.com',
+        firstName: 'Balikis',
+        lastName: 'Popoola',
+        phone: '08000000000',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-03',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Abuja Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      ),
+      '302382',
+    );
+
+    // 0c. Super Administrator & Master Stock Controller: Damilare Ajani
+    registerUserInMemory(
+      const UserModel(
+        id: '3be27458-e54e-4a99-83c8-73f0d0147e47',
+        email: 'damieajani@gmail.com',
+        firstName: 'Damilare',
+        lastName: 'Ajani',
+        phone: '07042266323',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-04',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Abuja Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      ),
+      'Password123!',
+    );
+
+    // 0. Executive Chairman Super Admin
+    registerUserInMemory(
+      const UserModel(
+        id: '2e0c27a2-9715-46a2-8e9c-08f54c66f45c',
+        email: 'chairmannovagroup@gmail.com',
+        firstName: 'Chairman',
+        lastName: 'Nova Group',
+        phone: '+234 800 000 0001',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-00',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Abuja Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      ),
+      'Nova2027',
+    );
+
+    // 1. Platform Super Admin
+    registerUserInMemory(
+      const UserModel(
+        id: 'b961785b-6003-4378-92d4-b5742b5b7e66',
+        email: 'emeraldcodelines@gmail.com',
+        firstName: 'Joel',
+        lastName: 'Emerald',
+        phone: '+234 800 000 0001',
+        role: 'super_admin',
+        deliveryAgentCode: 'ADMIN-HQ-01',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'NovaXpress HQ Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      ),
+      '@EmeraldXpress2026',
+    );
+
+    // 2. NovaXpress Platform Admin
+    registerUserInMemory(
+      const UserModel(
+        id: 'c1111111-1111-4111-8111-111111111111',
+        email: 'admin@novaxpress.ng',
+        firstName: 'NovaXpress',
+        lastName: 'Platform Admin',
+        phone: '+234 800 000 0002',
+        role: 'platform_admin',
+        deliveryAgentCode: 'NX-ADM-01',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'NovaXpress HQ Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      ),
+      'AdminPass123!',
+    );
+
+    // 3. NovaXpress Logistics Admin
+    registerUserInMemory(
+      const UserModel(
+        id: 'c2222222-2222-4222-8222-222222222222',
+        email: 'logistics.admin@novaxpress.ng',
+        firstName: 'NovaXpress',
+        lastName: 'Logistics Director',
+        phone: '+234 800 000 0003',
+        role: 'logistics_admin',
+        deliveryAgentCode: 'NX-LOG-01',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      ),
+      'LogisticsAdmin123!',
+    );
+
+    // 4. National General Accountant
+    registerUserInMemory(
+      const UserModel(
+        id: '33333333-3333-4333-8333-333333333333',
+        email: 'joelaccount@gmail.com',
+        firstName: 'Joel',
+        lastName: 'Accountant',
+        phone: '+234 803 000 1111',
+        role: 'general_accountant',
+        deliveryAgentCode: 'ACC-HQ-01',
+        accountantId: '33333333-3333-4333-8333-333333333333',
+        accountantCode: 'ACC-HQ-01',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'NovaXpress Central Treasury',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'joelaccount@gmail.com',
+    );
+
+    // 5. Grand DC Supervisor
+    registerUserInMemory(
+      const UserModel(
+        id: 'a2222222-2222-4222-8222-222222222222',
+        email: 'dc.supervisor@novaxpress.ng',
+        firstName: 'Ahmed',
+        lastName: 'Bello',
+        phone: '+234 802 345 6789',
+        role: 'dc_manager',
+        deliveryAgentCode: 'DC-MGR-WUSE-01',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Central Command Hub',
+      ),
+      'Password123!',
+    );
+
+    // 6. DC Dispatch Operator
+    registerUserInMemory(
+      const UserModel(
+        id: '99999999-9999-4999-8999-999999999999',
+        email: 'abigail.kooyon@novaxpress.net',
+        firstName: 'Abigail',
+        lastName: 'Kooyon',
+        phone: '+234 812 345 6789',
+        role: 'dc_operations',
+        deliveryAgentCode: 'OPS-CMD-01-159',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'CDV8pRxC#b',
+    );
+
+    // 7. DC Stock Keeper
+    registerUserInMemory(
+      const UserModel(
+        id: '55555555-5555-4555-8555-555555555555',
+        email: 'joelstock@novaxpress.ng',
+        firstName: 'Joel',
+        lastName: 'Stock Keeper',
+        phone: '+234 809 999 8888',
+        role: 'dc_stock_admin',
+        deliveryAgentCode: 'STK-WUSE-01',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'joelstock@novaxpress.ng',
+    );
+
+    // 7b. DC Stock Ops Admin - Ani Willis Ami
+    registerUserInMemory(
+      const UserModel(
+        id: '0af1a19a-0ecf-4690-ad07-a8ec2bea536e',
+        email: 'aniwillisami22@gmail.com',
+        firstName: 'Ani',
+        lastName: 'Willis Ami',
+        phone: '+234 809 876 5432',
+        role: 'dc_stock_admin',
+        deliveryAgentCode: 'STK-ABJ-02',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'password@123',
+    );
+
+    // 8. DC Finance & Cashier
+    registerUserInMemory(
+      const UserModel(
+        id: '44444444-4444-4444-8444-444444444444',
+        email: 'joelfinance@gmail.com',
+        firstName: 'Joel',
+        lastName: 'Finance Cashier',
+        phone: '+234 805 555 4444',
+        role: 'dc_finance_admin',
+        deliveryAgentCode: 'FIN-WUSE-01',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'joelfinance@gmail.com',
+    );
+
+    // 9. ADICHA LOGISTICS Partner (Real 3PL Agent)
+    registerUserInMemory(
+      const UserModel(
+        id: '66666666-6666-4666-8666-666666666666',
+        email: 'adicha.operations@novaxpress.ng',
+        firstName: 'ADICHA',
+        lastName: 'LOGISTICS',
+        phone: '+234 802 000 0062',
+        role: 'logistics_partner',
+        deliveryAgentCode: 'AG-001',
+        clientCompanyName: 'ADICHA LOGISTICS',
+        operatingState: 'Lagos',
+        operatingCity: 'Ikeja',
+      ),
+      'Password123!',
+    );
+    // Backward compatibility alias for legacy test runner
+    registerUserInMemory(
+      const UserModel(
+        id: '66666666-6666-4666-8666-666666666666',
+        email: 'gig.operations@novaxpress.ng',
+        firstName: 'ADICHA',
+        lastName: 'LOGISTICS',
+        phone: '+234 802 000 0062',
+        role: 'logistics_partner',
+        deliveryAgentCode: 'AG-001',
+        clientCompanyName: 'ADICHA LOGISTICS',
+        operatingState: 'Lagos',
+        operatingCity: 'Ikeja',
+      ),
+      'Password123!',
+    );
+
+    // 10. Victor Ogbenyi Logistics Partner (Real 3PL Partner)
+    registerUserInMemory(
+      const UserModel(
+        id: '66666666-6666-4666-8666-666666666667',
+        email: 'victor.operations@novaxpress.ng',
+        firstName: 'Victor',
+        lastName: 'Ogbenyi Logistics',
+        phone: '+234 803 000 0093',
+        role: 'logistics_partner',
+        deliveryAgentCode: 'AG-002',
+        clientCompanyName: 'Victor Ogbenyi Logistics',
+        operatingState: 'Lagos',
+        operatingCity: 'Victoria Island',
+      ),
+      'Password123!',
+    );
+    // Backward compatibility alias for legacy test runner
+    registerUserInMemory(
+      const UserModel(
+        id: '66666666-6666-4666-8666-666666666667',
+        email: 'speedaf.operations@novaxpress.ng',
+        firstName: 'Victor',
+        lastName: 'Ogbenyi Logistics',
+        phone: '+234 803 000 0093',
+        role: 'logistics_partner',
+        deliveryAgentCode: 'AG-002',
+        clientCompanyName: 'Victor Ogbenyi Logistics',
+        operatingState: 'Lagos',
+        operatingCity: 'Victoria Island',
+      ),
+      'Password123!',
+    );
+
+    // 11. Novacare Merchant Admin
+    registerUserInMemory(
+      const UserModel(
+        id: '00000000-0000-4000-8000-791731264594',
+        email: 'novacare@novaxpress.net',
+        firstName: 'Dr. Chuka',
+        lastName: 'Okafor',
+        phone: '08034455667',
+        role: 'client',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        deliveryAgentCode: 'CLI-S1-212',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'novacare@novaxpress.net',
+    );
+
+    // 12. Shop11 Merchant Admin
+    registerUserInMemory(
+      const UserModel(
+        id: '00000000-0000-4000-8000-888888888888',
+        email: 'shop11@novaxpress.net',
+        firstName: 'Tari',
+        lastName: 'Shop11 Admin',
+        phone: '08098765432',
+        role: 'client',
+        clientId: '00000000-0000-4000-8000-888888888888',
+        clientCompanyName: 'SHOP11 GLOBAL STORE',
+        deliveryAgentCode: 'CLI-SH11-01',
+        operatingState: 'Lagos',
+        operatingCity: 'Lekki',
+      ),
+      'Shop11Pass123!',
+    );
+
+    // 13. Samuel Accountant (Novacare Finance)
+    registerUserInMemory(
+      const UserModel(
+        id: '88888888-8888-4888-8888-888888888888',
+        email: 'accountant@novacare.com',
+        firstName: 'Samuel',
+        lastName: 'Accountant',
+        phone: '08033333333',
+        role: 'merchant_accountant',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        accountantId: '88888888-8888-4888-8888-888888888888',
+        accountantCode: 'ACC-NOVA-001',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'Password123!',
+    );
+
+    // 13b. Amaka Obi (Novacare Stock Keeper / Inventory Officer)
+    registerUserInMemory(
+      const UserModel(
+        id: 'stk-88888888-8888-4888-8888-888888888888',
+        email: 'inventory@novacare.com',
+        firstName: 'Amaka',
+        lastName: 'Obi',
+        phone: '08033221100',
+        role: 'merchant_inventory_officer',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        deliveryAgentCode: 'STK-NOVACARE-01',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'Password123!',
+    );
+
+    // 14. Joel Supervisor (Novacare Sales Rep Supervisor)
+    registerUserInMemory(
+      const UserModel(
+        id: '77777777-7777-4777-8777-777777777777',
+        email: 'joelsupervisor@novaxpress.ng',
+        firstName: 'Joel',
+        lastName: 'Supervisor',
+        phone: '+234 806 777 8888',
+        role: 'closer',
+        isSupervisor: true,
+        closerId: '77777777-7777-4777-8777-777777777777',
+        closerCode: 'SUP-SALES-01',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'joelsupervisor@novaxpress.ng',
+    );
+
+    // 15. Prestige Godwin Uto (Head Closer)
+    registerUserInMemory(
+      const UserModel(
+        id: '10610610-1061-4106-8106-106106106106',
+        email: 'prestige.godwin@novaxpress.net',
+        firstName: 'Prestige Godwin',
+        lastName: 'Uto',
+        phone: '+234 810 106 0106',
+        role: 'closer',
+        closerId: '10610610-1061-4106-8106-106106106106',
+        closerCode: 'CLS-NOVA-106',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'Closer123!',
+    );
+
+    // 16. Ojo Modupeolami (Closer)
+    registerUserInMemory(
+      const UserModel(
+        id: '10310310-1031-4103-8103-103103103103',
+        email: 'ojo.modupeolami@novaxpress.ng',
+        firstName: 'Ojo',
+        lastName: 'Modupeolami',
+        phone: '+234 810 103 0103',
+        role: 'closer',
+        closerId: '10310310-1031-4103-8103-103103103103',
+        closerCode: 'CLS-NOVA-103',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'ojo.modupeolami@novaxpress.ng',
+    );
+
+    // 17. Adewole Ibukun (Closer)
+    registerUserInMemory(
+      const UserModel(
+        id: '10410410-1041-4104-8104-104104104104',
+        email: 'adewole.ibukun@novaxpress.ng',
+        firstName: 'Adewole',
+        lastName: 'Ibukun',
+        phone: '+234 810 104 0104',
+        role: 'closer',
+        closerId: '10410410-1041-4104-8104-104104104104',
+        closerCode: 'CLS-NOVA-104',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'Closer123!',
+    );
+
+    // 18. Chioma Marketer (Marketing)
+    registerUserInMemory(
+      const UserModel(
+        id: '10510510-1051-4105-8105-105105105105',
+        email: 'chioma.marketing@novaxpress.ng',
+        firstName: 'Chioma',
+        lastName: 'Marketer',
+        phone: '+234 810 105 0105',
+        role: 'marketer',
+        marketerId: '10510510-1051-4105-8105-105105105105',
+        marketerCode: 'MKT-NOVA-01',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'Marketing123!',
+    );
+
+    // 19. Oladele Omowaye (Courier)
+    registerUserInMemory(
+      const UserModel(
+        id: 'd1111111-1111-4111-8111-111111111111',
+        email: 'oladele.omowaye@novaxpress.ng',
+        firstName: 'Oladele',
+        lastName: 'Omowaye',
+        phone: '+234 802 111 2222',
+        role: 'delivery_agent',
+        deliveryAgentId: 'd1111111-1111-4111-8111-111111111111',
+        deliveryAgentCode: 'RDR-501',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'omowaye123456',
+    );
+
+    // 20. Simon Tazha (Courier)
+    registerUserInMemory(
+      const UserModel(
+        id: 'd2222222-2222-4222-8222-222222222222',
+        email: 'simon.tazha@novaxpress.ng',
+        firstName: 'Simon',
+        lastName: 'Tazha',
+        phone: '+234 802 333 4444',
+        role: 'delivery_agent',
+        deliveryAgentId: 'd2222222-2222-4222-8222-222222222222',
+        deliveryAgentCode: 'RDR-682',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'SimonPass123!',
+    );
+
+    // 21. Uche Okafor (Courier)
+    registerUserInMemory(
+      const UserModel(
+        id: 'd3333333-3333-4333-8333-333333333333',
+        email: 'uche.okafor@novaxpress.ng',
+        firstName: 'Uche',
+        lastName: 'Okafor',
+        phone: '+234 802 555 6666',
+        role: 'delivery_agent',
+        deliveryAgentId: 'd3333333-3333-4333-8333-333333333333',
+        deliveryAgentCode: 'RDR-502',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Command Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'RiderPass123!',
+    );
+
+    // 22. Shop Eleven Merchant Stock Officer
+    registerUserInMemory(
+      const UserModel(
+        id: 'stk-99999999-9999-4999-8999-999999999999',
+        email: 'shop11.stock@novaxpress.net',
+        firstName: 'Tari',
+        lastName: 'Stock (Shop Eleven)',
+        phone: '08098765431',
+        role: 'merchant_inventory_officer',
+        clientId: '00000000-0000-4000-8000-793504597013',
+        clientCompanyName: 'Shop Eleven Limited',
+        deliveryAgentCode: 'STK-SHOP11-01',
+        operatingState: 'Lagos',
+        operatingCity: 'Lekki',
+      ),
+      'Password123!',
+    );
+
+    // 23. Novacare Merchant Stock Officer (Alias for novacare.stock@novaxpress.net)
+    registerUserInMemory(
+      const UserModel(
+        id: 'stk-88888888-8888-4888-8888-888888888889',
+        email: 'novacare.stock@novaxpress.net',
+        firstName: 'Amaka',
+        lastName: 'Obi (Novacare Stock)',
+        phone: '08033221100',
+        role: 'merchant_inventory_officer',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        deliveryAgentCode: 'STK-NOVACARE-02',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'Password123!',
+    );
+
+    // 24. Leafora Essence Merchant Admin
+    registerUserInMemory(
+      const UserModel(
+        id: '00000000-0000-4000-8000-794400000001',
+        email: 'leafora@novaxpress.net',
+        firstName: 'Folashade',
+        lastName: 'Ade (Leafora)',
+        phone: '08095554321',
+        role: 'client',
+        clientId: '00000000-0000-4000-8000-794400000001',
+        clientCompanyName: 'Leafora Direct',
+        deliveryAgentCode: 'CLI-LEA-01',
+        operatingState: 'Lagos',
+        operatingCity: 'Ikeja',
+      ),
+      'Password123!',
+    );
+
+    // 25. Babatunde Adeleke (Lagos DC Hub Head)
+    registerUserInMemory(
+      const UserModel(
+        id: 'lag-11111111-1111-4111-8111-111111111111',
+        email: 'lagos.ops@novaxpress.ng',
+        firstName: 'Babatunde',
+        lastName: 'Adeleke',
+        phone: '+234 802 111 9900',
+        role: 'dc_manager',
+        deliveryAgentCode: 'DC-MGR-LAG-01',
+        distributionCenterId: 'DC-LAG-01',
+        distributionCenterName: 'Lagos Central DC',
+        operatingState: 'Lagos',
+        operatingCity: 'Ikeja',
+        isSupervisor: true,
+      ),
+      'Password123!',
+    );
+
+    // 26. Emeka Nwosu (Lagos DC Stock Admin)
+    registerUserInMemory(
+      const UserModel(
+        id: 'lag-22222222-2222-4222-8222-222222222222',
+        email: 'stock.master@novaxpress.ng',
+        firstName: 'Emeka',
+        lastName: 'Nwosu',
+        phone: '+234 802 222 9900',
+        role: 'dc_stock_admin',
+        deliveryAgentCode: 'STK-LAG-01',
+        distributionCenterId: 'DC-LAG-01',
+        distributionCenterName: 'Lagos Central DC',
+        operatingState: 'Lagos',
+        operatingCity: 'Ikeja',
+      ),
+      'Password123!',
+    );
+
+    // 27. Fatima Garba (Lagos DC Finance Officer)
+    registerUserInMemory(
+      const UserModel(
+        id: 'lag-33333333-3333-4333-8333-333333333333',
+        email: 'remittance@novaxpress.ng',
+        firstName: 'Fatima',
+        lastName: 'Garba',
+        phone: '+234 802 333 9900',
+        role: 'dc_finance_admin',
+        deliveryAgentCode: 'FIN-LAG-01',
+        distributionCenterId: 'DC-LAG-01',
+        distributionCenterName: 'Lagos Central DC',
+        operatingState: 'Lagos',
+        operatingCity: 'Ikeja',
+      ),
+      'Password123!',
+    );
+
+    // 28. NovaXpress Logistics (Internal Fleet Lead)
+    registerUserInMemory(
+      const UserModel(
+        id: 'bd21930d-a2c7-546f-8fd6-1c61849ae4d6',
+        email: 'logistics@novaxpress.ng',
+        firstName: 'Engr. Tunde',
+        lastName: 'Adeleke (NX Fleet)',
+        phone: '+234 803 222 1100',
+        role: 'logistics_partner',
+        deliveryAgentCode: 'NX-ABJ-01',
+        clientCompanyName: 'NovaXpress Logistics',
+        distributionCenterId: 'DC-ABJ-01',
+        distributionCenterName: 'Abuja Central DC',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      ),
+      'Password123!',
+    );
+  }
+
+  AuthRemoteDataSourceImpl(this.supabaseClient) {
+    seedDefaultDevelopmentAccounts();
+  }
 
   @override
   Future<UserModel> login(String email, String password) async {
@@ -692,6 +1631,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
       }
     }
+
+    // Restore any custom accounts from local storage
+    await restoreCustomAccountsFromLocalStorage();
 
     // 1. Check in-memory registered accounts (accounts created/onboarded in current session or tests)
     if (_registeredUsers.containsKey(lookupEmail)) {
@@ -1004,6 +1946,55 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
+  @override
+  Future<bool> changePassword({
+    required String email,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+
+    // 1. Verify in-memory registered accounts
+    if (_registeredPasswords.containsKey(cleanEmail)) {
+      final expectedPass = _registeredPasswords[cleanEmail];
+      if (expectedPass != null && expectedPass != currentPassword) {
+        throw AppAuthException('Current password does not match. Please verify your current password.');
+      }
+      _registeredPasswords[cleanEmail] = newPassword;
+      debugPrint('[AUTH_DATASOURCE] ✅ Password updated in-memory for "$cleanEmail".');
+    }
+
+    // 2. Persist to live Supabase Auth
+    try {
+      if (supabaseClient.auth.currentUser != null) {
+        await supabaseClient.auth.updateUser(
+          UserAttributes(password: newPassword),
+        );
+        debugPrint('[AUTH_DATASOURCE] ✅ Supabase auth password updated for active user.');
+      } else {
+        try {
+          await supabaseClient.auth.signInWithPassword(
+            email: cleanEmail,
+            password: currentPassword,
+          );
+          await supabaseClient.auth.updateUser(
+            UserAttributes(password: newPassword),
+          );
+          debugPrint('[AUTH_DATASOURCE] ✅ Supabase auth password updated after re-auth.');
+        } catch (authErr) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase re-auth password update notice: $authErr');
+        }
+      }
+    } catch (e) {
+      debugPrint('[AUTH_DATASOURCE] Supabase changePassword notice: $e');
+      if (!_registeredPasswords.containsKey(cleanEmail)) {
+        throw AppAuthException('Unable to change password: ${e.toString().replaceAll('Exception: ', '')}');
+      }
+    }
+
+    return true;
+  }
+
   String _generateUuid() {
     final random = math.Random();
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));
@@ -1044,10 +2035,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       SupabaseConstants.supabaseServiceRoleKey,
     );
 
+    final isExternalPda = personnelType.toLowerCase() == 'external_pda';
     final isPda = personnelType.toLowerCase() == 'pda';
     final randomSuffix =
         (100 + (DateTime.now().millisecondsSinceEpoch % 899)).toString();
-    final agentCode = isPda ? 'PDA-7$randomSuffix' : 'RDR-$randomSuffix';
+    final agentCode = isExternalPda
+        ? 'EXT-PDA-$randomSuffix'
+        : (isPda ? 'PDA-7$randomSuffix' : 'RDR-$randomSuffix');
 
     String? authUserId;
     String userId = _generateUuid();
@@ -1175,6 +2169,35 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception("Failed to create rider user profile: $userErr");
     }
 
+    // 3b. Resolve target DC metadata before inserting delivery_agents
+    String? dcName;
+    String? dcState;
+    String? dcCity;
+    if (effectiveDcId.isNotEmpty) {
+      try {
+        final dcRes = await dbClient
+            .from('distribution_centers')
+            .select('name, state, city')
+            .eq('id', effectiveDcId)
+            .maybeSingle();
+        if (dcRes != null) {
+          dcName = dcRes['name']?.toString();
+          dcState = dcRes['state']?.toString();
+          dcCity = dcRes['city']?.toString();
+        }
+      } catch (_) {}
+    }
+
+    final effectiveOperatingState =
+        (dcState != null && dcState.trim().isNotEmpty)
+            ? dcState.trim()
+            : 'Abuja (FCT)';
+    final effectiveOperatingCity = assignedZone.trim().isNotEmpty
+        ? assignedZone.trim()
+        : (dcCity != null && dcCity.trim().isNotEmpty
+            ? dcCity.trim()
+            : 'Wuse 2');
+
     // 4. Insert into delivery_agents table
     try {
       await dbClient.from(SupabaseConstants.deliveryAgentsTable).insert({
@@ -1191,8 +2214,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'base_salary': baseSalary,
         'vehicle_type': vehicleType,
         'vehicle_plate_number': vehiclePlateNumber,
-        'operating_state': 'Abuja (FCT)',
-        'operating_city': assignedZone.isNotEmpty ? assignedZone : 'Wuse 2',
+        'operating_state': effectiveOperatingState,
+        'operating_city': effectiveOperatingCity,
         'current_status': 'available',
         'is_active': true,
         'current_cod_balance': 0.00,
@@ -1221,20 +2244,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception("Failed to create delivery agent record: $agentErr");
     }
 
-    String? dcName;
-    if (effectiveDcId.isNotEmpty) {
-      try {
-        final dcRes = await dbClient
-            .from('distribution_centers')
-            .select('name')
-            .eq('id', effectiveDcId)
-            .maybeSingle();
-        if (dcRes != null) {
-          dcName = dcRes['name']?.toString();
-        }
-      } catch (_) {}
-    }
-
     final userModel = UserModel(
       id: userId,
       authUserId: authUserId,
@@ -1256,6 +2265,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       baseSalary: baseSalary,
       vehicleType: vehicleType,
       vehiclePlateNumber: vehiclePlateNumber,
+      operatingState: effectiveOperatingState,
+      operatingCity: effectiveOperatingCity,
       bankName: bankName,
       bankAccountNumber: bankAccountNumber,
       bankAccountName: bankAccountName,
@@ -1380,6 +2391,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'first_name': firstName,
         'last_name': lastName,
         'role': 'dc_manager',
+        if (distributionCenterId.trim().isNotEmpty)
+          'distribution_center_id': distributionCenterId.trim(),
+        'is_active': true,
       });
       debugPrint(
           '[AUTH_DATASOURCE] ✅ Users table record inserted for DC Supervisor: $userId ($cleanEmail)');
@@ -1482,9 +2496,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (e.toString().contains('already exists')) rethrow;
     }
 
+    final roleLower = role.trim().toLowerCase();
+    final defaultCodePrefix = roleLower == 'dc_stock_admin' || roleLower.contains('stock')
+        ? 'STK'
+        : (roleLower == 'dc_finance_admin' || roleLower.contains('finance')
+            ? 'FIN'
+            : (roleLower == 'general_accountant' || roleLower.contains('accountant')
+                ? 'ACC-HQ'
+                : 'OPS'));
     final effectiveCode = staffCode?.trim().toUpperCase().isNotEmpty == true
         ? staffCode!.trim().toUpperCase()
-        : 'OPS-${100 + (DateTime.now().millisecondsSinceEpoch % 900)}';
+        : '$defaultCodePrefix-${100 + (DateTime.now().millisecondsSinceEpoch % 900)}';
 
     // 2. Try to register with Supabase Auth admin API
     try {
@@ -1588,6 +2610,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       debugPrint('[AUTH_DATASOURCE] ⚠️ Users table upsert notice ($userErr)');
     }
 
+    String resolvedState = 'Federal Capital Territory';
+    String resolvedCity = 'Abuja';
+    try {
+      final dcRow = await dbClient
+          .from('distribution_centers')
+          .select('state, city')
+          .eq('id', effectiveDcId)
+          .maybeSingle();
+      if (dcRow != null) {
+        final s = dcRow['state']?.toString().trim();
+        final c = dcRow['city']?.toString().trim();
+        if (s != null && s.isNotEmpty) resolvedState = s;
+        if (c != null && c.isNotEmpty) resolvedCity = c;
+      }
+    } catch (_) {}
+
     final userModel = UserModel(
       id: userId,
       authUserId: authUserId,
@@ -1600,8 +2638,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       deliveryAgentCode: effectiveCode,
       distributionCenterId: effectiveDcId,
       distributionCenterName: distributionCenterName,
-      operatingState: 'Federal Capital Territory',
-      operatingCity: 'Abuja',
+      operatingState: resolvedState,
+      operatingCity: resolvedCity,
     );
 
     _registeredUsers[cleanEmail] = userModel;
@@ -2085,7 +3123,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } catch (_) {}
       }
       if (rawRole.isEmpty) {
-        if (cleanEmail == 'emeraldcodelines@gmail.com' ||
+        if (cleanEmail == 'chairmannovagroup@gmail.com' ||
+            cleanEmail == 'emeraldcodelines@gmail.com' ||
             cleanEmail.contains('admin') ||
             cleanEmail.contains('superadmin')) {
           rawRole = 'super_admin';
@@ -2135,6 +3174,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           rawRole == 'admin' ||
           rawRole == 'platform_admin' ||
           rawRole == 'system_admin' ||
+          cleanEmail == 'chairmannovagroup@gmail.com' ||
           cleanEmail == 'emeraldcodelines@gmail.com';
       final isCloserSupervisor = (rawRole == 'sales_supervisor' ||
           rawRole == 'closer_supervisor' ||
@@ -2145,7 +3185,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                   userRes?['is_supervisor'] == 'true'))) && !isSuperAdmin;
       final isCloser = (rawRole == 'closer' || rawRole == 'client_closer') &&
           !isCloserSupervisor && !isSuperAdmin;
-      final isMarketer = (rawRole == 'marketer' || rawRole == 'digital_marketer') && !isSuperAdmin;
+      final isMarketer = (rawRole == 'marketer' ||
+              rawRole == 'digital_marketer' ||
+              rawRole == 'marketing_supervisor' ||
+              rawRole == 'supervisor_marketer') &&
+          !isSuperAdmin;
       final isClientAdmin =
           (rawRole == 'client' || rawRole == 'merchant' || rawRole == 'seller') && !isSuperAdmin;
       final isMerchantAccountant = (rawRole == 'merchant_accountant' ||
@@ -2358,7 +3402,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Closer profile query notice ($e)');
         }
       } else if (isMarketer) {
-        merged['role'] = 'marketer';
+        final bool initiallySupervisor = rawRole == 'marketing_supervisor' ||
+            rawRole == 'supervisor_marketer' ||
+            userRes?['is_supervisor'] == true ||
+            userRes?['is_supervisor'] == 'true';
+        bool resolvedSupervisor = initiallySupervisor;
         merged['delivery_agent_id'] = null;
 
         try {
@@ -2368,6 +3416,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               .or('email.ilike.$cleanEmail,id.eq.$userId,user_id.eq.$userId')
               .maybeSingle();
           if (marketerRes != null) {
+            resolvedSupervisor = resolvedSupervisor ||
+                marketerRes['is_supervisor'] == true ||
+                marketerRes['is_supervisor'] == 'true';
             merged['marketer_id'] = marketerRes['id'];
             merged['marketer_code'] = marketerRes['marketer_code'];
             merged['phone'] = marketerRes['phone'] ??
@@ -2401,6 +3452,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } catch (e) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Marketer profile query notice ($e)');
         }
+        merged['is_supervisor'] = resolvedSupervisor;
+        merged['role'] =
+            resolvedSupervisor ? 'marketing_supervisor' : 'marketer';
       } else if (isClientAdmin) {
         merged['role'] = 'client';
         merged['delivery_agent_id'] = null;

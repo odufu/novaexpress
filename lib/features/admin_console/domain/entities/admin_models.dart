@@ -135,6 +135,7 @@ class AdminDistributionCenter {
   final double vaultBalance;
   final String status; // 'operational' | 'congested' | 'maintenance'
   final bool isGrandDc;
+  final List<String> assignedAgentNames;
 
   const AdminDistributionCenter({
     required this.id,
@@ -151,6 +152,7 @@ class AdminDistributionCenter {
     this.vaultBalance = 0.0,
     this.status = 'operational',
     this.isGrandDc = false,
+    this.assignedAgentNames = const [],
   });
 
   AdminDistributionCenter copyWith({
@@ -168,6 +170,7 @@ class AdminDistributionCenter {
     double? vaultBalance,
     String? status,
     bool? isGrandDc,
+    List<String>? assignedAgentNames,
   }) {
     return AdminDistributionCenter(
       id: id ?? this.id,
@@ -184,6 +187,7 @@ class AdminDistributionCenter {
       vaultBalance: vaultBalance ?? this.vaultBalance,
       status: status ?? this.status,
       isGrandDc: isGrandDc ?? this.isGrandDc,
+      assignedAgentNames: assignedAgentNames ?? this.assignedAgentNames,
     );
   }
 
@@ -203,6 +207,9 @@ class AdminDistributionCenter {
       vaultBalance: double.tryParse(json['vault_balance']?.toString() ?? '') ?? 0.0,
       status: json['status']?.toString() ?? 'operational',
       isGrandDc: json['is_grand_dc'] == true || json['is_primary'] == true,
+      assignedAgentNames: (json['assigned_agent_names'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+          (json['assigned_agents'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+          const [],
     );
   }
 }
@@ -226,6 +233,13 @@ class AdminMerchant {
   final String status; // 'active' | 'pending' | 'suspended'
   final int activeOrdersCount;
   final double totalRemittedNaira;
+  final List<String> assignedAgentIds;
+  final List<String> assignedAgentNames;
+  final List<String> productsDistributed;
+  final double todayGrossCod;
+  final double todayDeliveryFees;
+  final double todayFailedFees;
+  final double todayNetRemittance;
 
   const AdminMerchant({
     required this.id,
@@ -244,9 +258,17 @@ class AdminMerchant {
     this.status = 'active',
     this.activeOrdersCount = 0,
     this.totalRemittedNaira = 0.0,
+    this.assignedAgentIds = const [],
+    this.assignedAgentNames = const [],
+    this.productsDistributed = const [],
+    this.todayGrossCod = 0.0,
+    this.todayDeliveryFees = 0.0,
+    this.todayFailedFees = 0.0,
+    this.todayNetRemittance = 0.0,
   });
 
   bool get isEnterprise => tier.toLowerCase() == 'enterprise';
+  bool get isActive => status == 'active';
 
   AdminMerchant copyWith({
     String? id,
@@ -265,6 +287,13 @@ class AdminMerchant {
     String? status,
     int? activeOrdersCount,
     double? totalRemittedNaira,
+    List<String>? assignedAgentIds,
+    List<String>? assignedAgentNames,
+    List<String>? productsDistributed,
+    double? todayGrossCod,
+    double? todayDeliveryFees,
+    double? todayFailedFees,
+    double? todayNetRemittance,
   }) {
     return AdminMerchant(
       id: id ?? this.id,
@@ -283,6 +312,13 @@ class AdminMerchant {
       status: status ?? this.status,
       activeOrdersCount: activeOrdersCount ?? this.activeOrdersCount,
       totalRemittedNaira: totalRemittedNaira ?? this.totalRemittedNaira,
+      assignedAgentIds: assignedAgentIds ?? this.assignedAgentIds,
+      assignedAgentNames: assignedAgentNames ?? this.assignedAgentNames,
+      productsDistributed: productsDistributed ?? this.productsDistributed,
+      todayGrossCod: todayGrossCod ?? this.todayGrossCod,
+      todayDeliveryFees: todayDeliveryFees ?? this.todayDeliveryFees,
+      todayFailedFees: todayFailedFees ?? this.todayFailedFees,
+      todayNetRemittance: todayNetRemittance ?? this.todayNetRemittance,
     );
   }
 
@@ -304,6 +340,13 @@ class AdminMerchant {
       status: json['status']?.toString() ?? 'active',
       activeOrdersCount: int.tryParse(json['active_orders']?.toString() ?? '') ?? 0,
       totalRemittedNaira: double.tryParse(json['total_remitted']?.toString() ?? '') ?? 0.0,
+      assignedAgentIds: (json['assigned_agent_ids'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      assignedAgentNames: (json['assigned_agent_names'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      productsDistributed: (json['products_distributed'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      todayGrossCod: double.tryParse(json['today_gross_cod']?.toString() ?? '') ?? 0.0,
+      todayDeliveryFees: double.tryParse(json['today_delivery_fees']?.toString() ?? '') ?? 0.0,
+      todayFailedFees: double.tryParse(json['today_failed_fees']?.toString() ?? '') ?? 0.0,
+      todayNetRemittance: double.tryParse(json['today_net_remittance']?.toString() ?? '') ?? 0.0,
     );
   }
 }
@@ -585,4 +628,616 @@ class AdminAuditLog {
     'metadata': metadata,
     'created_at': timestamp.toIso8601String(),
   };
+}
+
+/// Representation of 3PL Partners, Regional Distributors, and Rider Courier Agents
+@immutable
+class AdminLogisticsAgent {
+  final String id;
+  final String name;
+  final String agentCode;
+  final String type; // 'internal_logistics' | '3pl_partner' | 'distributor_agent' | 'rider_agent'
+  final String contactPerson;
+  final String phone;
+  final String email;
+  final List<String> coverageStates;
+  final int activeRidersCount;
+  final String bankName;
+  final String accountNumber;
+  final String accountName;
+  final String status; // 'active' | 'pending_approval' | 'suspended'
+  final double rating;
+  final int totalDeliveries;
+  final double totalRemittedNaira;
+  final double deliveryFee; // flat-rate delivery fee, e.g. 2500.0
+  final double failedDeliveryFee; // flat-rate failed delivery fee, e.g. 1000.0
+  final String? assignedWarehouseId;
+  final String? assignedWarehouseName;
+  final List<String> assignedMerchantIds;
+  final List<String> assignedMerchantNames;
+  final double commissionRate; // e.g. 5.0 for 5% or customized per-delivery commission
+  final Map<String, int> heldStock; // Product Name / SKU -> Units Held
+  final DateTime? lastBalancedAt;
+  final DateTime createdAt;
+
+  const AdminLogisticsAgent({
+    required this.id,
+    required this.name,
+    required this.agentCode,
+    required this.type,
+    required this.contactPerson,
+    required this.phone,
+    required this.email,
+    this.coverageStates = const [],
+    this.activeRidersCount = 0,
+    this.bankName = '',
+    this.accountNumber = '',
+    this.accountName = '',
+    this.status = 'active',
+    this.rating = 4.8,
+    this.totalDeliveries = 0,
+    this.totalRemittedNaira = 0.0,
+    this.deliveryFee = 2500.0,
+    this.failedDeliveryFee = 1000.0,
+    this.assignedWarehouseId,
+    this.assignedWarehouseName,
+    this.assignedMerchantIds = const [],
+    this.assignedMerchantNames = const [],
+    this.commissionRate = 0.0,
+    this.heldStock = const {},
+    this.lastBalancedAt,
+    required this.createdAt,
+  });
+
+  bool get isActive => status == 'active';
+  bool get isPendingApproval => status == 'pending_approval';
+
+  bool isAssignedToMerchant(String merchantId) =>
+      assignedMerchantIds.contains(merchantId);
+
+  String get typeLabel {
+    switch (type) {
+      case 'internal_logistics':
+        return 'Internal Hub (NovaXpress)';
+      case '3pl_partner':
+        return '3PL Logistics Company';
+      case 'distributor_agent':
+        return 'Regional Distributor';
+      case 'rider_agent':
+        return 'Rider Courier Agent';
+      default:
+        return 'Logistics Agent';
+    }
+  }
+
+  AdminLogisticsAgent copyWith({
+    String? id,
+    String? name,
+    String? agentCode,
+    String? type,
+    String? contactPerson,
+    String? phone,
+    String? email,
+    List<String>? coverageStates,
+    int? activeRidersCount,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+    String? status,
+    double? rating,
+    int? totalDeliveries,
+    double? totalRemittedNaira,
+    double? deliveryFee,
+    double? failedDeliveryFee,
+    String? assignedWarehouseId,
+    String? assignedWarehouseName,
+    List<String>? assignedMerchantIds,
+    List<String>? assignedMerchantNames,
+    double? commissionRate,
+    Map<String, int>? heldStock,
+    DateTime? lastBalancedAt,
+    DateTime? createdAt,
+  }) {
+    return AdminLogisticsAgent(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      agentCode: agentCode ?? this.agentCode,
+      type: type ?? this.type,
+      contactPerson: contactPerson ?? this.contactPerson,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      coverageStates: coverageStates ?? this.coverageStates,
+      activeRidersCount: activeRidersCount ?? this.activeRidersCount,
+      bankName: bankName ?? this.bankName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      accountName: accountName ?? this.accountName,
+      status: status ?? this.status,
+      rating: rating ?? this.rating,
+      totalDeliveries: totalDeliveries ?? this.totalDeliveries,
+      totalRemittedNaira: totalRemittedNaira ?? this.totalRemittedNaira,
+      deliveryFee: deliveryFee ?? this.deliveryFee,
+      failedDeliveryFee: failedDeliveryFee ?? this.failedDeliveryFee,
+      assignedWarehouseId: assignedWarehouseId ?? this.assignedWarehouseId,
+      assignedWarehouseName: assignedWarehouseName ?? this.assignedWarehouseName,
+      assignedMerchantIds: assignedMerchantIds ?? this.assignedMerchantIds,
+      assignedMerchantNames: assignedMerchantNames ?? this.assignedMerchantNames,
+      commissionRate: commissionRate ?? this.commissionRate,
+      heldStock: heldStock ?? this.heldStock,
+      lastBalancedAt: lastBalancedAt ?? this.lastBalancedAt,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  factory AdminLogisticsAgent.fromJson(Map<String, dynamic> json) {
+    Map<String, int> stockMap = {};
+    if (json['held_stock'] is Map) {
+      (json['held_stock'] as Map).forEach((k, v) {
+        stockMap[k.toString()] = int.tryParse(v.toString()) ?? 0;
+      });
+    }
+
+    return AdminLogisticsAgent(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Logistics Partner',
+      agentCode: json['agent_code']?.toString() ?? json['code']?.toString() ?? 'AGT',
+      type: json['type']?.toString() ?? '3pl_partner',
+      contactPerson: json['contact_person']?.toString() ?? json['contact_name']?.toString() ?? '',
+      phone: json['phone']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      coverageStates: (json['coverage_states'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      activeRidersCount: int.tryParse(json['active_riders_count']?.toString() ?? '') ?? 0,
+      bankName: json['bank_name']?.toString() ?? '',
+      accountNumber: json['account_number']?.toString() ?? '',
+      accountName: json['account_name']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'active',
+      rating: double.tryParse(json['rating']?.toString() ?? '') ?? 4.8,
+      totalDeliveries: int.tryParse(json['total_deliveries']?.toString() ?? '') ?? 0,
+      totalRemittedNaira: double.tryParse(json['total_remitted_naira']?.toString() ?? '') ?? 0.0,
+      deliveryFee: double.tryParse(json['delivery_fee']?.toString() ?? '') ?? 2500.0,
+      failedDeliveryFee: double.tryParse(json['failed_delivery_fee']?.toString() ?? '') ?? 1000.0,
+      assignedWarehouseId: json['assigned_warehouse_id']?.toString(),
+      assignedWarehouseName: json['assigned_warehouse_name']?.toString(),
+      assignedMerchantIds: (json['assigned_merchant_ids'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      assignedMerchantNames: (json['assigned_merchant_names'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      commissionRate: double.tryParse(json['commission_rate']?.toString() ?? '') ?? 0.0,
+      heldStock: stockMap,
+      lastBalancedAt: json['last_balanced_at'] != null ? DateTime.tryParse(json['last_balanced_at'].toString()) : null,
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'agent_code': agentCode,
+      'type': type,
+      'contact_person': contactPerson,
+      'phone': phone,
+      'email': email,
+      'coverage_states': coverageStates,
+      'active_riders_count': activeRidersCount,
+      'bank_name': bankName,
+      'account_number': accountNumber,
+      'account_name': accountName,
+      'status': status,
+      'rating': rating,
+      'total_deliveries': totalDeliveries,
+      'total_remitted_naira': totalRemittedNaira,
+      'delivery_fee': deliveryFee,
+      'failed_delivery_fee': failedDeliveryFee,
+      'assigned_warehouse_id': assignedWarehouseId,
+      'assigned_warehouse_name': assignedWarehouseName,
+      'assigned_merchant_ids': assignedMerchantIds,
+      'assigned_merchant_names': assignedMerchantNames,
+      'commission_rate': commissionRate,
+      'held_stock': heldStock,
+      'last_balanced_at': lastBalancedAt?.toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+}
+
+/// Representation of a Warehouse / Distribution Center Operational Expense
+@immutable
+class AdminWarehouseExpense {
+  final String id;
+  final String warehouseId;
+  final String warehouseName;
+  final String title;
+  final String category; // 'diesel_generator', 'facility_rent', 'packaging_materials', 'vehicle_fleet', 'security_utilities', 'other'
+  final double amount;
+  final String recordedBy;
+  final DateTime recordedAt;
+  final String status; // 'approved', 'pending_audit', 'reimbursed'
+  final String receiptNumber;
+  final String notes;
+
+  const AdminWarehouseExpense({
+    required this.id,
+    required this.warehouseId,
+    required this.warehouseName,
+    required this.title,
+    required this.category,
+    required this.amount,
+    required this.recordedBy,
+    required this.recordedAt,
+    this.status = 'approved',
+    this.receiptNumber = '',
+    this.notes = '',
+  });
+
+  String get categoryLabel {
+    switch (category) {
+      case 'diesel_generator':
+        return 'Diesel & Power';
+      case 'facility_rent':
+        return 'Facility & Rent';
+      case 'packaging_materials':
+        return 'Packaging & Boxes';
+      case 'vehicle_fleet':
+        return 'Fleet & Maintenance';
+      case 'security_utilities':
+        return 'Security & Utilities';
+      default:
+        return 'Operational Expense';
+    }
+  }
+
+  AdminWarehouseExpense copyWith({
+    String? id,
+    String? warehouseId,
+    String? warehouseName,
+    String? title,
+    String? category,
+    double? amount,
+    String? recordedBy,
+    DateTime? recordedAt,
+    String? status,
+    String? receiptNumber,
+    String? notes,
+  }) {
+    return AdminWarehouseExpense(
+      id: id ?? this.id,
+      warehouseId: warehouseId ?? this.warehouseId,
+      warehouseName: warehouseName ?? this.warehouseName,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      recordedBy: recordedBy ?? this.recordedBy,
+      recordedAt: recordedAt ?? this.recordedAt,
+      status: status ?? this.status,
+      receiptNumber: receiptNumber ?? this.receiptNumber,
+      notes: notes ?? this.notes,
+    );
+  }
+
+  factory AdminWarehouseExpense.fromJson(Map<String, dynamic> json) {
+    return AdminWarehouseExpense(
+      id: json['id']?.toString() ?? '',
+      warehouseId: json['warehouse_id']?.toString() ?? '',
+      warehouseName: json['warehouse_name']?.toString() ?? 'Distribution Center',
+      title: json['title']?.toString() ?? 'Operational Expense',
+      category: json['category']?.toString() ?? 'other',
+      amount: double.tryParse(json['amount']?.toString() ?? '') ?? 0.0,
+      recordedBy: json['recorded_by']?.toString() ?? 'Station Admin',
+      recordedAt: json['recorded_at'] != null ? DateTime.tryParse(json['recorded_at'].toString()) ?? DateTime.now() : DateTime.now(),
+      status: json['status']?.toString() ?? 'approved',
+      receiptNumber: json['receipt_number']?.toString() ?? '',
+      notes: json['notes']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'warehouse_id': warehouseId,
+      'warehouse_name': warehouseName,
+      'title': title,
+      'category': category,
+      'amount': amount,
+      'recorded_by': recordedBy,
+      'recorded_at': recordedAt.toIso8601String(),
+      'status': status,
+      'receipt_number': receiptNumber,
+      'notes': notes,
+    };
+  }
+}
+
+/// Representation of Cross-Hub Live Inventory for Platform Admin oversight
+@immutable
+class AdminGlobalStockItem {
+  final String id;
+  final String productId;
+  final String productName;
+  final String sku;
+  final String merchantId;
+  final String merchantName;
+  final double unitPrice;
+  final int totalWarehouseStock;
+  final int totalRiderCustodyStock;
+  final int totalStock;
+  final int lowStockDcCount;
+  final Map<String, int> dcStockBreakdown; // e.g. {'Abuja Central DC': 450, 'Lagos Grand Hub': 920}
+  final Map<String, int> agentStockBreakdown; // e.g. {'NovaXpress Logistics': 35, 'GIG Logistics': 150}
+
+  const AdminGlobalStockItem({
+    required this.id,
+    required this.productId,
+    required this.productName,
+    required this.sku,
+    required this.merchantId,
+    required this.merchantName,
+    required this.unitPrice,
+    required this.totalWarehouseStock,
+    required this.totalRiderCustodyStock,
+    required this.totalStock,
+    this.lowStockDcCount = 0,
+    this.dcStockBreakdown = const {},
+    this.agentStockBreakdown = const {},
+  });
+
+  AdminGlobalStockItem copyWith({
+    String? id,
+    String? productId,
+    String? productName,
+    String? sku,
+    String? merchantId,
+    String? merchantName,
+    double? unitPrice,
+    int? totalWarehouseStock,
+    int? totalRiderCustodyStock,
+    int? totalStock,
+    int? lowStockDcCount,
+    Map<String, int>? dcStockBreakdown,
+    Map<String, int>? agentStockBreakdown,
+  }) {
+    return AdminGlobalStockItem(
+      id: id ?? this.id,
+      productId: productId ?? this.productId,
+      productName: productName ?? this.productName,
+      sku: sku ?? this.sku,
+      merchantId: merchantId ?? this.merchantId,
+      merchantName: merchantName ?? this.merchantName,
+      unitPrice: unitPrice ?? this.unitPrice,
+      totalWarehouseStock: totalWarehouseStock ?? this.totalWarehouseStock,
+      totalRiderCustodyStock: totalRiderCustodyStock ?? this.totalRiderCustodyStock,
+      totalStock: totalStock ?? this.totalStock,
+      lowStockDcCount: lowStockDcCount ?? this.lowStockDcCount,
+      dcStockBreakdown: dcStockBreakdown ?? this.dcStockBreakdown,
+      agentStockBreakdown: agentStockBreakdown ?? this.agentStockBreakdown,
+    );
+  }
+
+  factory AdminGlobalStockItem.fromJson(Map<String, dynamic> json) {
+    Map<String, int> dcMap = {};
+    if (json['dc_stock_breakdown'] is Map) {
+      (json['dc_stock_breakdown'] as Map).forEach((k, v) {
+        dcMap[k.toString()] = int.tryParse(v.toString()) ?? 0;
+      });
+    }
+    Map<String, int> agentMap = {};
+    if (json['agent_stock_breakdown'] is Map) {
+      (json['agent_stock_breakdown'] as Map).forEach((k, v) {
+        agentMap[k.toString()] = int.tryParse(v.toString()) ?? 0;
+      });
+    }
+
+    return AdminGlobalStockItem(
+      id: json['id']?.toString() ?? '',
+      productId: json['product_id']?.toString() ?? '',
+      productName: json['product_name']?.toString() ?? '',
+      sku: json['sku']?.toString() ?? '',
+      merchantId: json['merchant_id']?.toString() ?? '',
+      merchantName: json['merchant_name']?.toString() ?? '',
+      unitPrice: double.tryParse(json['unit_price']?.toString() ?? '') ?? 0.0,
+      totalWarehouseStock: int.tryParse(json['total_warehouse_stock']?.toString() ?? '') ?? 0,
+      totalRiderCustodyStock: int.tryParse(json['total_rider_custody_stock']?.toString() ?? '') ?? 0,
+      totalStock: int.tryParse(json['total_stock']?.toString() ?? '') ?? 0,
+      lowStockDcCount: int.tryParse(json['low_stock_dc_count']?.toString() ?? '') ?? 0,
+      dcStockBreakdown: dcMap,
+      agentStockBreakdown: agentMap,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'product_id': productId,
+      'product_name': productName,
+      'sku': sku,
+      'merchant_id': merchantId,
+      'merchant_name': merchantName,
+      'unit_price': unitPrice,
+      'total_warehouse_stock': totalWarehouseStock,
+      'total_rider_custody_stock': totalRiderCustodyStock,
+      'total_stock': totalStock,
+      'low_stock_dc_count': lowStockDcCount,
+      'dc_stock_breakdown': dcStockBreakdown,
+      'agent_stock_breakdown': agentStockBreakdown,
+    };
+  }
+}
+
+/// Custodian Type for multi-hub stock representation (Agents & DC Shelves)
+enum AdminStockHolderType {
+  dcShelf,
+  internalFleet,
+  external3pl,
+  distributorAgent,
+  riderAgent,
+}
+
+/// Row representation for Multi-Hub Stock DataTable:
+/// Agents and Warehouse Shelves in ROWS, Products in COLUMNS
+@immutable
+class AdminStockHolderRow {
+  final String id;
+  final String name;
+  final String code;
+  final AdminStockHolderType type;
+  final String hubName;
+  final String hubId;
+  final List<String> assignedMerchantIds;
+  final List<String> assignedMerchantNames;
+  final String contactPerson;
+  final String phone;
+  final Map<String, int> productQuantities; // key: SKU -> quantity held
+  final int totalUnits;
+  final double totalValueNaira;
+  final String status;
+  final DateTime? lastBalancedAt;
+  final AdminLogisticsAgent? agentRef;
+  final AdminDistributionCenter? dcRef;
+
+  const AdminStockHolderRow({
+    required this.id,
+    required this.name,
+    required this.code,
+    required this.type,
+    required this.hubName,
+    required this.hubId,
+    this.assignedMerchantIds = const [],
+    this.assignedMerchantNames = const [],
+    this.contactPerson = '',
+    this.phone = '',
+    this.productQuantities = const {},
+    required this.totalUnits,
+    required this.totalValueNaira,
+    this.status = 'active',
+    this.lastBalancedAt,
+    this.agentRef,
+    this.dcRef,
+  });
+
+  bool get isDcShelf => type == AdminStockHolderType.dcShelf;
+  bool get isInternalFleet => type == AdminStockHolderType.internalFleet;
+  bool get is3pl => type == AdminStockHolderType.external3pl;
+
+  String get typeLabel {
+    switch (type) {
+      case AdminStockHolderType.dcShelf:
+        return 'Warehouse Shelf';
+      case AdminStockHolderType.internalFleet:
+        return 'Internal Fleet';
+      case AdminStockHolderType.external3pl:
+        return '3PL Partner';
+      case AdminStockHolderType.distributorAgent:
+        return 'Regional Distributor';
+      case AdminStockHolderType.riderAgent:
+        return 'Courier Agent';
+    }
+  }
+
+  int quantityForSku(String sku) {
+    if (productQuantities.containsKey(sku)) {
+      return productQuantities[sku]!;
+    }
+    final normalized = sku.toLowerCase().trim();
+    for (final e in productQuantities.entries) {
+      if (e.key.toLowerCase().trim() == normalized) {
+        return e.value;
+      }
+    }
+    return 0;
+  }
+}
+
+/// Representation of 10:00 PM Daily Settlement & Reconciliation Record
+@immutable
+class AdminSettlementReconciliation {
+  final String id;
+  final DateTime date;
+  final double totalGrossCodCollected;
+  final double totalCourierDeliveryFees;
+  final double totalFuelAllowances;
+  final double totalPlatformCommissions;
+  final double totalNetMerchantPayout;
+  final int totalOrdersSettled;
+  final int participatingAgentsCount;
+  final int participatingMerchantsCount;
+  final String status; // 'awaiting_cutoff' | 'settled' | 'processing'
+  final DateTime? settledAt;
+
+  const AdminSettlementReconciliation({
+    required this.id,
+    required this.date,
+    required this.totalGrossCodCollected,
+    required this.totalCourierDeliveryFees,
+    required this.totalFuelAllowances,
+    required this.totalPlatformCommissions,
+    required this.totalNetMerchantPayout,
+    required this.totalOrdersSettled,
+    required this.participatingAgentsCount,
+    required this.participatingMerchantsCount,
+    this.status = 'awaiting_cutoff',
+    this.settledAt,
+  });
+
+  bool get isSettled => status == 'settled';
+
+  AdminSettlementReconciliation copyWith({
+    String? id,
+    DateTime? date,
+    double? totalGrossCodCollected,
+    double? totalCourierDeliveryFees,
+    double? totalFuelAllowances,
+    double? totalPlatformCommissions,
+    double? totalNetMerchantPayout,
+    int? totalOrdersSettled,
+    int? participatingAgentsCount,
+    int? participatingMerchantsCount,
+    String? status,
+    DateTime? settledAt,
+  }) {
+    return AdminSettlementReconciliation(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      totalGrossCodCollected: totalGrossCodCollected ?? this.totalGrossCodCollected,
+      totalCourierDeliveryFees: totalCourierDeliveryFees ?? this.totalCourierDeliveryFees,
+      totalFuelAllowances: totalFuelAllowances ?? this.totalFuelAllowances,
+      totalPlatformCommissions: totalPlatformCommissions ?? this.totalPlatformCommissions,
+      totalNetMerchantPayout: totalNetMerchantPayout ?? this.totalNetMerchantPayout,
+      totalOrdersSettled: totalOrdersSettled ?? this.totalOrdersSettled,
+      participatingAgentsCount: participatingAgentsCount ?? this.participatingAgentsCount,
+      participatingMerchantsCount: participatingMerchantsCount ?? this.participatingMerchantsCount,
+      status: status ?? this.status,
+      settledAt: settledAt ?? this.settledAt,
+    );
+  }
+
+  factory AdminSettlementReconciliation.fromJson(Map<String, dynamic> json) {
+    return AdminSettlementReconciliation(
+      id: json['id']?.toString() ?? '',
+      date: json['date'] != null ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now() : DateTime.now(),
+      totalGrossCodCollected: double.tryParse(json['total_gross_cod_collected']?.toString() ?? '') ?? 0.0,
+      totalCourierDeliveryFees: double.tryParse(json['total_courier_delivery_fees']?.toString() ?? '') ?? 0.0,
+      totalFuelAllowances: double.tryParse(json['total_fuel_allowances']?.toString() ?? '') ?? 0.0,
+      totalPlatformCommissions: double.tryParse(json['total_platform_commissions']?.toString() ?? '') ?? 0.0,
+      totalNetMerchantPayout: double.tryParse(json['total_net_merchant_payout']?.toString() ?? '') ?? 0.0,
+      totalOrdersSettled: int.tryParse(json['total_orders_settled']?.toString() ?? '') ?? 0,
+      participatingAgentsCount: int.tryParse(json['participating_agents_count']?.toString() ?? '') ?? 0,
+      participatingMerchantsCount: int.tryParse(json['participating_merchants_count']?.toString() ?? '') ?? 0,
+      status: json['status']?.toString() ?? 'awaiting_cutoff',
+      settledAt: json['settled_at'] != null ? DateTime.tryParse(json['settled_at'].toString()) : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'date': date.toIso8601String(),
+      'total_gross_cod_collected': totalGrossCodCollected,
+      'total_courier_delivery_fees': totalCourierDeliveryFees,
+      'total_fuel_allowances': totalFuelAllowances,
+      'total_platform_commissions': totalPlatformCommissions,
+      'total_net_merchant_payout': totalNetMerchantPayout,
+      'total_orders_settled': totalOrdersSettled,
+      'participating_agents_count': participatingAgentsCount,
+      'participating_merchants_count': participatingMerchantsCount,
+      'status': status,
+      'settled_at': settledAt?.toIso8601String(),
+    };
+  }
 }

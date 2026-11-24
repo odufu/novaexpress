@@ -102,12 +102,21 @@ class UserEntity {
   bool get isDeliveryAgent => isRider;
   bool get isPda => isRider && personnelType == 'pda';
   bool get isInHouseRider => isRider && personnelType == 'in_house_rider';
-  bool get isSuperAdmin =>
+  bool get isPlatformAdmin =>
       role == 'super_admin' ||
       role == 'admin' ||
       role == 'platform_admin' ||
-      role == 'system_admin';
-  bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || isSuperAdmin;
+      role == 'system_admin' ||
+      role == 'novaxpress_admin';
+  bool get isLogisticsAdmin =>
+      role == 'logistics_admin' ||
+      role == 'nova_logistics_admin' ||
+      role == 'logistics_director' ||
+      role == 'logistics_manager' ||
+      role == 'fleet_director' ||
+      role == 'dc_admin';
+  bool get isSuperAdmin => isPlatformAdmin;
+  bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || isSuperAdmin || isLogisticsAdmin;
   bool get isDcOrdersAdmin =>
       role == 'dc_operations' ||
       role == 'operations_officer' ||
@@ -148,18 +157,38 @@ class UserEntity {
       role == 'supervisor_marketer';
   bool get isMarketer => isMarketerRaw || isMarketerSupervisor;
   bool get isClientAdmin => role == 'client' || role == 'merchant' || role == 'seller';
+  bool get isLogisticsPartner =>
+      role == 'logistics_partner' ||
+      role == 'logistics_company' ||
+      role == '3pl_partner';
   bool get isMerchantAccountant =>
       role == 'merchant_accountant' ||
       role == 'client_accountant' ||
       role == 'client_finance' ||
       role == 'merchant_finance';
-  bool get isClient => isClientAdmin || isCloser || isMarketer || isMerchantAccountant;
+  bool get isNovaXpressStockKeeper =>
+      role == 'novaxpress_stock_keeper' ||
+      role == 'warehouse_stock_keeper' ||
+      role == 'master_stock_keeper' ||
+      role == 'platform_stock_keeper' ||
+      role == 'master_stock_controller';
+  bool get isMerchantInventoryOfficer =>
+      role == 'merchant_inventory_officer' ||
+      role == 'client_inventory_officer' ||
+      role == 'merchant_stock_keeper' ||
+      role == 'client_stock_keeper' ||
+      role == 'merchant_inventory' ||
+      role == 'client_inventory';
+  bool get isClient => isClientAdmin || isCloser || isMarketer || isMerchantAccountant || isMerchantInventoryOfficer;
 
   String get roleDescription {
-    if (isSuperAdmin) return 'Super Administrator';
+    if (isNovaXpressStockKeeper) return 'NovaXpress Master Stock Keeper';
+    if (isLogisticsAdmin) return 'NovaXpress Logistics Admin';
+    if (isPlatformAdmin) return 'NovaXpress Platform Admin';
     if (isCloserSupervisor) return 'Merchant Sales Rep Supervisor';
     if (isGeneralAccountant) return 'General Accountant';
     if (isMerchantAccountant) return 'Merchant Finance Accountant';
+    if (isMerchantInventoryOfficer) return 'Merchant Inventory Officer';
     if (isDcManager) return 'DC Operations Supervisor';
     if (isDcStockAdmin) return 'DC Stock Management Officer';
     if (isDcFinanceAdmin) return 'DC Finance & Remittance Officer';
@@ -167,6 +196,7 @@ class UserEntity {
     if (isCloser) return 'Telesales Closer';
     if (isMarketerSupervisor) return 'Marketing Supervisor';
     if (isMarketer) return 'Digital Marketer';
+    if (isLogisticsPartner) return '3PL Logistics Partner';
     if (isClientAdmin) return 'E-Commerce Merchant Admin';
     if (isRider) return 'Field Delivery Agent (PDA)';
     return 'User';
@@ -174,16 +204,20 @@ class UserEntity {
 
   /// Canonical console route strictly governed by the user's operational role
   String get homeConsoleRoute {
-    if (isSuperAdmin) return '/admin';
+    if (isNovaXpressStockKeeper) return '/master-stock-ops';
+    if (isLogisticsAdmin) return '/logistics-admin';
+    if (isPlatformAdmin) return '/admin';
     if (isCloserSupervisor) return '/sales-supervisor';
     if (isGeneralAccountant) return '/accountant';
     if (isMerchantAccountant) return '/merchant-settlements';
+    if (isMerchantInventoryOfficer) return '/merchant-inventory';
     if (isDcManager) return '/dc';
     if (isDcStockAdmin) return '/stock-ops';
     if (isDcFinanceAdmin) return '/finance-ops';
     if (isDcOrdersAdmin) return '/ops';
     if (isCloser) return '/closer';
     if (isMarketer) return '/marketer';
+    if (isLogisticsPartner) return '/logistics-partner';
     if (isClientAdmin) return '/client';
     if (isRider) return '/';
     return '/login';

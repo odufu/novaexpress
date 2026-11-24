@@ -1063,7 +1063,10 @@ class _RiderDutyStatusBanner extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           isAvailable ? "YOU'RE ONLINE" : "YOU'RE OFF-DUTY",
@@ -1076,7 +1079,6 @@ class _RiderDutyStatusBanner extends StatelessWidget {
                                 : (isDark ? Colors.white : const Color(0xFF334155)),
                           ),
                         ),
-                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(

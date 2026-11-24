@@ -546,6 +546,64 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
 
+          // DUAL CONSOLE TOGGLE: Warehouse Console <-> DC Logistics Console
+          if (!isCompact) ...[
+            Container(
+              height: 36,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: () => context.go('/admin'),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warehouse_outlined, size: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Warehouse Console',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF97316),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.local_shipping_rounded, size: 14, color: Colors.white),
+                        const SizedBox(width: 5),
+                        Text(
+                          'DC Logistics Console',
+                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+
           // Distribution Center Selector or Locked Station Indicator
           Builder(
             builder: (context) {
@@ -651,7 +709,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                             const Icon(Icons.public_rounded, size: 15, color: Color(0xFF38BDF8)),
                             const SizedBox(width: 6),
                             Text(
-                              isVeryCompact ? 'All' : (isCompact ? 'All DCs' : '🌐 Cumulative Network (All DCs)'),
+                              isVeryCompact ? 'All' : (isCompact ? 'All DCs' : '🌐 All Regions (Overall Control)'),
                               style: GoogleFonts.inter(
                                 fontSize: isVeryCompact ? 10.5 : (isCompact ? 11 : 12),
                                 fontWeight: FontWeight.bold,

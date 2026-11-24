@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/supabase_constants.dart';
@@ -11,6 +12,8 @@ import '../../../../core/helpers/formatters.dart';
 import '../../../../core/helpers/map_launcher_helper.dart';
 import '../../../../core/widgets/signature_pad_modal.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/domain/entities/stock_item.dart';
@@ -18,6 +21,7 @@ import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import 'dc_assign_order_modal.dart';
+import 'mark_order_delivered_modal.dart';
 import '../../../orders/presentation/widgets/order_product_switch_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
@@ -1119,6 +1123,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
   // Card 3: Custody Holder & Courier Allocation
   Widget _buildHolderAndRiderSection(bool isDark, DCFleetDriver? assignedDriver, List<DCFleetDriver> allDrivers) {
     final hasRider = assignedDriver != null && _currentOrder.deliveryAgentId != null && _currentOrder.deliveryAgentId!.isNotEmpty;
+    final isExtCourier = hasRider && (assignedDriver.isExternalPda || (_currentOrder.deliveryAgentCode?.toUpperCase().startsWith('EXT-') ?? false));
     final riderAvatar = (_loadedRiderAvatar != null && _loadedRiderAvatar!.isNotEmpty)
         ? _loadedRiderAvatar
         : (assignedDriver?.avatarUrl.isNotEmpty == true ? assignedDriver!.avatarUrl : null);
@@ -1132,81 +1137,112 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
         style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
       ),
       child: hasRider
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Circular Avatar with DP or Initials fallback
-                UserAvatarWidget(
-                  avatarUrl: riderAvatar,
-                  fullName: assignedDriver.name.isNotEmpty
-                      ? assignedDriver.name
-                      : (_currentOrder.deliveryAgentName ?? 'Rider'),
-                  radius: 20,
-                  backgroundColor: const Color(0xFFDBEAFE),
-                  textColor: const Color(0xFF2563EB),
-                  showBorder: true,
-                  borderColor: const Color(0xFFBFDBFE),
-                  borderWidth: 1.5,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Circular Avatar with DP or Initials fallback
+                    UserAvatarWidget(
+                      avatarUrl: riderAvatar,
+                      fullName: assignedDriver.name.isNotEmpty
+                          ? assignedDriver.name
+                          : (_currentOrder.deliveryAgentName ?? 'Rider'),
+                      radius: 20,
+                      backgroundColor: const Color(0xFFDBEAFE),
+                      textColor: const Color(0xFF2563EB),
+                      showBorder: true,
+                      borderColor: const Color(0xFFBFDBFE),
+                      borderWidth: 1.5,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(
-                              assignedDriver.name,
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13.5,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  assignedDriver.name,
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isExtCourier
+                                      ? const Color(0xFFD97706).withValues(alpha: 0.14)
+                                      : const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: isExtCourier
+                                        ? const Color(0xFFD97706).withValues(alpha: 0.35)
+                                        : const Color(0xFFBFDBFE),
+                                  ),
+                                ),
+                                child: Text(
+                                  assignedDriver.driverCode,
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isExtCourier ? const Color(0xFFD97706) : const Color(0xFF2563EB),
+                                  ),
+                                ),
+                              ),
+                              if (isExtCourier) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'OFFLINE COURIER',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFFD97706),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: const Color(0xFFBFDBFE)),
-                            ),
-                            child: Text(
-                              assignedDriver.driverCode,
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF2563EB),
-                              ),
-                            ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Vehicle: ${assignedDriver.vehiclePlate.isNotEmpty ? assignedDriver.vehiclePlate : assignedDriver.vehicleType} • Ph: ${assignedDriver.phone}',
+                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Motorbike: ${assignedDriver.vehiclePlate} • Ph: ${assignedDriver.phone}',
-                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (!_currentOrder.isDelivered && !_currentOrder.isCancelled)
-                  OutlinedButton.icon(
-                    onPressed: () => _openAssignModal(context),
-                    icon: const Icon(Icons.swap_horiz_rounded, size: 14),
-                    label: const Text('Reassign', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    if (!_currentOrder.isDelivered && !_currentOrder.isCancelled)
+                      OutlinedButton.icon(
+                        onPressed: () => _openAssignModal(context),
+                        icon: const Icon(Icons.swap_horiz_rounded, size: 14),
+                        label: const Text('Reassign', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                  ],
+                ),
+                if (isExtCourier)
+                  _buildExternalPdaStatusLogSection(context, isDark, assignedDriver),
               ],
             )
           : Container(
@@ -1243,6 +1279,292 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                 ],
               ),
             ),
+    );
+  }
+
+  // External PDA Delivery Status Management Panel
+  Widget _buildExternalPdaStatusLogSection(
+    BuildContext context,
+    bool isDark,
+    DCFleetDriver driver,
+  ) {
+    final order = _currentOrder;
+    final isDelivered = order.isDelivered;
+    final isCancelled = order.isCancelled;
+    final isInTransit = order.status == 'in_transit';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0xFFD97706).withValues(alpha: isDark ? 0.35 : 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.edit_note_rounded, size: 16, color: Color(0xFFD97706)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Dispatch Ops • External Courier Delivery Log',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFFD97706),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isDelivered
+                      ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                      : (isInTransit
+                          ? const Color(0xFF2563EB).withValues(alpha: 0.15)
+                          : const Color(0xFFD97706).withValues(alpha: 0.15)),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isDelivered
+                      ? 'DELIVERED'
+                      : (isInTransit ? 'OUT FOR DELIVERY' : 'ASSIGNED TO COURIER'),
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDelivered
+                        ? const Color(0xFF059669)
+                        : (isInTransit ? const Color(0xFF2563EB) : const Color(0xFFD97706)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Since this courier operates offline without the app, update order fulfillment status below:',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (!isDelivered && !isCancelled && !isInTransit)
+                ElevatedButton.icon(
+                  onPressed: () => _markExternalPdaInTransit(context, driver),
+                  icon: const Icon(Icons.local_shipping_outlined, size: 14, color: Colors.white),
+                  label: const Text(
+                    'Mark Out for Delivery',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    elevation: 0,
+                  ),
+                ),
+              if (!isDelivered && !isCancelled)
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final delivered = await MarkOrderDeliveredModal.show(context, order);
+                    if (delivered == true && mounted) {
+                      setState(() {});
+                    }
+                  },
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.white),
+                  label: const Text(
+                    'Log Delivered (POD)',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    elevation: 0,
+                  ),
+                ),
+              if (!isDelivered && !isCancelled)
+                OutlinedButton.icon(
+                  onPressed: () => _showExternalPdaAttemptModal(context, driver),
+                  icon: const Icon(Icons.history_rounded, size: 14, color: Color(0xFFD97706)),
+                  label: const Text(
+                    'Log Attempt / Reschedule',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD97706)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFD97706)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _markExternalPdaInTransit(
+    BuildContext context,
+    DCFleetDriver driver,
+  ) async {
+    final authUser = ref.read(authProvider).user;
+    final actor = authUser?.fullName.isNotEmpty == true
+        ? authUser!.fullName
+        : (authUser?.roleDescription ?? 'Dispatch Ops');
+    final nowStr = DateFormat('hh:mm a, dd MMM yyyy').format(DateTime.now());
+    final tag = '[EXTERNAL PDA DISPATCH: Out for delivery with ${driver.name} (${driver.driverCode}) logged by $actor at $nowStr]';
+    final currentNotes = _currentOrder.deliveryNotes?.trim() ?? '';
+    final combinedNotes = currentNotes.isNotEmpty ? '$currentNotes $tag' : tag;
+
+    final messenger = ScaffoldMessenger.of(context);
+    await ref.read(ordersProvider.notifier).updateOrderStatus(
+      _currentOrder.id,
+      'in_transit',
+      notes: combinedNotes,
+    );
+
+    if (mounted) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('🚚 Order #${_currentOrder.orderNumber} marked Out for Delivery with ${driver.name}.'),
+          backgroundColor: const Color(0xFF2563EB),
+        ),
+      );
+      setState(() {});
+    }
+  }
+
+  void _showExternalPdaAttemptModal(
+    BuildContext context,
+    DCFleetDriver driver,
+  ) {
+    String selectedReason = 'Customer phone unreachable / switched off';
+    final notesController = TextEditingController();
+    DateTime rescheduleDate = DateTime.now().add(const Duration(days: 1));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(
+            'Log Delivery Attempt • External PDA',
+            style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Courier: ${driver.name} (${driver.driverCode})',
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 12),
+                const Text('Outcome / Delay Reason *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: selectedReason,
+                  isExpanded: true,
+                  items: const [
+                    DropdownMenuItem(value: 'Customer phone unreachable / switched off', child: Text('Customer phone unreachable / switched off', style: TextStyle(fontSize: 12))),
+                    DropdownMenuItem(value: 'Customer requested reschedule date', child: Text('Customer requested reschedule date', style: TextStyle(fontSize: 12))),
+                    DropdownMenuItem(value: 'Customer not at delivery address', child: Text('Customer not at delivery address', style: TextStyle(fontSize: 12))),
+                    DropdownMenuItem(value: 'Customer requested callback tomorrow', child: Text('Customer requested callback tomorrow', style: TextStyle(fontSize: 12))),
+                    DropdownMenuItem(value: 'Customer cancelled order at door', child: Text('Customer cancelled order at door', style: TextStyle(fontSize: 12))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedReason = val);
+                  },
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Proposed Reschedule Date', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: rescheduleDate,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 60)),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => rescheduleDate = picked);
+                    }
+                  },
+                  icon: const Icon(Icons.calendar_today_rounded, size: 14),
+                  label: Text(DateFormat('EEE, dd MMM yyyy').format(rescheduleDate), style: const TextStyle(fontSize: 12)),
+                ),
+                const SizedBox(height: 12),
+                const Text('Dispatcher Callback Notes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: notesController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Courier reported customer is at work, deliver after 5pm.',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.all(10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                final authUser = ref.read(authProvider).user;
+                final actor = authUser?.fullName.isNotEmpty == true ? authUser!.fullName : 'Dispatch Ops';
+                final dateStr = DateFormat('dd MMM yyyy').format(rescheduleDate);
+                final extraNote = notesController.text.trim();
+                final logTag = '[ATTEMPT LOG: $selectedReason • Reschedule: $dateStr • Note: ${extraNote.isNotEmpty ? extraNote : "None"} • Logged by $actor]';
+                final currentNotes = _currentOrder.deliveryNotes?.trim() ?? '';
+                final combined = currentNotes.isNotEmpty ? '$currentNotes $logTag' : logTag;
+
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(ctx);
+                await ref.read(ordersProvider.notifier).updateOrderStatus(
+                  _currentOrder.id,
+                  selectedReason.contains('cancelled') ? 'cancelled' : 'rescheduled',
+                  notes: combined,
+                );
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('📝 Attempt logged for Order #${_currentOrder.orderNumber}.'),
+                      backgroundColor: const Color(0xFFD97706),
+                    ),
+                  );
+                  setState(() {});
+                }
+              },
+              child: const Text('Save Log'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1390,10 +1712,14 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                   ],
                 ),
               ),
-              if (_currentOrder.isUnremitted) ...[
+              if (_currentOrder.isUnremitted &&
+                  (ref.watch(authProvider).user == null ||
+                      ref.watch(authProvider).user!.isDcFinanceAdmin ||
+                      ref.watch(authProvider).user!.isGeneralAccountant ||
+                      ref.watch(authProvider).user!.isDcManager)) ...[
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
-                  onPressed: () => _markOrderAsRemitted(context),
+                  onPressed: () => _markOrderAsRemitted(context, assignedDriver),
                   icon: const Icon(Icons.check_circle_outline_rounded, size: 13, color: Colors.white),
                   label: const Text('Mark Remitted / Cleared', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
@@ -1764,6 +2090,12 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
 
   // Sticky Bottom Action Bar
   Widget _buildFooterActions(BuildContext context, bool isDark, DCFleetDriver? assignedDriver, List<DCFleetDriver> allDrivers) {
+    final authUser = ref.watch(authProvider).user;
+    final canDispatchDeliver = authUser != null &&
+        (authUser.isDcOrdersAdmin || authUser.isDcManager) &&
+        !_currentOrder.isDelivered &&
+        !_currentOrder.isCancelled;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -1783,7 +2115,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
               onPressed: () => _printWaybillManifest(context),
               icon: const Icon(Icons.print_outlined, size: 16),
               label: const Text(
-                'Print Manifest / Waybill',
+                'Print Manifest',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1795,36 +2127,68 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          // Right: Primary Action Button (Dispatch, Assign, or Confirm Status)
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () {
-                if (_currentOrder.isUnassigned) {
-                  _openAssignModal(context);
-                } else {
-                  _printWaybillManifest(context);
-                }
-              },
-              icon: Icon(
-                _currentOrder.isUnassigned ? Icons.person_add_alt_1_rounded : Icons.check_circle_outline_rounded,
-                size: 16,
-                color: Colors.white,
-              ),
-              label: Text(
-                _currentOrder.isUnassigned ? 'Dispatch / Assign Rider' : 'Confirm Status / Dispatch',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _currentOrder.isUnassigned ? const Color(0xFFF37021) : const Color(0xFF2563EB),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
+          if (_currentOrder.isUnassigned) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _openAssignModal(context),
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 16, color: Colors.white),
+                label: const Text(
+                  'Dispatch / Assign Rider',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF37021),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
               ),
             ),
-          ),
+          ],
+          if (canDispatchDeliver) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => MarkOrderDeliveredModal.show(context, _currentOrder),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 16, color: Colors.white),
+                label: const Text(
+                  'Mark Delivered',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ] else if (!_currentOrder.isUnassigned) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _printWaybillManifest(context),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 16, color: Colors.white),
+                label: Text(
+                  _currentOrder.isDelivered ? 'Delivered ✓' : 'Confirm Waybill',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2065,22 +2429,238 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     );
   }
 
-  void _markOrderAsRemitted(BuildContext context) async {
+  Future<void> _markOrderAsRemitted(
+    BuildContext context,
+    DCFleetDriver? assignedDriver,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
     final order = _currentOrder;
-    final refCode = 'RMT-REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    final authUser = ref.read(authProvider).user;
 
-    await ref.read(ordersProvider.notifier).updateOrderRemittance(
-      orderId: order.id,
-      remittanceStatus: 'cleared',
-      remittanceReference: refCode,
-    );
+    if (authUser != null &&
+        !authUser.isDcFinanceAdmin &&
+        !authUser.isGeneralAccountant &&
+        !authUser.isDcManager) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Permission denied: Only Finance Operations, General Accountant, or DC Manager can clear remittances.',
+          ),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
 
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text('✅ Order ${order.orderNumber} remittance marked as CLEARED & RECONCILED! (Ref: $refCode)'),
-        backgroundColor: const Color(0xFF10B981),
-      ),
-    );
+    if (authUser == null) {
+      final refCode =
+          'RMT-REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      await ref.read(ordersProvider.notifier).updateOrderRemittance(
+            orderId: order.id,
+            remittanceStatus: 'cleared',
+            remittanceReference: refCode,
+          );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '✅ Order ${order.orderNumber} remittance marked as CLEARED & RECONCILED! (Ref: $refCode)',
+          ),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+      return;
+    }
+
+    final dcState = ref.read(dcConsoleProvider);
+    final financeSettings = dcState.financeSettings;
+    final isUnassigned = order.isUnassigned || assignedDriver == null;
+    final double comm = isUnassigned
+        ? 0.0
+        : (order.agentEntitlement > 0
+            ? order.agentEntitlement
+            : (assignedDriver.commissionRate > 0
+                ? assignedDriver.commissionRate
+                : financeSettings.defaultCommissionRate));
+    final double transport = isUnassigned
+        ? 0.0
+        : (order.transportFee > 0
+            ? order.transportFee
+            : (assignedDriver.transportAllowance > 0
+                ? assignedDriver.transportAllowance
+                : financeSettings.defaultTransportAllowance));
+    final double pos = financeSettings.computePosFee(order.totalAmount);
+    final double netDue =
+        (order.totalAmount - comm - transport - pos).clamp(0.0, double.infinity);
+
+    String selectedChannel = 'cash_to_dc';
+    final refController = TextEditingController();
+    Map<String, dynamic>? result;
+    try {
+      result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            title: Text(
+              'Verify & Clear Remittance',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Directly clear cash for Order ${order.orderNumber} (${CurrencyFormatter.formatNaira(netDue)} net after deductions):',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedChannel,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Clearance Channel',
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'cash_to_dc',
+                      child: Text('Cash Handover to DC'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'bank_transfer',
+                      child: Text('Bank Transfer Verified'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'pos_deposit',
+                      child: Text('POS / Agent Settlement'),
+                    ),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDialogState(() => selectedChannel = val);
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: refController,
+                  decoration: InputDecoration(
+                    labelText: 'Reference # (Optional)',
+                    hintText: 'Auto-generated if left blank',
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(null),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop({
+                  'confirmed': true,
+                  'channel': selectedChannel,
+                  'reference': refController.text.trim(),
+                }),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text(
+                  'Confirm & Clear',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      refController.dispose();
+    }
+
+    if (result?['confirmed'] != true || !mounted) return;
+
+    final customRef = result?['reference']?.toString();
+    final channel = result?['channel']?.toString() ?? 'cash_to_dc';
+    final fallbackRef = (customRef != null && customRef.isNotEmpty)
+        ? customRef
+        : 'RMT-REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+    try {
+      final res = await ref
+          .read(financeProvider.notifier)
+          .clearUnrequestedRemittanceDirectly(
+            riderId: assignedDriver?.id ?? order.deliveryAgentId ?? '',
+            riderName:
+                assignedDriver?.name ?? order.deliveryAgentName ?? 'Direct DC Handover',
+            riderCode:
+                assignedDriver?.driverCode ?? order.deliveryAgentCode ?? 'DC-DIR',
+            netAmount: netDue,
+            grossAmount: order.totalAmount,
+            commissionDeducted: comm,
+            transportAllowanceDeducted: transport,
+            posFee: pos,
+            paymentMethod: channel,
+            referenceNumber: (customRef != null && customRef.isNotEmpty)
+                ? customRef
+                : null,
+            companyId: authUser.companyId ?? order.clientId,
+            distributionCenterId:
+                dcState.activeDcId.isNotEmpty
+                    ? dcState.activeDcId
+                    : order.distributionCenterId,
+            orders: [order],
+          );
+
+      if (res['success'] != true) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('❌ ${res['error'] ?? 'Could not clear remittance.'}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+        return;
+      }
+
+      final displayRef = res['referenceNumber']?.toString() ?? fallbackRef;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '✅ Order ${order.orderNumber} directly cleared & settled! (Ref: $displayRef)',
+          ),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+    } on NoSuchMethodError {
+      await ref.read(ordersProvider.notifier).updateOrderRemittance(
+            orderId: order.id,
+            remittanceStatus: 'cleared',
+            remittanceReference: fallbackRef,
+          );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '✅ Order ${order.orderNumber} remittance marked as CLEARED & RECONCILED! (Ref: $fallbackRef)',
+          ),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+    }
   }
 }

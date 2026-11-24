@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/audio_service.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/notifications_remote_datasource.dart';
@@ -213,6 +214,33 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       actionRoute: actionRoute,
     );
     await fetchNotifications(agentId);
+  }
+
+  Future<void> emitLocalNotification({
+    required String title,
+    required String message,
+    required NotificationCategory category,
+    String? orderId,
+    String? orderNumber,
+    String? actionRoute,
+  }) async {
+    final newNotif = AppNotificationEntity(
+      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      title: title,
+      message: message,
+      category: category,
+      createdAt: DateTime.now(),
+      isRead: false,
+      actionRoute: actionRoute ?? (orderId != null ? 'order:$orderId' : (orderNumber != null ? 'orderNumber:$orderNumber' : null)),
+      metadata: {
+        if (orderId != null) 'order_id': orderId,
+        if (orderNumber != null) 'order_number': orderNumber,
+      },
+    );
+    state = state.copyWith(notifications: [newNotif, ...state.notifications]);
+    try {
+      AudioService().playFollowUpReminderChime();
+    } catch (_) {}
   }
 
   void setFilter(String filter) {

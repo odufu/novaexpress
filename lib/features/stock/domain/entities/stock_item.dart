@@ -250,4 +250,12 @@ class StockItemEntity {
       lastAuditDate: lastAuditDate ?? this.lastAuditDate,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StockItemEntity && id.isNotEmpty && other.id == id);
+
+  @override
+  int get hashCode => id.hashCode;
 }
