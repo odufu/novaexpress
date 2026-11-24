@@ -41,6 +41,8 @@ class _AdminUserModalState extends State<AdminUserModal> {
 
   final List<Map<String, String>> _availableRoles = const [
     {'value': 'super_admin', 'label': 'Super Administrator'},
+    {'value': 'novaxpress_stock_keeper', 'label': 'NovaXpress Stock Keeper (Central Warehouse & All Agents)'},
+    {'value': 'logistics_admin', 'label': 'Logistics Administrator (NovaXpress Logistics Fleet)'},
     {'value': 'dc_manager', 'label': 'DC Operations Supervisor'},
     {'value': 'dc_operations', 'label': 'DC Orders & Dispatch Officer'},
     {'value': 'dc_stock_admin', 'label': 'DC Stock Management Officer'},

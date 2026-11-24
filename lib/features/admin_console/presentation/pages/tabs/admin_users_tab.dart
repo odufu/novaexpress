@@ -103,6 +103,8 @@ class AdminUsersTab extends ConsumerWidget {
                 items: const [
                   DropdownMenuItem(value: 'all', child: Text('All Roles')),
                   DropdownMenuItem(value: 'super_admin', child: Text('Super Admin')),
+                  DropdownMenuItem(value: 'novaxpress_stock_keeper', child: Text('NovaXpress Stock Keeper')),
+                  DropdownMenuItem(value: 'logistics_admin', child: Text('Logistics Admin')),
                   DropdownMenuItem(value: 'dc_manager', child: Text('DC Manager')),
                   DropdownMenuItem(value: 'dc_operations', child: Text('DC Operations')),
                   DropdownMenuItem(value: 'dc_stock_admin', child: Text('DC Stock')),
@@ -349,6 +351,19 @@ class AdminUsersTab extends ConsumerWidget {
         bg = const Color(0xFF8B5CF6).withValues(alpha: 0.15);
         text = const Color(0xFF8B5CF6);
         label = 'Admin';
+        break;
+      case 'novaxpress_stock_keeper':
+      case 'warehouse_stock_keeper':
+      case 'master_stock_keeper':
+        bg = const Color(0xFF0D9488).withValues(alpha: 0.15);
+        text = const Color(0xFF0D9488);
+        label = 'Stock Keeper';
+        break;
+      case 'logistics_admin':
+      case 'nova_logistics_admin':
+        bg = const Color(0xFF2563EB).withValues(alpha: 0.15);
+        text = const Color(0xFF2563EB);
+        label = 'Logistics Admin';
         break;
       case 'dc_manager':
         bg = AppColors.orange.withValues(alpha: 0.15);
